@@ -14,48 +14,7 @@ export type Database = {
   }
   public: {
     Tables: {
-      distributor_profiles: {
-        Row: {
-          alamat_lengkap: string
-          created_at: string
-          email_pemilik: string
-          id: string
-          kontak_pemilik: string
-          kota_kabupaten: string
-          nama_bisnis: string
-          nama_pemilik: string
-          status: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          alamat_lengkap: string
-          created_at?: string
-          email_pemilik: string
-          id?: string
-          kontak_pemilik: string
-          kota_kabupaten: string
-          nama_bisnis: string
-          nama_pemilik: string
-          status?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          alamat_lengkap?: string
-          created_at?: string
-          email_pemilik?: string
-          id?: string
-          kontak_pemilik?: string
-          kota_kabupaten?: string
-          nama_bisnis?: string
-          nama_pemilik?: string
-          status?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Views: {
       [_ in never]: never
