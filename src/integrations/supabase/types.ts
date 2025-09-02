@@ -38,6 +38,10 @@ export interface Database {
           status: 'pending' | 'approved' | 'rejected'
           approved_at: string | null
           approved_by: string | null
+          email_pemilik: string | null
+          website_perusahaan: string | null
+          jumlah_karyawan: number | null
+          npwp: string | null
         }
         Insert: {
           id?: string
@@ -62,6 +66,10 @@ export interface Database {
           status?: 'pending' | 'approved' | 'rejected'
           approved_at?: string | null
           approved_by?: string | null
+          email_pemilik?: string | null
+          website_perusahaan?: string | null
+          jumlah_karyawan?: number | null
+          npwp?: string | null
         }
         Update: {
           id?: string
@@ -86,6 +94,10 @@ export interface Database {
           status?: 'pending' | 'approved' | 'rejected'
           approved_at?: string | null
           approved_by?: string | null
+          email_pemilik?: string | null
+          website_perusahaan?: string | null
+          jumlah_karyawan?: number | null
+          npwp?: string | null
         }
       }
       products: {

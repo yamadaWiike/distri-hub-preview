@@ -1,0 +1,22 @@
+/* Fix Leaflet icon display issues */
+.leaflet-default-icon-path {
+  background-image: url(https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png) !important;
+}
+
+/* Hide routing container when not needed */
+.leaflet-control-container .leaflet-routing-container-hide {
+  display: none;
+}
+
+/* Basic map container styling */
+.leaflet-container {
+  height: 400px !important;
+  width: 100% !important;
+  border-radius: 8px;
+  z-index: 1;
+}
+
+/* Make sure popups appear above other elements */
+.leaflet-popup {
+  z-index: 1000;
+}
