@@ -18,10 +18,14 @@ import {
 } from "@/components/ui/dialog";
 import MapSelector from "@/components/ui/map-selector";
 import 'leaflet/dist/leaflet.css';
+import { useLanguage } from "@/contexts/LanguageContext";
+import { translations } from "@/lib/translations";
 
 export default function Profil() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { lang } = useLanguage();
+  const t = translations[lang];
   const [form, setForm] = useState({
     // Required fields in database
     nama_bisnis: "",
@@ -150,7 +154,10 @@ export default function Profil() {
   // Detect user location
   const detectUserLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      setLocationError('Geolokasi tidak didukung oleh browser Anda');
+      setLocationError(lang === 'id' 
+        ? 'Geolokasi tidak didukung oleh browser Anda'
+        : 'Geolocation is not supported by your browser'
+      );
       return;
     }
 
@@ -169,14 +176,20 @@ export default function Profil() {
       (error) => {
         setLocationError(
           error.code === 1
-            ? 'Izin lokasi ditolak. Silakan izinkan akses lokasi.'
-            : 'Gagal mendeteksi lokasi Anda. Silakan masukkan koordinat secara manual.'
+            ? (lang === 'id'
+                ? 'Izin lokasi ditolak. Silakan izinkan akses lokasi.'
+                : 'Location permission denied. Please allow location access.'
+              )
+            : (lang === 'id'
+                ? 'Gagal mendeteksi lokasi Anda. Silakan masukkan koordinat secara manual.'
+                : 'Failed to detect your location. Please enter coordinates manually.'
+              )
         );
         setIsLocating(false);
       },
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
-  }, []);
+  }, [lang]);
 
   // Handle address found from map
   const handleAddressFound = useCallback((address: string) => {
@@ -301,7 +314,10 @@ export default function Profil() {
       }
       
       setSubmitSuccess(true);
-      toast({ title: "Berhasil", description: "Profil Anda berhasil disimpan" });
+      toast({ 
+        title: lang === 'id' ? "Berhasil" : "Success", 
+        description: lang === 'id' ? "Profil Anda berhasil disimpan" : "Your profile has been saved successfully" 
+      });
       
       // Redirect after a short delay
       setTimeout(() => {
@@ -310,8 +326,10 @@ export default function Profil() {
     } catch (error) {
       console.error('Error saving profile:', error);
       toast({ 
-        title: "Gagal", 
-        description: "Terjadi kesalahan saat menyimpan profil. Silakan coba lagi.",
+        title: lang === 'id' ? "Gagal" : "Failed", 
+        description: lang === 'id' 
+          ? "Terjadi kesalahan saat menyimpan profil. Silakan coba lagi."
+          : "An error occurred while saving your profile. Please try again.",
         variant: "destructive" 
       });
     } finally {
@@ -321,20 +339,26 @@ export default function Profil() {
 
   return (
     <div className="min-h-screen bg-background">
-      <SEO title="Lengkapi Profil | Baskit Distributor Hub" description="Lengkapi data untuk proses onboarding dan pembelian." />
+      <SEO 
+        title={lang === 'id' ? "Lengkapi Profil | Baskit Distributor Hub" : "Complete Profile | Baskit Distributor Hub"}
+        description={lang === 'id' 
+          ? "Lengkapi data untuk proses onboarding dan pembelian."
+          : "Complete your data for the onboarding and purchasing process."
+        } 
+      />
       <Navbar />
       <main className="container max-w-3xl mx-auto py-10">
-        <h1 className="text-2xl font-bold mb-6">Lengkapi Profil</h1>
+        <h1 className="text-2xl font-bold mb-6">{lang === 'id' ? "Lengkapi Profil" : "Complete Profile"}</h1>
         <form onSubmit={onSubmit} className="grid sm:grid-cols-2 gap-4">
           {isLoading && (
             <div className="sm:col-span-2 p-4 bg-muted/50 rounded-md text-center">
               <div className="inline-block h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></div>
-              <span>Memuat data profil...</span>
+              <span>{lang === 'id' ? "Memuat data profil..." : "Loading profile data..."}</span>
             </div>
           )}
           
           <div className="sm:col-span-2">
-            <h2 className="text-lg font-semibold mb-3 pb-2 border-b">Informasi Bisnis</h2>
+            <h2 className="text-lg font-semibold mb-3 pb-2 border-b">{lang === 'id' ? "Informasi Bisnis" : "Business Information"}</h2>
           </div>
           
           <div>

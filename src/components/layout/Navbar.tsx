@@ -94,7 +94,9 @@ export default function Navbar() {
                 
                 {/* Language Selector (Mobile) */}
                 <div className="border-t py-4 px-4">
-                  <div className="text-sm font-medium mb-2 text-muted-foreground">Language</div>
+                  <div className="text-sm font-medium mb-2 text-muted-foreground">
+                    {lang === 'id' ? "Bahasa" : "Language"}
+                  </div>
                   <div className="flex gap-2">
                     <Button 
                       variant="outline" 

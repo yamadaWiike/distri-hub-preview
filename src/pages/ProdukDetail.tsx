@@ -65,16 +65,28 @@ export default function ProdukDetail() {
     }
   }, [product]);
   
-  if (loading) return <div className="min-h-screen"><Navbar /><main className="container max-w-6xl mx-auto py-10">Loading...</main></div>;
+  if (loading) return <div className="min-h-screen"><Navbar /><main className="container max-w-6xl mx-auto py-10">{lang === 'id' ? "Memuat..." : "Loading..."}</main></div>;
   if (!product) return (
     <div className="min-h-screen">
-      <SEO title="Produk Tidak Ditemukan | Baskit" description="Produk yang Anda cari tidak ditemukan dalam katalog kami." />
+      <SEO 
+        title={lang === 'id' ? "Produk Tidak Ditemukan | Baskit" : "Product Not Found | Baskit"} 
+        description={lang === 'id' ? "Produk yang Anda cari tidak ditemukan dalam katalog kami." : "The product you are looking for was not found in our catalog."} 
+      />
       <Navbar />
       <main className="container max-w-6xl mx-auto py-10">
         <div className="text-center py-12">
-          <h1 className="text-2xl font-bold mb-4">Produk tidak ditemukan</h1>
-          <p className="text-muted-foreground mb-6">SKU "{id}" tidak tersedia dalam katalog kami saat ini.</p>
-          <Button variant="default" onClick={() => window.history.back()}>Kembali</Button>
+          <h1 className="text-2xl font-bold mb-4">
+            {lang === 'id' ? "Produk tidak ditemukan" : "Product not found"}
+          </h1>
+          <p className="text-muted-foreground mb-6">
+            {lang === 'id' 
+              ? `SKU "${id}" tidak tersedia dalam katalog kami saat ini.`
+              : `SKU "${id}" is not available in our current catalog.`
+            }
+          </p>
+          <Button variant="default" onClick={() => window.history.back()}>
+            {lang === 'id' ? "Kembali" : "Back"}
+          </Button>
         </div>
       </main>
     </div>
@@ -104,7 +116,9 @@ export default function ProdukDetail() {
                 className="w-full h-64 object-cover rounded-md transition-transform duration-300 group-hover:scale-[1.02]" 
               />
               <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-md">
-                <span className="bg-white/80 text-black text-xs font-medium px-2 py-1 rounded">Klik untuk memperbesar</span>
+                <span className="bg-white/80 text-black text-xs font-medium px-2 py-1 rounded">
+                  {lang === 'id' ? "Klik untuk memperbesar" : "Click to enlarge"}
+                </span>
               </div>
             </div>
             <p className="text-muted-foreground">{product.description}</p>
@@ -122,15 +136,21 @@ export default function ProdukDetail() {
           </Dialog>
           <div className="space-y-4">
             <div>
-              <div className="text-xs text-muted-foreground">Harga Konsumen (per pcs)</div>
+              <div className="text-xs text-muted-foreground">
+                {lang === 'id' ? "Harga Konsumen (per pcs)" : "Consumer Price (per pcs)"}
+              </div>
               <div className="text-lg font-medium">{formatIDR(product.consumerPrice)}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">Harga Konsumen (per karton)</div>
+              <div className="text-xs text-muted-foreground">
+                {lang === 'id' ? "Harga Konsumen (per karton)" : "Consumer Price (per box)"}
+              </div>
               <div className="text-lg font-medium">—</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">Harga Distributor</div>
+              <div className="text-xs text-muted-foreground">
+                {lang === 'id' ? "Harga Distributor" : "Distributor Price"}
+              </div>
               <div className={`text-lg font-medium ${user ? '' : 'blur-sm select-none'}`}>{formatIDR(usedPrice)}</div>
             </div>
             <div>
@@ -138,11 +158,15 @@ export default function ProdukDetail() {
               <div className="text-lg font-medium">{usedMoq} pcs</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">Stock</div>
+              <div className="text-xs text-muted-foreground">
+                {lang === 'id' ? "Stok" : "Stock"}
+              </div>
               <div className="text-lg font-medium">{product.stock || 0} pcs</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground mb-1">Area Distribusi</div>
+              <div className="text-xs text-muted-foreground mb-1">
+                {lang === 'id' ? "Area Distribusi" : "Distribution Area"}
+              </div>
               <div className="flex flex-wrap gap-2 text-sm">
                 {product.regions.map((r) => (
                   <span key={r.area} className="px-2 py-1 rounded-md border">{r.area}</span>
@@ -152,7 +176,9 @@ export default function ProdukDetail() {
             {user && (
               <div className="grid sm:grid-cols-3 gap-3 items-end">
                 <div>
-                  <label className="text-xs text-muted-foreground">Pilih Area</label>
+                  <label className="text-xs text-muted-foreground">
+                    {lang === 'id' ? "Pilih Area" : "Select Area"}
+                  </label>
                   <select
                     value={selectedArea}
                     onChange={(e) => setSelectedArea(e.target.value)}
@@ -164,7 +190,9 @@ export default function ProdukDetail() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">Kuantitas</label>
+                  <label className="text-xs text-muted-foreground">
+                    {lang === 'id' ? "Kuantitas" : "Quantity"}
+                  </label>
                   <input type="number" min={usedMoq} value={qty} onChange={(e) => setQty(parseInt(e.target.value || '0'))} className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" />
                 </div>
                 <div>
@@ -187,12 +215,14 @@ export default function ProdukDetail() {
                       // Show toast notification
                       toast({
                         title: `${product.name} ${product.size}`,
-                        description: `${qty} items added to cart`,
+                        description: lang === 'id' 
+                          ? `${qty} item ditambahkan ke keranjang` 
+                          : `${qty} items added to cart`,
                         duration: 3000,
                       });
                     }}
                   >
-                    Add to Cart
+                    {lang === 'id' ? "Tambah ke Keranjang" : "Add to Cart"}
                   </Button>
                 </div>
               </div>
@@ -200,7 +230,9 @@ export default function ProdukDetail() {
           </div>
         </section>
         <section>
-          <h2 className="text-lg font-semibold mb-2">Harga & MOQ per Area Distribusi</h2>
+          <h2 className="text-lg font-semibold mb-2">
+            {lang === 'id' ? "Harga & MOQ per Area Distribusi" : "Price & MOQ by Distribution Area"}
+          </h2>
           <div className="divide-y border rounded-lg">
             {product.regions.map((r) => (
               <div key={r.area} className="grid grid-cols-3 gap-3 p-3 text-sm">
@@ -210,7 +242,11 @@ export default function ProdukDetail() {
               </div>
             ))}
           </div>
-          {!user && <p className="text-sm text-muted-foreground mt-2">Masuk untuk melihat harga dan simulasi lengkap.</p>}
+          {!user && <p className="text-sm text-muted-foreground mt-2">
+            {lang === 'id' 
+              ? "Masuk untuk melihat harga dan simulasi lengkap." 
+              : "Login to view complete pricing and simulation."}
+          </p>}
         </section>
       </main>
     </div>

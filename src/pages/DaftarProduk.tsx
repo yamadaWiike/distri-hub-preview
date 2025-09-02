@@ -66,15 +66,21 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
           <div className="text-xs text-muted-foreground">{product.category} • {product.brand}</div>
           <h3 className="text-lg font-semibold">{product.name} — {product.size}</h3>
         </div>
-        <Link to={`/produk/${product.id}`} className="text-sm text-primary underline-offset-4 hover:underline">Pelajari Lebih Lanjut</Link>
+        <Link to={`/produk/${product.id}`} className="text-sm text-primary underline-offset-4 hover:underline">
+          {lang === 'id' ? "Pelajari Lebih Lanjut" : "Learn More"}
+        </Link>
       </header>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">Harga Konsumen</div>
+          <div className="text-xs text-muted-foreground">
+            {lang === 'id' ? "Harga Konsumen" : "Consumer Price"}
+          </div>
           <div className="text-base font-medium">{formatIDR(product.consumerPrice)}</div>
         </div>
         <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">Harga Distributor</div>
+          <div className="text-xs text-muted-foreground">
+            {lang === 'id' ? "Harga Distributor" : "Distributor Price"}
+          </div>
           {loggedIn ? (
             <div className="text-base font-medium">{formatIDR(usedPrice)}</div>
           ) : (
@@ -171,21 +177,30 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
                   // Show toast notification
                   toast({
                     title: `${product.name} ${product.size}`,
-                    description: `${qty} items added to cart`,
+                    description: lang === 'id' 
+                      ? `${qty} item ditambahkan ke keranjang` 
+                      : `${qty} items added to cart`,
                     duration: 3000,
                   });
                 }}
               >
-                Add to Cart
+                {lang === 'id' ? "Tambah ke Keranjang" : "Add to Cart"}
               </Button>
             </div>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            <div className="text-sm text-muted-foreground">Masuk untuk menggunakan simulasi dan melihat harga distributor.</div>
+            <div className="text-sm text-muted-foreground">
+              {lang === 'id' 
+                ? "Masuk untuk menggunakan simulasi dan melihat harga distributor."
+                : "Login to use simulation and view distributor prices."
+              }
+            </div>
             <div className="h-10">
               <Link to="/masuk" className="block">
-                <Button variant="hero" size="sm" className="w-full h-full">Lihat Harga</Button>
+                <Button variant="hero" size="sm" className="w-full h-full">
+                  {lang === 'id' ? "Lihat Harga" : "View Prices"}
+                </Button>
               </Link>
             </div>
           </div>
@@ -307,7 +322,9 @@ export default function DaftarProduk() {
   // Auto-detect location using useCallback to avoid recreation on each render
   const detectUserLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      setLocationError('Geolokasi tidak didukung oleh browser Anda');
+      setLocationError(lang === 'id' 
+        ? 'Geolokasi tidak didukung oleh browser Anda' 
+        : 'Geolocation is not supported by your browser');
       return;
     }
 
@@ -327,14 +344,18 @@ export default function DaftarProduk() {
       (error) => {
         setLocationError(
           error.code === 1
-            ? 'Izin lokasi ditolak. Silakan izinkan akses lokasi untuk melihat produk di area Anda.'
-            : 'Gagal mendeteksi lokasi Anda. Silakan pilih area secara manual.'
+            ? lang === 'id'
+              ? 'Izin lokasi ditolak. Silakan izinkan akses lokasi untuk melihat produk di area Anda.'
+              : 'Location permission denied. Please allow location access to see products in your area.'
+            : lang === 'id'
+              ? 'Gagal mendeteksi lokasi Anda. Silakan pilih area secara manual.'
+              : 'Failed to detect your location. Please select an area manually.'
         );
         setIsLocating(false);
       },
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
-  }, [findNearestArea, setArea]);
+  }, [findNearestArea, setArea, lang]);
 
 
 
@@ -457,7 +478,14 @@ export default function DaftarProduk() {
 
   return (
     <div className="min-h-screen bg-background">
-      <SEO title="Daftar Produk | Baskit Distributor Hub" description="Lihat katalog produk Baskit, harga konsumen, MOQ, dan harga distributor (setelah masuk)." />
+      <SEO 
+        title={lang === 'id' ? "Daftar Produk | Baskit Distributor Hub" : "Product List | Baskit Distributor Hub"} 
+        description={
+          lang === 'id' 
+            ? "Lihat katalog produk Baskit, harga konsumen, MOQ, dan harga distributor (setelah masuk)." 
+            : "View Baskit product catalog, consumer prices, MOQ, and distributor prices (after login)."
+        } 
+      />
       <Navbar />
       <main className="container max-w-6xl mx-auto py-8 space-y-6">
         {/* Product List Header */}
@@ -471,7 +499,9 @@ export default function DaftarProduk() {
             {/* Area Distribution Filter - 3 columns */}
             <div className="md:col-span-3">
               <div className="flex flex-col">
-                <label className="text-sm font-medium mb-1.5">Area Distribusi</label>
+                <label className="text-sm font-medium mb-1.5">
+                  {lang === 'id' ? "Area Distribusi" : "Distribution Area"}
+                </label>
                 <div className="flex gap-2">
                   <select
                     value={area}
@@ -481,7 +511,9 @@ export default function DaftarProduk() {
                     }}
                     className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                   >
-                    <option value="">Semua Area</option>
+                    <option value="">
+                      {lang === 'id' ? "Semua Area" : "All Areas"}
+                    </option>
                     {areas.map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}
@@ -491,7 +523,7 @@ export default function DaftarProduk() {
                     size="icon"
                     className="h-9 w-9 flex-shrink-0"
                     onClick={detectUserLocation}
-                    title="Deteksi Lokasi"
+                    title={lang === 'id' ? "Deteksi Lokasi" : "Detect Location"}
                     disabled={isLocating}
                   >
                     {isLocating ? 
@@ -516,7 +548,9 @@ export default function DaftarProduk() {
                   }}
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                 >
-                  <option value="">Semua Brand</option>
+                  <option value="">
+                    {lang === 'id' ? "Semua Brand" : "All Brands"}
+                  </option>
                   {allBrands.map((brand) => (
                     <option key={brand} value={brand}>{brand}</option>
                   ))}
@@ -528,7 +562,9 @@ export default function DaftarProduk() {
             <div className="md:col-span-5">
               <div className="flex flex-col">
                 <div className="flex justify-between mb-1.5">
-                  <label className="text-sm font-medium">Rentang Harga</label>
+                  <label className="text-sm font-medium">
+                    {lang === 'id' ? "Rentang Harga" : "Price Range"}
+                  </label>
                   <div className="text-xs text-muted-foreground">
                     {formatIDR(priceRange[0])} - {formatIDR(priceRange[1])}
                   </div>
@@ -588,33 +624,47 @@ export default function DaftarProduk() {
                   setCurrentPage(1);
                 }}
               >
-                Reset
+                {lang === 'id' ? "Reset" : "Reset"}
               </Button>
             </div>
             
             {/* Export Button - 1 column with optional separator on mobile */}
             <div className="md:col-span-12 md:border-t md:pt-3 md:mt-2 md:flex md:justify-end">
               <Button variant="outline" onClick={exportPDF} className="w-full md:w-auto">
-                Export PDF
+                {lang === 'id' ? "Ekspor PDF" : "Export PDF"}
               </Button>
             </div>
           </div>
         </div>
-        <p className="text-muted-foreground text-sm">Harga distributor akan terlihat setelah Anda masuk / mendaftar.</p>
+        <p className="text-muted-foreground text-sm">
+          {lang === 'id'
+            ? "Harga distributor akan terlihat setelah Anda masuk / mendaftar."
+            : "Distributor prices will be visible after you login / register."
+          }
+        </p>
         <div ref={ref} className="space-y-4">
           <div className="border rounded-md p-3 text-sm flex items-center justify-between">
             <div>
-              <div className="font-medium">Ringkasan Ekspor</div>
+              <div className="font-medium">
+                {lang === 'id' ? "Ringkasan Ekspor" : "Export Summary"}
+              </div>
               <div className="text-muted-foreground">
-                Area: {area || 'Semua Area'} • 
-                Brand: {selectedBrand || 'Semua Brand'} • 
-                Harga: {formatIDR(priceRange[0])} - {formatIDR(priceRange[1])} • 
-                Tanggal: {new Date().toLocaleDateString('id-ID')}
+                {lang === 'id' ? "Area: " : "Area: "}{area || (lang === 'id' ? 'Semua Area' : 'All Areas')} • 
+                Brand: {selectedBrand || (lang === 'id' ? 'Semua Brand' : 'All Brands')} • 
+                {lang === 'id' ? " Harga: " : " Price: "}{formatIDR(priceRange[0])} - {formatIDR(priceRange[1])} • 
+                {lang === 'id' ? " Tanggal: " : " Date: "}{new Date().toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US')}
               </div>
             </div>
             <div className="text-muted-foreground">
-              Total Produk: {filteredProducts.length} {currentPage > 1 && `(Halaman ${currentPage}/${totalPages})`}
-              {items?.length ? ` • Item di Keranjang: ${items.length}` : ''}
+              {lang === 'id' ? "Total Produk: " : "Total Products: "}{filteredProducts.length} 
+              {currentPage > 1 && (lang === 'id' 
+                ? ` (Halaman ${currentPage}/${totalPages})` 
+                : ` (Page ${currentPage}/${totalPages})`
+              )}
+              {items?.length ? (lang === 'id' 
+                ? ` • Item di Keranjang: ${items.length}` 
+                : ` • Items in Cart: ${items.length}`
+              ) : ''}
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -638,7 +688,7 @@ export default function DaftarProduk() {
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
               >
-                Previous
+                {lang === 'id' ? "Sebelumnya" : "Previous"}
               </Button>
               
               <div className="flex items-center space-x-1">
@@ -705,7 +755,7 @@ export default function DaftarProduk() {
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
               >
-                Next
+                {lang === 'id' ? "Selanjutnya" : "Next"}
               </Button>
               
               <select
@@ -716,10 +766,18 @@ export default function DaftarProduk() {
                   setCurrentPage(1);
                 }}
               >
-                <option value={8}>8 per page</option>
-                <option value={12}>12 per page</option>
-                <option value={16}>16 per page</option>
-                <option value={24}>24 per page</option>
+                <option value={8}>
+                  {lang === 'id' ? "8 per halaman" : "8 per page"}
+                </option>
+                <option value={12}>
+                  {lang === 'id' ? "12 per halaman" : "12 per page"}
+                </option>
+                <option value={16}>
+                  {lang === 'id' ? "16 per halaman" : "16 per page"}
+                </option>
+                <option value={24}>
+                  {lang === 'id' ? "24 per halaman" : "24 per page"}
+                </option>
               </select>
             </div>
           )}
