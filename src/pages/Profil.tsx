@@ -1,7 +1,7 @@
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 

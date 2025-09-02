@@ -6,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type Database = {
+export interface Database {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
@@ -14,7 +14,188 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      distributor_profiles: {
+        Row: {
+          id: string
+          user_id: string
+          nama_bisnis: string
+          alamat_lengkap: string
+          kota: string
+          nama_pemilik: string
+          kontak_pemilik: string
+          created_at: string
+          updated_at: string
+          omzet: string | null
+          alamat_kantor: string | null
+          alamat_gudang: string | null
+          bentuk_usaha: string | null
+          foto_gudang: string | null
+          koordinat: string | null
+          bank: string | null
+          norek: string | null
+          nama_rek: string | null
+          nib: string | null
+          status: 'pending' | 'approved' | 'rejected'
+          approved_at: string | null
+          approved_by: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          nama_bisnis: string
+          alamat_lengkap: string
+          kota: string
+          nama_pemilik: string
+          kontak_pemilik: string
+          created_at?: string
+          updated_at?: string
+          omzet?: string | null
+          alamat_kantor?: string | null
+          alamat_gudang?: string | null
+          bentuk_usaha?: string | null
+          foto_gudang?: string | null
+          koordinat?: string | null
+          bank?: string | null
+          norek?: string | null
+          nama_rek?: string | null
+          nib?: string | null
+          status?: 'pending' | 'approved' | 'rejected'
+          approved_at?: string | null
+          approved_by?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          nama_bisnis?: string
+          alamat_lengkap?: string
+          kota?: string
+          nama_pemilik?: string
+          kontak_pemilik?: string
+          created_at?: string
+          updated_at?: string
+          omzet?: string | null
+          alamat_kantor?: string | null
+          alamat_gudang?: string | null
+          bentuk_usaha?: string | null
+          foto_gudang?: string | null
+          koordinat?: string | null
+          bank?: string | null
+          norek?: string | null
+          nama_rek?: string | null
+          nib?: string | null
+          status?: 'pending' | 'approved' | 'rejected'
+          approved_at?: string | null
+          approved_by?: string | null
+        }
+      }
+      products: {
+        Row: {
+          id: string
+          sku: string
+          category_id: string
+          brand_id: string
+          name: string
+          size: string
+          base_distributor_price: number
+          consumer_price: number
+          base_moq: number
+          description: string | null
+          image_url: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          sku: string
+          category_id: string
+          brand_id: string
+          name: string
+          size: string
+          base_distributor_price: number
+          consumer_price: number
+          base_moq?: number
+          description?: string | null
+          image_url?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          sku?: string
+          category_id?: string
+          brand_id?: string
+          name?: string
+          size?: string
+          base_distributor_price?: number
+          consumer_price?: number
+          base_moq?: number
+          description?: string | null
+          image_url?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      regional_pricing: {
+        Row: {
+          id: string
+          product_id: string
+          region_id: string
+          distributor_price: number
+          moq: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          region_id: string
+          distributor_price: number
+          moq?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          region_id?: string
+          distributor_price?: number
+          moq?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      regions: {
+        Row: {
+          id: string
+          name: string
+          province: string
+          latitude: number | null
+          longitude: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          province: string
+          latitude?: number | null
+          longitude?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          province?: string
+          latitude?: number | null
+          longitude?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

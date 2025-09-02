@@ -14,7 +14,8 @@ import Masuk from "./pages/Masuk";
 import Daftar from "./pages/Daftar";
 import Profil from "./pages/Profil";
 import Admin from "./pages/Admin";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { AuthProvider } from "./contexts/AuthContext";
+import { useAuth } from "./hooks/use-auth";
 import { CartProvider } from "./contexts/CartContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 

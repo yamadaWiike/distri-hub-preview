@@ -16,6 +16,7 @@ export type Product = {
   description: string;
   regions: RegionPricing[];
   image?: string; // URL or imported asset path
+  stock?: number; // Stock quantity
 };
 
 export const PRODUCTS: Product[] = [

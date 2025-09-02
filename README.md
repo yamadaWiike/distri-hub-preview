@@ -1,73 +1,91 @@
-# Welcome to your Lovable project
 
-## Project info
+# Baskit Distributor Hub
 
-**URL**: https://lovable.dev/projects/8f232d77-cc27-4788-bc81-f012c9ee4d08
+**Platform distributor GT Baskit:** katalog produk, harga, MOQ, dan pendaftaran distributor.
 
-## How can I edit this code?
+## Project Overview
 
-There are several ways of editing your application.
+Baskit Distributor Hub adalah portal resmi untuk distributor FMCG di Indonesia. Platform ini memudahkan distributor untuk:
 
-**Use Lovable**
+- Menjelajahi katalog produk lengkap
+- Melihat harga khusus per wilayah/provinsi
+- Simulasi keuntungan dan margin
+- Mendaftar sebagai distributor resmi
+- Menghubungi tim Baskit untuk onboarding dan dukungan
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/8f232d77-cc27-4788-bc81-f012c9ee4d08) and start prompting.
+## Features
 
-Changes made via Lovable will be committed automatically to this repo.
+- Katalog produk dengan filter area dan harga regional
+- Simulasi keuntungan distributor
+- Pendaftaran distributor online
 
-**Use your preferred IDE**
+## Environment Setup
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+This project uses environment variables to secure sensitive information. Follow these steps to set up your environment:
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
 
-Follow these steps:
+2. Fill in the required environment variables in the `.env` file:
+   - `VITE_SUPABASE_URL`: Your Supabase project URL
+   - `VITE_SUPABASE_ANON_KEY`: Your Supabase anonymous/public key
+   - `VITE_SUPABASE_PROJECT_ID`: Your Supabase project ID
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+Note: The `.env` file is ignored by Git to protect sensitive information. Never commit your actual environment variables to the repository.
+- Profil bisnis dan verifikasi
+- Admin dashboard untuk pengelolaan SKU dan aplikasi distributor
+- FAQ dan kontak support
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
+## Technologies Used
 
 - Vite
 - TypeScript
 - React
 - shadcn-ui
 - Tailwind CSS
+- Supabase (auth & backend integration)
 
-## How can I deploy this project?
+## Getting Started
 
-Simply open [Lovable](https://lovable.dev/projects/8f232d77-cc27-4788-bc81-f012c9ee4d08) and click on Share -> Publish.
+### Prerequisites
+- Node.js & npm
 
-## Can I connect a custom domain to my Lovable project?
+### Installation
+```sh
+git clone <YOUR_GIT_URL>
+cd baskit-distributor-hub-25
+npm i
+npm run dev
+```
 
-Yes, you can!
+### Usage
+- Buka `http://localhost:5173` di browser
+- Daftar sebagai distributor untuk akses harga khusus
+- Jelajahi produk, simulasi margin, dan lakukan pendaftaran
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Deployment
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+Deploy via [Lovable](https://lovable.dev/projects/8f232d77-cc27-4788-bc81-f012c9ee4d08) atau hosting Vite/React standar.
+
+## Custom Domain
+
+Ikuti panduan [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide) untuk menghubungkan domain Anda.
+
+
+## Contact & Support
+
+Untuk bantuan dan FAQ, gunakan halaman Hubungi di aplikasi.
+
+## About Baskit
+
+Platform distribusi FMCG terdepan di Indonesia yang menghubungkan produsen dengan distributor untuk ekosistem perdagangan efisien dan menguntungkan.
+
+**Misi:** Memudahkan akses distribusi produk FMCG berkualitas ke seluruh Indonesia dengan teknologi modern dan layanan terpercaya.
+
+**Visi:** Menjadi platform distribusi FMCG nomor satu di Indonesia yang menghubungkan ribuan produsen dan distributor.
+
+---
+
+© 2025 Baskit. All rights reserved.

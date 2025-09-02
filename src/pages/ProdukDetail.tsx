@@ -1,25 +1,84 @@
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import { useParams } from "react-router-dom";
-import { PRODUCTS } from "@/data/products";
-import { useAuth } from "@/contexts/AuthContext";
-import { useState } from "react";
+import { PRODUCTS, Product } from "@/data/products";
+import { useAuth } from "@/hooks/use-auth";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { useCart } from "@/contexts/CartContext";
-function formatIDR(n: number) {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
-}
+import { useCart } from "@/hooks/use-cart";
+import { formatIDR } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { translations } from "@/lib/translations";
+import { useToast } from "@/components/ui/use-toast";
+import { fetchProductBySku } from "@/lib/db";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 export default function ProdukDetail() {
   const { id } = useParams();
   const { user } = useAuth();
   const { addItem } = useCart();
-  const product = PRODUCTS.find((p) => p.id === id);
-
-  if (!product) return <div className="min-h-screen"><Navbar /><main className="container max-w-6xl mx-auto py-10">Produk tidak ditemukan.</main></div>;
-
-  const [selectedArea, setSelectedArea] = useState(product.regions[0]?.area || '');
-  const [qty, setQty] = useState(product.moq);
+  const { toast } = useToast();
+  const { lang } = useLanguage();
+  const t = translations[lang];
+  
+  // Add state for fetched product
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  // First look for product in hardcoded data
+  const hardcodedProduct = PRODUCTS.find((p) => p.id === id);
+  
+  // Fetch product from database if not in hardcoded data
+  useEffect(() => {
+    async function loadProduct() {
+      if (hardcodedProduct) {
+        setProduct(hardcodedProduct);
+        setLoading(false);
+        return;
+      }
+      
+      if (id) {
+        try {
+          const fetchedProduct = await fetchProductBySku(id);
+          setProduct(fetchedProduct);
+        } catch (error) {
+          console.error("Error fetching product:", error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    }
+    
+    loadProduct();
+  }, [id, hardcodedProduct]);
+  
+  // Move hooks to the top level and use default values
+  const [selectedArea, setSelectedArea] = useState('');
+  const [qty, setQty] = useState(0);
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  
+  // Initialize the state values when product changes
+  useEffect(() => {
+    if (product) {
+      setSelectedArea(product.regions[0]?.area || '');
+      setQty(product.moq);
+    }
+  }, [product]);
+  
+  if (loading) return <div className="min-h-screen"><Navbar /><main className="container max-w-6xl mx-auto py-10">Loading...</main></div>;
+  if (!product) return (
+    <div className="min-h-screen">
+      <SEO title="Produk Tidak Ditemukan | Baskit" description="Produk yang Anda cari tidak ditemukan dalam katalog kami." />
+      <Navbar />
+      <main className="container max-w-6xl mx-auto py-10">
+        <div className="text-center py-12">
+          <h1 className="text-2xl font-bold mb-4">Produk tidak ditemukan</h1>
+          <p className="text-muted-foreground mb-6">SKU "{id}" tidak tersedia dalam katalog kami saat ini.</p>
+          <Button variant="default" onClick={() => window.history.back()}>Kembali</Button>
+        </div>
+      </main>
+    </div>
+  );
   const regional = product.regions.find((r) => r.area === selectedArea) || product.regions[0];
   const usedPrice = regional?.distributorPrice ?? product.distributorPrice;
   const usedMoq = regional?.moq ?? product.moq;
@@ -35,9 +94,32 @@ export default function ProdukDetail() {
         </header>
         <section className="grid md:grid-cols-2 gap-6">
           <div className="space-y-4">
-            <img src={product.image || '/placeholder.svg'} alt={`${product.name} — ${product.size}`} className="w-full h-64 object-cover rounded-md" />
+            <div 
+              className="cursor-pointer relative group" 
+              onClick={() => setImageDialogOpen(true)}
+            >
+              <img 
+                src={product.image || '/placeholder.svg'} 
+                alt={`${product.name} — ${product.size}`} 
+                className="w-full h-64 object-cover rounded-md transition-transform duration-300 group-hover:scale-[1.02]" 
+              />
+              <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-md">
+                <span className="bg-white/80 text-black text-xs font-medium px-2 py-1 rounded">Klik untuk memperbesar</span>
+              </div>
+            </div>
             <p className="text-muted-foreground">{product.description}</p>
           </div>
+          
+          {/* Image Dialog */}
+          <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
+            <DialogContent className="max-w-3xl p-1 border-none">
+              <img 
+                src={product.image || '/placeholder.svg'} 
+                alt={`${product.name} — ${product.size}`} 
+                className="w-full h-auto object-contain max-h-[80vh] rounded-md"
+              />
+            </DialogContent>
+          </Dialog>
           <div className="space-y-4">
             <div>
               <div className="text-xs text-muted-foreground">Harga Konsumen (per pcs)</div>
@@ -54,6 +136,10 @@ export default function ProdukDetail() {
             <div>
               <div className="text-xs text-muted-foreground">MOQ</div>
               <div className="text-lg font-medium">{usedMoq} pcs</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Stock</div>
+              <div className="text-lg font-medium">{product.stock || 0} pcs</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground mb-1">Area Distribusi</div>
@@ -82,7 +168,32 @@ export default function ProdukDetail() {
                   <input type="number" min={usedMoq} value={qty} onChange={(e) => setQty(parseInt(e.target.value || '0'))} className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" />
                 </div>
                 <div>
-                  <Button variant="hero" className="w-full mt-5" onClick={() => addItem({ id: product.id, name: product.name, size: product.size, image: product.image, province: selectedArea, unitPrice: usedPrice, moq: usedMoq, qty: Math.max(qty, usedMoq), consumerPrice: product.consumerPrice })}>Add to Cart</Button>
+                  <Button 
+                    variant="hero" 
+                    className="w-full mt-5" 
+                    onClick={() => {
+                      addItem({
+                        id: product.id, 
+                        name: product.name, 
+                        size: product.size, 
+                        image: product.image, 
+                        province: selectedArea, 
+                        unitPrice: usedPrice, 
+                        moq: usedMoq, 
+                        qty: qty, // Use exactly what the user specified 
+                        consumerPrice: product.consumerPrice
+                      });
+                      
+                      // Show toast notification
+                      toast({
+                        title: `${product.name} ${product.size}`,
+                        description: `${qty} items added to cart`,
+                        duration: 3000,
+                      });
+                    }}
+                  >
+                    Add to Cart
+                  </Button>
                 </div>
               </div>
             )}

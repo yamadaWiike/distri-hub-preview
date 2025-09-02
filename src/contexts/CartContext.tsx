@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { CartContext, CartContextType } from "./CartContextDefinition";
 
 export type CartItem = {
   id: string; // product id
@@ -12,14 +13,6 @@ export type CartItem = {
   consumerPrice: number;
 };
 
-type CartContextType = {
-  items: CartItem[];
-  addItem: (item: CartItem) => void;
-  clear: () => void;
-};
-
-const CartContext = createContext<CartContextType | undefined>(undefined);
-
 const STORAGE_KEY = "baskit_cart";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
@@ -30,7 +23,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (raw) {
       try {
         setItems(JSON.parse(raw));
-      } catch {}
+      } catch (error) {
+        console.error("Error loading cart:", error);
+      }
     }
   }, []);
 
@@ -38,28 +33,62 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }, [items]);
 
-  const addItem = (item: CartItem) => {
+  const addItem = useCallback((item: CartItem) => {
     setItems((prev) => {
-      // merge by product+province if exists
+      // Check if the product already exists in the cart
       const idx = prev.findIndex((p) => p.id === item.id && p.province === item.province);
       if (idx >= 0) {
+        // Replace the entire item with the new one but use the exact quantity passed
+        // instead of adding quantities together
         const copy = [...prev];
-        copy[idx] = { ...copy[idx], qty: copy[idx].qty + item.qty };
+        copy[idx] = { ...item };
         return copy;
       }
       return [...prev, item];
     });
-  };
+  }, []);
+  
+  const removeItem = useCallback((id: string, province: string) => {
+    setItems((prev) => 
+      prev.filter(item => !(item.id === id && item.province === province))
+    );
+  }, []);
 
-  const clear = () => setItems([]);
+  const updateQuantity = useCallback((id: string, province: string, qty: number) => {
+    if (qty <= 0) {
+      removeItem(id, province);
+      return;
+    }
+    
+    setItems((prev) => {
+      return prev.map(item => {
+        if (item.id === id && item.province === province) {
+          return { ...item, qty };
+        }
+        return item;
+      });
+    });
+  }, [removeItem]);
 
-  const value = useMemo(() => ({ items, addItem, clear }), [items]);
+  const clear = useCallback(() => setItems([]), []);
+  
+  const totalItems = useMemo(() => {
+    return items.reduce((sum, item) => sum + item.qty, 0);
+  }, [items]);
+  
+  const totalAmount = useMemo(() => {
+    return items.reduce((sum, item) => sum + (item.unitPrice * item.qty), 0);
+  }, [items]);
+
+  const value = useMemo(() => ({ 
+    items, 
+    addItem, 
+    removeItem, 
+    updateQuantity, 
+    clear, 
+    totalItems, 
+    totalAmount 
+  }), [items, totalItems, totalAmount, addItem, removeItem, updateQuantity, clear]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
-}
-
-export function useCart() {
-  const ctx = useContext(CartContext);
-  if (!ctx) throw new Error("useCart must be used within CartProvider");
-  return ctx;
 }
