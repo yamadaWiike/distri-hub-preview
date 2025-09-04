@@ -2,9 +2,11 @@ import { Link, NavLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/use-auth";
+import { useCart } from "@/hooks/use-cart";
 import { translations } from "@/lib/translations";
-import { CartDrawer } from "../cart/CartDrawer";
-import { Menu, X, ChevronDown, User, Home, Package, Info, Phone, LogOut, Globe } from "lucide-react";
+import { ModernCartDrawer } from "../cart/NewModernCartDrawer";
+import { Menu, X, ChevronDown, User, Home, Package, Info, Phone, LogOut, Globe, ShoppingCart } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -30,6 +32,19 @@ const mobileNavLinkClass = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-2 px-4 py-3 transition-colors ${
     isActive ? "bg-accent text-foreground font-medium" : "text-foreground/80 hover:bg-accent/50"
   }`;
+
+// Cart indicator component
+function CartIndicator() {
+  const { totalItems } = useCart();
+  
+  if (totalItems === 0) return null;
+  
+  return (
+    <Badge variant="destructive" className="absolute -top-1 -right-1 px-1.5 min-w-[1.2rem] h-5 rounded-full">
+      {totalItems}
+    </Badge>
+  );
+}
 
 export default function Navbar() {
   const { lang, setLang } = useLanguage();
@@ -129,6 +144,7 @@ export default function Navbar() {
                             </Button>
                           </Link>
                         </SheetClose>
+                        <ModernCartDrawer />
                         <Button 
                           variant="outline" 
                           className="w-full flex items-center justify-start gap-2 text-destructive" 
@@ -185,6 +201,8 @@ export default function Navbar() {
         
         {/* Right Side Actions */}
         <div className="flex items-center gap-2">
+          {/* Cart Button has been replaced by ModernCartDrawer */}
+          
           {/* Language Switcher (Desktop) */}
           {!isMobile ? (
             <div className="hidden sm:flex items-center gap-1">
@@ -226,7 +244,7 @@ export default function Navbar() {
           )}
           
           {/* Cart */}
-          <CartDrawer />
+          <ModernCartDrawer />
           
           {/* Auth Actions (Desktop) */}
           {!isMobile ? (

@@ -1,5 +1,17 @@
 import { createContext } from "react";
-import { CartItem } from "./CartContext";
+
+// Define CartItem type here to avoid circular import
+export type CartItem = {
+  id: string;
+  name: string;
+  size: string;
+  image?: string;
+  province: string;
+  unitPrice: number;
+  moq: number;
+  qty: number;
+  consumerPrice: number;
+};
 
 export type CartContextType = {
   items: CartItem[];

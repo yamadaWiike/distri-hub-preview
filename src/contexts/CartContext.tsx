@@ -1,17 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { CartContext, CartContextType } from "./CartContextDefinition";
-
-export type CartItem = {
-  id: string; // product id
-  name: string;
-  size: string;
-  image?: string;
-  province: string;
-  unitPrice: number; // distributor price used
-  moq: number;
-  qty: number;
-  consumerPrice: number;
-};
+import { CartContext, CartContextType, CartItem } from "./CartContextDefinition";
 
 const STORAGE_KEY = "baskit_cart";
 

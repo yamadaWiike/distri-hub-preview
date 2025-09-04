@@ -14,6 +14,7 @@ import Masuk from "./pages/Masuk";
 import Daftar from "./pages/Daftar";
 import Profil from "./pages/Profil";
 import Admin from "./pages/Admin";
+import Checkout from "./pages/Checkout";
 import { AuthProvider } from "./contexts/AuthContext";
 import { useAuth } from "./hooks/use-auth";
 import { CartProvider } from "./contexts/CartContext";
@@ -46,6 +47,7 @@ const App = () => (
                   <Route path="/masuk" element={<Masuk />} />
                   <Route path="/daftar" element={<Daftar />} />
                   <Route path="/profil" element={<Protected><Profil /></Protected>} />
+                  <Route path="/checkout" element={<Protected><Checkout /></Protected>} />
                   <Route path="/admin" element={<Admin />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />

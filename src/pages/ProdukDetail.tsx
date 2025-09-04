@@ -1,6 +1,6 @@
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { PRODUCTS, Product } from "@/data/products";
 import { useAuth } from "@/hooks/use-auth";
 import React, { useState, useEffect } from "react";
@@ -20,6 +20,7 @@ export default function ProdukDetail() {
   const { toast } = useToast();
   const { lang } = useLanguage();
   const t = translations[lang];
+  const navigate = useNavigate();
   
   // Add state for fetched product
   const [product, setProduct] = useState<Product | null>(null);
@@ -219,6 +220,15 @@ export default function ProdukDetail() {
                           ? `${qty} item ditambahkan ke keranjang` 
                           : `${qty} items added to cart`,
                         duration: 3000,
+                        action: (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => navigate('/checkout')}
+                          >
+                            {lang === 'id' ? "Checkout" : "Checkout"}
+                          </Button>
+                        ),
                       });
                     }}
                   >

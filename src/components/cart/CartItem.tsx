@@ -1,5 +1,5 @@
 import React from 'react';
-import { CartItem as CartItemType } from '@/contexts/CartContext';
+import { CartItem as CartItemType } from '@/contexts/CartContextDefinition';
 import { useCart } from '@/hooks/use-cart';
 import { formatIDR } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
