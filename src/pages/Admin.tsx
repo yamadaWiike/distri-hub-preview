@@ -36,8 +36,7 @@ export default function Admin() {
         // For demo purposes, we'll consider certain emails as admin
         // In production, use proper role-based access control
         const adminEmails = [
-          "rudy@baskit.app",
-          "admin@example.com"
+          "rudy@baskit.app"
         ];
         
         setIsAdmin(adminEmails.includes(user.email || ""));
