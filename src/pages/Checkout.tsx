@@ -15,8 +15,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { translations } from "@/lib/translations";
 
-// Payment method type
-type PaymentMethod = 'transfer_bank' | 'cod' | 'credit_card';
+// Address type selection
+type AddressType = 'default' | 'warehouse';
 
 // Delivery details type
 interface DeliveryDetails {
@@ -26,7 +26,7 @@ interface DeliveryDetails {
   city: string;
   postalCode: string;
   notes: string;
-  paymentMethod: PaymentMethod;
+  addressType: AddressType;
 }
 
 export default function Checkout() {
@@ -37,6 +37,16 @@ export default function Checkout() {
   const { lang } = useLanguage();
   const t = translations[lang];
 
+  // State for profile data
+  const [profileData, setProfileData] = useState<{
+    nama_bisnis?: string;
+    nama_pemilik?: string;
+    kontak_pemilik?: string;
+    alamat_lengkap?: string;
+    alamat_gudang?: string;
+    kota?: string;
+  } | null>(null);
+
   // Initial delivery details
   const [deliveryDetails, setDeliveryDetails] = useState<DeliveryDetails>({
     fullName: "",
@@ -45,10 +55,10 @@ export default function Checkout() {
     city: "",
     postalCode: "",
     notes: "",
-    paymentMethod: "transfer_bank",
+    addressType: "default",
   });
 
-  // Check for user authentication and cart items
+  // Check for user authentication, cart items, and fetch profile data
   useEffect(() => {
     console.log("Checkout page mounted, checking auth and cart");
     
@@ -62,9 +72,55 @@ export default function Checkout() {
     if (items.length === 0) {
       console.log("Cart is empty, redirecting to products");
       navigate("/daftar-produk", { replace: true });
-    } else {
-      console.log("Checkout page ready");
+      return;
     }
+
+    // Fetch profile data for autofill
+    const fetchProfileData = async () => {
+      if (!user || !user.id) return;
+      
+      try {
+        // Import supabase client
+        const { supabase } = await import('@/integrations/supabase/client');
+        
+        // Fetch profile data
+        const { data, error } = await supabase
+          .from('distributor_profiles')
+          .select('nama_bisnis, nama_pemilik, kontak_pemilik, alamat_lengkap, alamat_gudang, kota')
+          .eq('user_id', user.id)
+          .maybeSingle<{
+            nama_bisnis: string;
+            nama_pemilik: string;
+            kontak_pemilik: string;
+            alamat_lengkap: string;
+            alamat_gudang: string | null;
+            kota: string;
+          }>();
+          
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error fetching profile:', error);
+          return;
+        }
+        
+        // If we have data, store it and autofill the form
+        if (data) {
+          setProfileData(data);
+          
+          setDeliveryDetails(prev => ({
+            ...prev,
+            fullName: data.nama_pemilik || "",
+            phone: data.kontak_pemilik || "",
+            address: data.alamat_lengkap || "",
+            city: data.kota || "",
+          }));
+        }
+      } catch (err) {
+        console.error('Profile fetch error:', err);
+      }
+    };
+    
+    fetchProfileData();
+    console.log("Checkout page ready");
   }, [user, items, navigate]);
 
   // Update delivery details
@@ -88,6 +144,15 @@ export default function Checkout() {
       });
       return;
     }
+    
+    // Include address type in order data
+    const orderData = {
+      ...deliveryDetails,
+      addressType: deliveryDetails.addressType,
+      items: items,
+      totalAmount
+    };
+    console.log('Submitting order:', orderData);
 
     // Process the order
     // In a real app, this would send the order to the backend
@@ -176,6 +241,42 @@ export default function Checkout() {
               </h2>
               
               <div className="space-y-4">
+                <div className="space-y-3 mb-5 pb-3 border-b">
+                  <h3 className="font-semibold">
+                    {lang === 'id' ? 'Pilih Alamat Pengiriman' : 'Select Shipping Address'} *
+                  </h3>
+                  
+                  <RadioGroup 
+                    value={deliveryDetails.addressType} 
+                    onValueChange={(value) => {
+                      const newType = value as AddressType;
+                      updateDeliveryDetails("addressType", newType);
+                      
+                      // Auto-fill the address based on selection
+                      if (profileData) {
+                        if (newType === 'default') {
+                          updateDeliveryDetails("address", profileData.alamat_lengkap || "");
+                        } else if (newType === 'warehouse') {
+                          updateDeliveryDetails("address", profileData.alamat_gudang || profileData.alamat_lengkap || "");
+                        }
+                      }
+                    }}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="default" id="default_address" />
+                      <Label htmlFor="default_address">
+                        {lang === 'id' ? 'Alamat Utama' : 'Default Address'}
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="warehouse" id="warehouse_address" />
+                      <Label htmlFor="warehouse_address">
+                        {lang === 'id' ? 'Alamat Gudang' : 'Warehouse Address'}
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+                
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="fullName">
@@ -250,41 +351,11 @@ export default function Checkout() {
                     onChange={(e) => updateDeliveryDetails("notes", e.target.value)}
                   />
                 </div>
-
-                <div className="space-y-3 pt-4 border-t">
-                  <h3 className="font-semibold">
-                    {t.paymentMethod} *
-                  </h3>
-                  
-                  <RadioGroup 
-                    value={deliveryDetails.paymentMethod} 
-                    onValueChange={(value) => updateDeliveryDetails("paymentMethod", value as PaymentMethod)}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="transfer_bank" id="transfer_bank" />
-                      <Label htmlFor="transfer_bank">
-                        {t.bankTransfer}
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="cod" id="cod" />
-                      <Label htmlFor="cod">
-                        {t.cashOnDelivery}
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="credit_card" id="credit_card" />
-                      <Label htmlFor="credit_card">
-                        {t.creditCard}
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </div>
               </div>
 
               <div className="mt-8">
                 <Button type="submit" className="w-full">
-                  {t.completeOrder}
+                  {lang === 'id' ? 'Pesan' : 'Order'}
                 </Button>
               </div>
             </form>

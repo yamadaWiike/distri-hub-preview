@@ -1,10 +1,10 @@
-import React, { createContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useEffect, useMemo, useState, useContext } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Database } from "@/integrations/supabase/types";
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 
-type User = {
+export type User = {
   id?: string;
   email: string;
   namaBisnis?: string;
@@ -16,19 +16,29 @@ type DistributorProfile = Database['public']['Tables']['distributor_profiles']['
 
 type AuthContextType = {
   user: User | null;
-  loading: boolean;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: { email: string; password: string; namaBisnis: string; alamatLengkap: string; kota: string; namaPemilik: string; kontakPemilik: string; }) => Promise<void>;
+  register: (data: { 
+    email: string; 
+    password: string; 
+    namaBisnis: string; 
+    alamatLengkap: string; 
+    provinsiId: string; 
+    kota: string; 
+    namaPemilik: string; 
+    kontakPemilik: string; 
+  }) => Promise<void>;
   logout: () => void;
 };
 
 // Creating context in its own file to avoid fast refresh issues
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
 export { AuthContext };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Check for existing session on mount
   useEffect(() => {
@@ -75,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error('Session check error:', error);
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
     
@@ -140,7 +150,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (data: { email: string; password: string; namaBisnis: string; alamatLengkap: string; kota: string; namaPemilik: string; kontakPemilik: string; }) => {
+  const register = async (data: { 
+    email: string; 
+    password: string; 
+    namaBisnis: string; 
+    alamatLengkap: string; 
+    provinsiId: string; 
+    kota: string; 
+    namaPemilik: string; 
+    kontakPemilik: string; 
+  }) => {
     try {
       // Create user in Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -166,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           user_id: authData.user.id,
           nama_bisnis: data.namaBisnis,
           alamat_lengkap: data.alamatLengkap,
+          provinsi_id: data.provinsiId,
           kota: data.kota,
           nama_pemilik: data.namaPemilik,
           kontak_pemilik: data.kontakPemilik,
@@ -229,7 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
-  const value = useMemo(() => ({ user, loading, login, register, logout }), [user, loading]);
+  const value = useMemo(() => ({ user, isLoading, login, register, logout }), [user, isLoading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

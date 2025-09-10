@@ -243,16 +243,16 @@ export default function DaftarProduk() {
         const productsData = await getAllProducts();
         setProducts(productsData);
         
-        // Fetch areas
-        const areasData = await getAllAreas();
-        setAreas(areasData);
+        // Set fixed areas instead of fetching them
+        const fixedAreas = ["Jabodetabek", "Jawa Barat", "Jawa Tengah", "Jawa Timur"];
+        setAreas(fixedAreas);
         
         // Fetch brands
         const brandsData = await getAllBrands();
         setAllBrands(brandsData);
         
         // Set initial area if user has a location
-        if (user?.kota && areasData.includes(user.kota)) {
+        if (user?.kota && fixedAreas.includes(user.kota)) {
           setArea(user.kota);
         }
         
@@ -277,47 +277,49 @@ export default function DaftarProduk() {
   // Calculate nearest area from user's coordinates with useCallback to avoid recreation
   const findNearestArea = useCallback((latitude: number, longitude: number) => {
     // This is a simplified mapping of Indonesian cities to approximate coordinates
-    // In a real app, you would use a more comprehensive database
-    const cityCoordinates: Record<string, [number, number]> = {
-      'Jakarta Pusat': [-6.1751, 106.8650],
-      'Jakarta Selatan': [-6.2615, 106.8106],
-      'Jakarta Barat': [-6.1683, 106.7588],
-      'Jakarta Timur': [-6.2256, 106.9012],
-      'Jakarta Utara': [-6.1339, 106.8823],
-      'Kota Bandung': [-6.9175, 107.6191],
-      'Kota Surabaya': [-7.2575, 112.7521],
-      'Kota Semarang': [-7.0051, 110.4381],
-      'Kota Yogyakarta': [-7.7971, 110.3688],
-      'Kota Medan': [3.5952, 98.6722],
-      'Kota Makassar': [-5.1477, 119.4327],
-      'Kota Tangerang': [-6.1701, 106.6403],
-      'Kota Bekasi': [-6.2349, 107.0003],
-      'Kota Depok': [-6.4025, 106.7942],
-      'Kota Bogor': [-6.5944, 106.7892],
-      'Kota Denpasar': [-8.6705, 115.2126],
-      'Kota Malang': [-7.9797, 112.6304],
+    const cityMapping: Record<string, [number, number, string]> = {
+      // Jakarta area (Jabodetabek)
+      'Jakarta Pusat': [-6.1751, 106.8650, "Jabodetabek"],
+      'Jakarta Selatan': [-6.2615, 106.8106, "Jabodetabek"],
+      'Jakarta Barat': [-6.1683, 106.7588, "Jabodetabek"],
+      'Jakarta Timur': [-6.2256, 106.9012, "Jabodetabek"],
+      'Jakarta Utara': [-6.1339, 106.8823, "Jabodetabek"],
+      'Kota Tangerang': [-6.1701, 106.6403, "Jabodetabek"],
+      'Kota Bekasi': [-6.2349, 107.0003, "Jabodetabek"],
+      'Kota Depok': [-6.4025, 106.7942, "Jabodetabek"],
+      'Kota Bogor': [-6.5944, 106.7892, "Jabodetabek"],
+      
+      // Jawa Barat
+      'Kota Bandung': [-6.9175, 107.6191, "Jawa Barat"],
+      'Kota Cirebon': [-6.7320, 108.5523, "Jawa Barat"],
+      
+      // Jawa Tengah
+      'Kota Semarang': [-7.0051, 110.4381, "Jawa Tengah"],
+      'Kota Yogyakarta': [-7.7971, 110.3688, "Jawa Tengah"],
+      
+      // Jawa Timur
+      'Kota Surabaya': [-7.2575, 112.7521, "Jawa Timur"],
+      'Kota Malang': [-7.9797, 112.6304, "Jawa Timur"],
     };
 
-    let nearest = '';
+    let nearestArea = "Jabodetabek"; // Default to Jabodetabek
     let minDistance = Infinity;
 
     // Find the closest city by calculating distance
-    Object.entries(cityCoordinates).forEach(([city, [lat, lng]]) => {
-      if (areas.includes(city)) {
-        // Simple distance calculation using Pythagorean theorem (not accurate for long distances)
-        const distance = Math.sqrt(
-          Math.pow(latitude - lat, 2) + Math.pow(longitude - lng, 2)
-        );
+    Object.entries(cityMapping).forEach(([city, [lat, lng, area]]) => {
+      // Simple distance calculation using Pythagorean theorem (not accurate for long distances)
+      const distance = Math.sqrt(
+        Math.pow(latitude - lat, 2) + Math.pow(longitude - lng, 2)
+      );
 
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearest = city;
-        }
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestArea = area;
       }
     });
 
-    return nearest;
-  }, [areas]);
+    return nearestArea;
+  }, []);
 
   // Auto-detect location using useCallback to avoid recreation on each render
   const detectUserLocation = useCallback(() => {
@@ -514,7 +516,7 @@ export default function DaftarProduk() {
                     <option value="">
                       {lang === 'id' ? "Semua Area" : "All Areas"}
                     </option>
-                    {areas.map((p) => (
+                    {["Jabodetabek", "Jawa Barat", "Jawa Tengah", "Jawa Timur"].map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
@@ -563,7 +565,7 @@ export default function DaftarProduk() {
               <div className="flex flex-col">
                 <div className="flex justify-between mb-1.5">
                   <label className="text-sm font-medium">
-                    {lang === 'id' ? "Rentang Harga" : "Price Range"}
+                    {lang === 'id' ? "Rentang Harga per Karton" : "Price Range per Carton"}
                   </label>
                   <div className="text-xs text-muted-foreground">
                     {formatIDR(priceRange[0])} - {formatIDR(priceRange[1])}

@@ -121,8 +121,8 @@ export default function Hubungi() {
           <h1 className="text-4xl md:text-5xl font-bold mb-6">{t.contact}</h1>
           <p className="text-muted-foreground text-lg max-w-3xl mx-auto">
             {lang === 'id' 
-              ? "Tim Baskit GT mendukung distributor dalam onboarding produk, negosiasi harga, dan perencanaan distribusi. Kami siap membantu kebutuhan bisnis Anda."
-              : "The Baskit GT team supports distributors in product onboarding, price negotiation, and distribution planning. We are ready to assist with your business needs."
+              ? "Tim GT Baskit mendukung distributor dalam onboarding produk, negosiasi harga, dan perencanaan distribusi. Kami siap membantu kebutuhan bisnis Anda."
+              : "The GT Baskit team supports distributors in product onboarding, price negotiation, and distribution planning. We are ready to assist with your business needs."
             }
           </p>
           
@@ -249,8 +249,8 @@ export default function Hubungi() {
                       </h3>
                       <p className="text-sm text-muted-foreground">
                         {lang === 'id'
-                          ? "Ya, kami menyediakan materi pemasaran, training produk, dan dukungan promosi untuk distributor aktif."
-                          : "Yes, we provide marketing materials, product training, and promotional support for active distributors."
+                          ? "Ya, kami menyediakan materi pemasaran, training produk, dan dukungan promosi untuk distributor aktif. Dukungan pemasaran hanya tersedia untuk produk atau pembelian tertentu, dalam skema kerja sama khusus."
+                          : "Yes, we provide marketing materials, product training, and promotional support for active distributors. Marketing support is only available for specific products or purchases, under special cooperation schemes."
                         }
                       </p>
                     </div>

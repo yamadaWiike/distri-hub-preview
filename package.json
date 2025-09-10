@@ -9,7 +9,9 @@
     "build:dev": "vite build --mode development",
     "postbuild": "powershell -Command \"Copy-Item vercel.json -Destination dist/\"",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:migrate": "node scripts/applyMigrations.js",
+    "db:seed": "node scripts/seedData.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

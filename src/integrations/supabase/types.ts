@@ -14,6 +14,86 @@ export interface Database {
   }
   public: {
     Tables: {
+      brands: {
+        Row: {
+          id: string
+          name: string
+          description?: string
+          logo_url?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string
+          logo_url?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string
+          logo_url?: string
+        }
+      }
+      skus: {
+        Row: {
+          id: string
+          name: string
+          description: string
+          size: string
+          brand: string
+          sku: string
+          image_url: string
+          consumer_price: number
+          is_active: boolean
+        }
+        Insert: {
+          id?: string
+          name: string
+          description: string
+          size: string
+          brand: string
+          sku: string
+          image_url: string
+          consumer_price: number
+          is_active: boolean
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string
+          size?: string
+          brand?: string
+          sku?: string
+          image_url?: string
+          consumer_price?: number
+          is_active?: boolean
+        }
+      }
+      region_pricing: {
+        Row: {
+          id: string
+          sku_id: string
+          area: string
+          distributor_price: number
+          moq: number
+        }
+        Insert: {
+          id?: string
+          sku_id: string
+          area: string
+          distributor_price: number
+          moq: number
+        }
+        Update: {
+          id?: string
+          sku_id?: string
+          area?: string
+          distributor_price?: number
+          moq?: number
+        }
+      }
       distributor_profiles: {
         Row: {
           id: string

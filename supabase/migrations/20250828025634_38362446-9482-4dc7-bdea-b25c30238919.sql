@@ -4,7 +4,7 @@ CREATE TABLE public.distributor_profiles (
   user_id UUID NOT NULL REFERENCES auth.users ON DELETE CASCADE,
   nama_bisnis TEXT NOT NULL,
   alamat_lengkap TEXT NOT NULL,
-  kota_kabupaten TEXT NOT NULL,
+  kota TEXT NOT NULL,
   nama_pemilik TEXT NOT NULL,
   kontak_pemilik TEXT NOT NULL,
   email_pemilik TEXT NOT NULL,

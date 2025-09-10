@@ -23,8 +23,8 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 const queryClient = new QueryClient();
 
 function Protected({ children }: { children: JSX.Element }) {
-  const { user, loading } = useAuth();
-  if (loading) return null;
+  const { user, isLoading } = useAuth();
+  if (isLoading) return null;
   return user ? children : <Navigate to="/masuk" replace />;
 }
 
@@ -37,7 +37,7 @@ const App = () => (
         <LanguageProvider>
           <AuthProvider>
             <CartProvider>
-              <BrowserRouter>
+              <BrowserRouter future={{ v7_startTransition: true }}>
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/daftar-produk" element={<DaftarProduk />} />

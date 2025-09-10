@@ -47,6 +47,27 @@ Note: The `.env` file is ignored by Git to protect sensitive information. Never 
 - Tailwind CSS
 - Supabase (auth & backend integration)
 
+## Known Issues and TODOs
+
+### TypeScript Errors with Supabase
+
+There are currently some TypeScript issues in the `SKUManager.tsx` component related to Supabase type definitions. These issues occur because:
+
+1. The type definitions don't exactly match the database schema
+2. The Supabase client has strict typing that doesn't align with our use case
+
+**Current solution:**
+- We use targeted `@ts-expect-error` comments at specific points where TypeScript errors occur
+- We've added custom type definitions for the database tables in `src/integrations/supabase/types.ts`
+
+**Recommended long-term fix:**
+- Generate accurate types from the Supabase schema:
+  ```bash
+  npx supabase gen types typescript --project-id <your-project-id>
+  ```
+- Update the Database interface in `src/integrations/supabase/types.ts` with the generated types
+- Remove the `@ts-expect-error` comments once proper types are in place
+
 ## Getting Started
 
 ### Prerequisites

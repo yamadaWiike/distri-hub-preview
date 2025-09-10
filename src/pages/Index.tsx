@@ -40,8 +40,8 @@ const Index = () => {
                 </h1>
                 <p className="text-xl text-muted-foreground leading-relaxed">
                   {lang === 'id'
-                    ? "Jelajahi katalog, simulasi keuntungan, dan daftar sebagai distributor untuk melihat harga khusus per area wilayah."
-                    : "Explore catalog, profit simulations, and register as a distributor to view special prices by area."
+                    ? "Area Distribusi Tertarget – Produk dan harga disesuaikan dengan area distribusi Anda, memberikan fleksibilitas dan fokus pasar yang lebih baik."
+                    : "Targeted Distribution Areas – Products and prices tailored to your distribution area, providing better market flexibility and focus."
                   }
                 </p>
               </div>

@@ -20,3 +20,30 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
     autoRefreshToken: true,
   }
 });
+
+/**
+ * Check if the current user has admin role
+ * @returns {Promise<boolean>} Whether the user is an admin
+ */
+export const isAdmin = async (): Promise<boolean> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+    
+    // First check jwt claims if they exist
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      const claims = JSON.parse(atob(session.access_token.split('.')[1]));
+      if (claims && claims.role === 'admin') {
+        return true;
+      }
+    }
+    
+    // Alternatively check email against admin list
+    const adminEmails = ['rudy@baskit.app', 'admin@example.com'];
+    return adminEmails.includes(user.email || '');
+  } catch (error) {
+    console.error('Error checking admin status:', error);
+    return false;
+  }
+};
