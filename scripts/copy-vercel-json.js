@@ -1,16 +1,25 @@
 // Simple script to copy vercel.json to dist folder
-const fs = require('fs');
-const path = require('path');
+import * as fs from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get the directory name
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootDir = path.resolve(__dirname, '..');
 
 try {
-  if (fs.existsSync('vercel.json')) {
+  const vercelJsonPath = path.join(rootDir, 'vercel.json');
+  const distPath = path.join(rootDir, 'dist');
+  
+  if (fs.existsSync(vercelJsonPath)) {
     // Make sure the dist directory exists
-    if (!fs.existsSync('dist')) {
-      fs.mkdirSync('dist', { recursive: true });
+    if (!fs.existsSync(distPath)) {
+      fs.mkdirSync(distPath, { recursive: true });
     }
     
     // Copy the file
-    fs.copyFileSync('vercel.json', path.join('dist', 'vercel.json'));
+    fs.copyFileSync(vercelJsonPath, path.join(distPath, 'vercel.json'));
     console.log('Successfully copied vercel.json to dist folder');
   } else {
     console.log('vercel.json file not found, skipping copy');
