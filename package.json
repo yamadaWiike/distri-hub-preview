@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
-    "postbuild": "cp vercel.json dist/ || (if exist vercel.json copy vercel.json dist/)",
+    "postbuild": "node scripts/copy-vercel-json.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "db:migrate": "node scripts/applyMigrations.js",
