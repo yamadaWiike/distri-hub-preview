@@ -5,9 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && cp vercel.json dist/",
     "build:dev": "vite build --mode development",
-    "postbuild": "node scripts/copy-vercel-json.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "db:migrate": "node scripts/applyMigrations.js",

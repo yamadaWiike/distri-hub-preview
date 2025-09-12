@@ -37,7 +37,7 @@ const App = () => (
         <LanguageProvider>
           <AuthProvider>
             <CartProvider>
-              <BrowserRouter future={{ v7_startTransition: true }}>
+              <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/daftar-produk" element={<DaftarProduk />} />

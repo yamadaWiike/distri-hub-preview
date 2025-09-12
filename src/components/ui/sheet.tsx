@@ -67,6 +67,10 @@ const SheetContent = React.forwardRef<
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </SheetPrimitive.Close>
+      {/* Adding hidden description for accessibility */}
+      <SheetPrimitive.Description className="sr-only">
+        Sheet content
+      </SheetPrimitive.Description>
     </SheetPrimitive.Content>
   </SheetPortal>
 ))
