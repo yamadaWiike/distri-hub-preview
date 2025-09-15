@@ -421,7 +421,7 @@ export default function DaftarProduk() {
   }, [area, selectedBrand, priceRange, products]);
   
   // Pagination logic
-  const totalPages = useMemo(() => Math.ceil(filteredProducts.length / productsPerPage), [filteredProducts, productsPerPage]);
+  const paginationTotalPages = useMemo(() => Math.ceil(filteredProducts.length / productsPerPage), [filteredProducts, productsPerPage]);
   
   // Current page products
   const currentProducts = useMemo(() => {
@@ -633,14 +633,12 @@ export default function DaftarProduk() {
     
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(10);
-    pdf.text('Informasi kontak', 25, tocY);
-    pdf.text(String(totalPages), 180, tocY, { align: 'right' });
+      pdf.text('Informasi kontak', 25, tocY);
+    pdf.text(String(paginationTotalPages), 180, tocY, { align: 'right' });
     tocY += 8;
     
     pdf.text('Cara pemesanan', 25, tocY);
-    pdf.text(String(totalPages), 180, tocY, { align: 'right' });
-    
-    // Add page break for intro page
+    pdf.text(String(paginationTotalPages), 180, tocY, { align: 'right' });    // Add page break for intro page
     pdf.addPage();
     
     // Add intro page
@@ -789,11 +787,11 @@ export default function DaftarProduk() {
       const nameLines = pdf.splitTextToSize(product.name, itemWidth - 10);
       pdf.text(nameLines, xPosition + 5, detailsY + 12);
       
-      // Product size/SKU
+      // Product size/ID
       pdf.setTextColor(100, 100, 100);
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7);
-      pdf.text(`${product.size} • SKU: ${product.sku}`, xPosition + 5, detailsY + 18);
+      pdf.text(`${product.size} • SKU: ${product.id}`, xPosition + 5, detailsY + 18);
       
       // Divider line
       pdf.setDrawColor(240, 240, 240);
@@ -814,7 +812,7 @@ export default function DaftarProduk() {
       pdf.setFontSize(10);
       pdf.setTextColor(0, 102, 87); // Teal green
       pdf.setFont('helvetica', 'bold');
-      pdf.text(formatRupiah(usedPrice), xPosition + 8, row1Y + 8);
+      pdf.text(formatIDR(usedPrice), xPosition + 8, row1Y + 8);
       
       // Right column - Consumer Price
       pdf.setFillColor(242, 101, 34, 0.1); // Light orange background
@@ -828,7 +826,7 @@ export default function DaftarProduk() {
       pdf.setFontSize(10);
       pdf.setTextColor(242, 101, 34); // Orange
       pdf.setFont('helvetica', 'bold');
-      pdf.text(formatRupiah(product.consumerPrice), xPosition + itemWidth/2 + 3, row1Y + 8);
+      pdf.text(formatIDR(product.consumerPrice), xPosition + itemWidth/2 + 3, row1Y + 8);
       
       // Second row of details
       const row2Y = row1Y + 25;
@@ -897,10 +895,14 @@ export default function DaftarProduk() {
     }
     
     // Add footer on each page with page numbers
-    const totalPages = pdf.internal.getNumberOfPages();
+    // For jsPDF typings, access the internal object and use appropriate method
+    const totalPdfPages = pdf.internal.pages.length - 1;
+    
+    // Get current date for the footer
+    const footerDate = new Date();
     
     // Go through all pages to add consistent footer
-    for (let i = 1; i <= totalPages; i++) {
+    for (let i = 1; i <= totalPdfPages; i++) {
       pdf.setPage(i);
       
       // Add colored footer
@@ -911,13 +913,13 @@ export default function DaftarProduk() {
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(8);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 25, pageHeight - 5);
+      pdf.text(`Page ${i} of ${totalPdfPages}`, pageWidth - 25, pageHeight - 5);
       
       // Add baskit info
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(8);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`Baskit Distributor Catalog | ${currentDate.toLocaleDateString('id-ID')}`, 15, pageHeight - 5);
+      pdf.text(`Baskit Distributor Catalog | ${footerDate.toLocaleDateString('id-ID')}`, 15, pageHeight - 5);
       
       // Add disclaimer text
       pdf.setTextColor(255, 255, 255);
@@ -926,7 +928,7 @@ export default function DaftarProduk() {
     }
     
     // Move back to the last page
-    pdf.setPage(totalPages);
+    pdf.setPage(totalPdfPages);
     
     // Add a final contact page
     pdf.addPage();
@@ -1256,8 +1258,8 @@ export default function DaftarProduk() {
             <div className="text-muted-foreground">
               {lang === 'id' ? "Total Produk: " : "Total Products: "}{filteredProducts.length} 
               {currentPage > 1 && (lang === 'id' 
-                ? ` (Halaman ${currentPage}/${totalPages})` 
-                : ` (Page ${currentPage}/${totalPages})`
+                ? ` (Halaman ${currentPage}/${paginationTotalPages})` 
+                : ` (Page ${currentPage}/${paginationTotalPages})`
               )}
               {items?.length ? (lang === 'id' 
                 ? ` • Item di Keranjang: ${items.length}` 
@@ -1305,19 +1307,19 @@ export default function DaftarProduk() {
                 )}
                 
                 {/* Show nearby pages */}
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                {Array.from({ length: Math.min(5, paginationTotalPages) }, (_, i) => {
                   // Calculate which page numbers to show
                   let pageNum;
                   if (currentPage <= 3) {
                     pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
+                  } else if (currentPage >= paginationTotalPages - 2) {
+                    pageNum = paginationTotalPages - 4 + i;
                   } else {
                     pageNum = currentPage - 2 + i;
                   }
                   
                   // Only show if within valid range
-                  if (pageNum > 0 && pageNum <= totalPages) {
+                  if (pageNum > 0 && pageNum <= paginationTotalPages) {
                     return (
                       <Button
                         key={pageNum}
@@ -1333,15 +1335,15 @@ export default function DaftarProduk() {
                 })}
                 
                 {/* Show last page */}
-                {currentPage < totalPages - 2 && (
+                {currentPage < paginationTotalPages - 2 && (
                   <>
-                    {currentPage < totalPages - 3 && <span className="text-muted-foreground">...</span>}
+                    {currentPage < paginationTotalPages - 3 && <span className="text-muted-foreground">...</span>}
                     <Button 
-                      variant={currentPage === totalPages ? "default" : "outline"} 
+                      variant={currentPage === paginationTotalPages ? "default" : "outline"} 
                       size="sm"
-                      onClick={() => setCurrentPage(totalPages)}
+                      onClick={() => setCurrentPage(paginationTotalPages)}
                     >
-                      {totalPages}
+                      {paginationTotalPages}
                     </Button>
                   </>
                 )}
@@ -1350,8 +1352,8 @@ export default function DaftarProduk() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(paginationTotalPages, prev + 1))}
+                disabled={currentPage === paginationTotalPages}
               >
                 {lang === 'id' ? "Selanjutnya" : "Next"}
               </Button>
