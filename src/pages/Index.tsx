@@ -143,7 +143,7 @@ const Index = () => {
                 <CardContent>
                   <p className="text-muted-foreground">
                     {lang === 'id'
-                      ? "Berbagai pilihan metode pembayaran yang fleksibel khusus untuk distributor terdaftar."
+                      ? "Area Distribusi Tertarget – Produk dan harga disesuaikan dengan area distribusi Anda, memberikan fleksibilitas dan fokus pasar yang lebih baik."
                       : "Various flexible payment method options specifically for registered distributors."
                     }
                   </p>

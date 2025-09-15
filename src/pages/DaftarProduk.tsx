@@ -11,6 +11,7 @@ import { Slider } from "@/components/ui/slider";
 import { useCart } from "@/hooks/use-cart";
 import { formatIDR } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { addPDFHeader, addPDFFooter } from "@/utils/pdf-utils";
 import { translations } from "@/lib/translations";
 import { useToast } from "@/components/ui/use-toast";
 import { getAllProducts, getAllAreas, getAllBrands } from "@/services/product-service";
@@ -229,7 +230,7 @@ export default function DaftarProduk() {
   const [productsPerPage, setProductsPerPage] = useState(12);
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
+
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 500000]);
   const [sortOrder, setSortOrder] = useState('price-asc');
   const [searchQuery, setSearchQuery] = useState('');
@@ -428,595 +429,484 @@ export default function DaftarProduk() {
     const startIndex = (currentPage - 1) * productsPerPage;
     return filteredProducts.slice(startIndex, startIndex + productsPerPage);
   }, [currentPage, filteredProducts, productsPerPage]);
+  // Baskit brand colors
+  const COLORS = {
+    tealGreen: [0, 104, 90], // #00685A - Primary color
+    orange: [242, 101, 34],  // #F26522 - Secondary color
+    lime: [140, 198, 63],    // #8CC63F - Accent color
+    yellow: [253, 187, 48],  // #FDBB30 - Accent color
+    lightGray: [245, 245, 245], // #F5F5F5 - Background
+    gray: [100, 100, 100],   // #646464 - Text
+    darkGray: [51, 51, 51]   // #333333 - Dark text
+  };
+  
+  // Helper function to draw a product card
+  const drawProductCard = (
+    pdf: jsPDF, 
+    product: Product, 
+    x: number, 
+    y: number, 
+    width: number, 
+    height: number,
+    selectedArea: string
+  ) => {
+    const regional = product.regions.find(r => r.area === selectedArea) || product.regions[0];
+    const usedPrice = regional?.distributorPrice ?? product.distributorPrice;
+    const usedMoq = regional?.moq ?? product.moq;
+    const margin = product.consumerPrice > 0 ? ((product.consumerPrice - usedPrice) / product.consumerPrice) * 100 : 0;
+    
+    // Create a clean product card with better shadow effect
+    // Draw shadow
+    pdf.setFillColor(230, 230, 230);
+    pdf.roundedRect(x + 1.5, y + 1.5, width, height, 4, 4, 'F');
+    
+    // Draw white box with proper border
+    pdf.setFillColor(255, 255, 255);
+    pdf.setDrawColor(240, 240, 240);
+    pdf.setLineWidth(0.5);
+    pdf.roundedRect(x, y, width, height, 4, 4, 'FD');
+    
+    // Draw the product image area with improved styling
+    pdf.setFillColor(250, 250, 250); // Very light gray background for product
+    pdf.roundedRect(x + 7, y + 7, width - 14, width - 14, 3, 3, 'F');
+    
+    // Draw product brand logo area
+    if (product.brand) {
+      // Brand logo background
+      pdf.setFillColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2], 0.05);
+      pdf.roundedRect(x + 7, y + 7, width - 14, 20, 3, 3, 'F');
+      
+      // Brand name
+      pdf.setTextColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2]);
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(product.brand.toUpperCase(), x + 12, y + 19);
+    }
+    
+    // Draw product image placeholder with improved styling
+    pdf.setTextColor(120, 120, 120);
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    if (product.name) {
+      const nameLines = pdf.splitTextToSize(product.name.toUpperCase(), width - 24);
+      pdf.text(nameLines, x + width/2, y + (width/2) - 5, { align: 'center' });
+    }
+    
+    // Starting Y position for product details (below the image)
+    const detailsY = y + width;
+    
+    // Add category badge with improved styling
+    if (product.category) {
+      pdf.setFillColor(COLORS.orange[0], COLORS.orange[1], COLORS.orange[2], 0.1);
+      pdf.setDrawColor(COLORS.orange[0], COLORS.orange[1], COLORS.orange[2]);
+      pdf.setTextColor(COLORS.orange[0], COLORS.orange[1], COLORS.orange[2]);
+      pdf.setFontSize(7);
+      
+      const categoryText = product.category;
+      const categoryWidth = pdf.getStringUnitWidth(categoryText) * 7 / pdf.internal.scaleFactor;
+      
+      // Draw badge background with better padding
+      pdf.roundedRect(x + 7, detailsY + 3, categoryWidth + 10, 10, 3, 3, 'FD');
+      // Draw category text
+      pdf.text(categoryText, x + 12, detailsY + 10);
+    }
+    
+    // Product name with improved styling
+    pdf.setTextColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2]);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    // Split name if too long
+    const nameLines = pdf.splitTextToSize(product.name, width - 14);
+    pdf.text(nameLines, x + 7, detailsY + 20);
+    
+    // Product size/ID with better positioning
+    pdf.setTextColor(COLORS.gray[0], COLORS.gray[1], COLORS.gray[2]);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.5);
+    pdf.text(`${product.size} • SKU: ${product.id}`, x + 7, detailsY + 20 + (nameLines.length * 5) + 3);
+    
+    // Divider line with proper styling
+    pdf.setDrawColor(240, 240, 240);
+    pdf.setLineWidth(0.7);
+    pdf.line(x + 7, detailsY + 35, x + width - 7, detailsY + 35);
+    
+    // First row of details - with better vertical spacing
+    const row1Y = detailsY + 45;
+    
+    // Left column - Distributor Price with improved styling
+    pdf.setFillColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2], 0.08);
+    pdf.roundedRect(x + 7, row1Y - 5, (width/2) - 10, 25, 3, 3, 'F');
+    
+    pdf.setFontSize(7);
+    pdf.setTextColor(COLORS.darkGray[0], COLORS.darkGray[1], COLORS.darkGray[2]);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Harga Distributor', x + 12, row1Y);
+    
+    pdf.setFontSize(10);
+    pdf.setTextColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2]);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(formatIDR(usedPrice), x + 12, row1Y + 10);
+    
+    // Right column - Consumer Price with improved styling
+    pdf.setFillColor(COLORS.orange[0], COLORS.orange[1], COLORS.orange[2], 0.08);
+    pdf.roundedRect(x + (width/2) + 3, row1Y - 5, (width/2) - 10, 25, 3, 3, 'F');
+    
+    pdf.setFontSize(7);
+    pdf.setTextColor(COLORS.darkGray[0], COLORS.darkGray[1], COLORS.darkGray[2]);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Harga Konsumen', x + (width/2) + 8, row1Y);
+    
+    pdf.setFontSize(10);
+    pdf.setTextColor(COLORS.orange[0], COLORS.orange[1], COLORS.orange[2]);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(formatIDR(product.consumerPrice), x + (width/2) + 8, row1Y + 10);
+    
+    // Second row of details with better vertical spacing
+    const row2Y = row1Y + 30;
+    
+    // Create grid layout for additional details
+    const columnWidth = (width - 17) / 2;
+    
+    // Margin and MOQ with improved styling
+    // Draw margin indicator with better color scheme
+    let marginColor = [220, 53, 69]; // Red for low margin
+    if (margin >= 30) {
+      marginColor = [40, 167, 69]; // Green for high margin
+    } else if (margin >= 15) {
+      marginColor = COLORS.yellow; // Baskit yellow for medium margin
+    }
+    
+    // Left column - Margin with color indicator and better styling
+    pdf.setFillColor(marginColor[0], marginColor[1], marginColor[2], 0.08);
+    pdf.roundedRect(x + 7, row2Y - 5, columnWidth, 20, 3, 3, 'F');
+    
+    pdf.setFontSize(7);
+    pdf.setTextColor(COLORS.darkGray[0], COLORS.darkGray[1], COLORS.darkGray[2]);
+    pdf.text('Margin Distributor', x + 12, row2Y);
+    
+    pdf.setFontSize(9.5);
+    pdf.setTextColor(marginColor[0], marginColor[1], marginColor[2]);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`${margin.toFixed(1)}%`, x + 12, row2Y + 10);
+    
+    // Right column - MOQ with improved styling
+    pdf.setFillColor(COLORS.lightGray[0], COLORS.lightGray[1], COLORS.lightGray[2]);
+    pdf.roundedRect(x + 7 + columnWidth + 3, row2Y - 5, columnWidth, 20, 3, 3, 'F');
+    
+    pdf.setFontSize(7);
+    pdf.setTextColor(COLORS.darkGray[0], COLORS.darkGray[1], COLORS.darkGray[2]);
+    pdf.text('Min. Qty Pesanan', x + 12 + columnWidth + 3, row2Y);
+    
+    pdf.setFontSize(9.5);
+    pdf.setTextColor(COLORS.darkGray[0], COLORS.darkGray[1], COLORS.darkGray[2]);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`${usedMoq}`, x + 12 + columnWidth + 3, row2Y + 10);
+    
+    // Third row - Area with improved styling
+    const row3Y = row2Y + 25;
+    
+    pdf.setFontSize(7);
+    pdf.setTextColor(COLORS.gray[0], COLORS.gray[1], COLORS.gray[2]);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Area Distribusi', x + 7, row3Y);
+    
+    pdf.setFontSize(8);
+    pdf.setTextColor(COLORS.darkGray[0], COLORS.darkGray[1], COLORS.darkGray[2]);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(regional?.area || 'Semua Area', x + 7, row3Y + 8);
+  };
+  
   const exportPDF = async () => {
     try {
-      setIsExporting(true);
       // Create PDF document
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    
-    // We'll use direct path for logo
-    
-    // Utility function to add a page with header
-    const addPageWithHeader = () => {
-      // Add white header background
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      
+      // Group products by category
+      const groupedProducts: Record<string, Product[]> = {};
+      
+      filteredProducts.forEach(product => {
+        const category = product.category || 'Uncategorized';
+        if (!groupedProducts[category]) {
+          groupedProducts[category] = [];
+        }
+        groupedProducts[category].push(product);
+      });
+      
+      // Create an elegant cover page
+      // Create a clean white background
       pdf.setFillColor(255, 255, 255);
-      pdf.rect(0, 0, pageWidth, 30, 'F');
+      pdf.rect(0, 0, pageWidth, pageHeight, 'F');
       
-      // Draw Baskit logo directly
-      // Draw "baskit" text
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(51, 51, 51); // Dark gray
-      pdf.setFontSize(18);
-      pdf.text('baskit', 10, 18);
+      // Add teal green header area at top
+      pdf.setFillColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2]);
+      pdf.rect(0, 0, pageWidth, 40, 'F');
       
-      // Draw colored squares for the logo
-      const squareSize = 5;
-      const logoX = 58;
-      const logoY = 13;
+      // Add teal green footer area at bottom
+      pdf.setFillColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2]);
+      pdf.rect(0, pageHeight - 40, pageWidth, 40, 'F');
       
-      pdf.setFillColor(0, 102, 87); // Teal green - top left
-      pdf.rect(logoX, logoY, squareSize, squareSize, 'F');
+      // Add modern side accent bar
+      pdf.setFillColor(COLORS.orange[0], COLORS.orange[1], COLORS.orange[2]);
+      pdf.rect(0, 40, 15, pageHeight - 80, 'F');
       
-      pdf.setFillColor(242, 101, 34); // Orange - top right
-      pdf.rect(logoX + squareSize + 1, logoY, squareSize, squareSize, 'F');
-      
-      pdf.setFillColor(140, 198, 63); // Green - bottom right
-      pdf.rect(logoX + squareSize + 1, logoY + squareSize + 1, squareSize, squareSize, 'F');
-      
-      pdf.setFillColor(253, 187, 48); // Yellow - bottom left
-      pdf.rect(logoX, logoY + squareSize + 1, squareSize, squareSize, 'F');
-      
-      // Add title
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(242, 101, 34); // Baskit orange color
-      pdf.setFontSize(24);
-      pdf.text('Distributor Catalog', 70, 18);
-      
-      // Add Area Distribusi on the right side
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(0, 102, 87); // Teal green
-      pdf.setFontSize(10);
-      pdf.text('Area Distribusi', pageWidth - 60, 15);
-      
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(0, 0, 0); 
-      pdf.text(area || 'Semua Area', pageWidth - 60, 20);
-      
-      // Add date
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(0, 102, 87); // Teal green
-      pdf.text('Tanggal Catalog', pageWidth - 30, 15);
-      
-      // Format date as DD/MM/YY
-      const currentDate = new Date();
-      const day = String(currentDate.getDate()).padStart(2, '0');
-      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-      const year = String(currentDate.getFullYear()).substring(2);
-      const formattedDate = `${day}/${month}/${year}`;
-      
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(0, 0, 0);
-      pdf.text(formattedDate, pageWidth - 30, 20);
-      
-      // Add horizontal line
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(10, 25, pageWidth - 10, 25);
-      
-      return 30; // Return starting Y position for content
-    };
-    
-    // Add cover page
-    // Create background gradient-like effect
-    pdf.setFillColor(0, 102, 87); // Teal green
-    pdf.rect(0, 0, pageWidth, pageHeight, 'F');
-    
-    // Add decorative element
-    pdf.setFillColor(242, 101, 34, 0.2); // Light orange
-    pdf.circle(pageWidth - 50, 50, 80, 'F');
-    pdf.circle(50, pageHeight - 80, 60, 'F');
-    
-    // Add baskit logo
-    pdf.setFillColor(255, 255, 255);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(36);
-    pdf.setTextColor(255, 255, 255);
-    pdf.text('baskit', pageWidth/2, pageHeight/2 - 50, { align: 'center' });
-    
-    // Draw colored squares for the logo - larger for cover
-    const logoSquareSize = 12;
-    const logoX = pageWidth/2 + 40;
-    const logoY = pageHeight/2 - 55;
-    
-    pdf.setFillColor(0, 102, 87); // Teal green - top left
-    pdf.rect(logoX, logoY, logoSquareSize, logoSquareSize, 'F');
-    
-    pdf.setFillColor(242, 101, 34); // Orange - top right
-    pdf.rect(logoX + logoSquareSize + 2, logoY, logoSquareSize, logoSquareSize, 'F');
-    
-    pdf.setFillColor(140, 198, 63); // Green - bottom right
-    pdf.rect(logoX + logoSquareSize + 2, logoY + logoSquareSize + 2, logoSquareSize, logoSquareSize, 'F');
-    
-    pdf.setFillColor(253, 187, 48); // Yellow - bottom left
-    pdf.rect(logoX, logoY + logoSquareSize + 2, logoSquareSize, logoSquareSize, 'F');
-    
-    // Add title
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(48);
-    pdf.setTextColor(255, 255, 255);
-    pdf.text('DISTRIBUTOR', pageWidth/2, pageHeight/2 + 10, { align: 'center' });
-    pdf.text('CATALOG', pageWidth/2, pageHeight/2 + 45, { align: 'center' });
-    
-    // Add catalog details
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(14);
-    pdf.text(area || 'Semua Area', pageWidth/2, pageHeight/2 + 80, { align: 'center' });
-    
-    // Add date
-    const formattedFullDate = new Date().toLocaleDateString('id-ID', { 
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
-    pdf.text(formattedFullDate, pageWidth/2, pageHeight/2 + 100, { align: 'center' });
-    
-    // Add contact info at bottom
-    pdf.setFontSize(10);
-    pdf.text('www.baskit-distributor.com', pageWidth/2, pageHeight - 50, { align: 'center' });
-    pdf.text('info@baskit-distributor.com | +62 822 1234 5678', pageWidth/2, pageHeight - 35, { align: 'center' });
-    
-    // Add page break
-    pdf.addPage();
-    
-    // Add table of contents page
-    pdf.setFillColor(255, 255, 255);
-    pdf.rect(0, 0, pageWidth, pageHeight, 'F');
-    
-    // Add header
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(0, 102, 87); // Teal green
-    pdf.setFontSize(24);
-    pdf.text('Daftar Isi', 20, 30);
-    
-    pdf.setDrawColor(0, 102, 87); // Teal green
-    pdf.line(20, 35, 80, 35);
-    
-    let tocY = 50;
-    
-    // Add introduction section
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(14);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text('1. Informasi Katalog', 20, tocY);
-    tocY += 10;
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(10);
-    pdf.text('Informasi area distribusi', 25, tocY);
-    pdf.text('3', 180, tocY, { align: 'right' });
-    tocY += 8;
-    
-    pdf.text('Panduan pemesanan produk', 25, tocY);
-    pdf.text('3', 180, tocY, { align: 'right' });
-    tocY += 8;
-    
-    pdf.text('Syarat dan ketentuan', 25, tocY);
-    pdf.text('3', 180, tocY, { align: 'right' });
-    tocY += 20;
-    
-    // Add product categories
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(14);
-    pdf.text('2. Daftar Produk', 20, tocY);
-    tocY += 10;
-    
-    // Group products by category for ToC
-    const categories = [...new Set(filteredProducts.map(p => p.category || 'Lainnya'))];
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(10);
-    
-    categories.forEach((category, index) => {
-      pdf.text(`${category}`, 25, tocY);
-      pdf.text('4', 180, tocY, { align: 'right' });
-      tocY += 8;
-    });
-    
-    tocY += 20;
-    
-    // Add contact information
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(14);
-    pdf.text('3. Kontak dan Pemesanan', 20, tocY);
-    tocY += 10;
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(10);
-      pdf.text('Informasi kontak', 25, tocY);
-    pdf.text(String(paginationTotalPages), 180, tocY, { align: 'right' });
-    tocY += 8;
-    
-    pdf.text('Cara pemesanan', 25, tocY);
-    pdf.text(String(paginationTotalPages), 180, tocY, { align: 'right' });    // Add page break for intro page
-    pdf.addPage();
-    
-    // Add intro page
-    const introY = addPageWithHeader();
-    
-    // Add intro header
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(0, 102, 87); // Teal green
-    pdf.setFontSize(18);
-    pdf.text('Informasi Katalog', 20, introY + 10);
-    
-    pdf.setDrawColor(200, 200, 200);
-    pdf.line(20, introY + 15, pageWidth - 20, introY + 15);
-    
-    // Add intro content
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(12);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text('Informasi Area Distribusi', 20, introY + 30);
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(10);
-    pdf.text(`Katalog ini mencakup area distribusi: ${area || 'Semua Area'}`, 20, introY + 40);
-    pdf.text('Harga dan ketersediaan produk dapat berbeda untuk setiap area distribusi.', 20, introY + 50);
-    
-    // Add ordering information
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(12);
-    pdf.text('Panduan Pemesanan', 20, introY + 70);
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(10);
-    pdf.text('1. Hubungi distributor Baskit terdekat atau tim sales kami', 20, introY + 80);
-    pdf.text('2. Sebutkan kode SKU produk yang ingin dipesan', 20, introY + 90);
-    pdf.text('3. Perhatikan MOQ (Minimum Order Quantity) setiap produk', 20, introY + 100);
-    pdf.text('4. Konfirmasi harga dan ketersediaan produk', 20, introY + 110);
-    
-    // Add terms and conditions
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(12);
-    pdf.text('Syarat dan Ketentuan', 20, introY + 130);
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(10);
-    pdf.text('• Harga dapat berubah sewaktu-waktu tanpa pemberitahuan', 20, introY + 140);
-    pdf.text('• Ketersediaan stok tergantung pada kapasitas produksi dan permintaan', 20, introY + 150);
-    pdf.text('• Pemesanan harus memenuhi MOQ yang ditentukan', 20, introY + 160);
-    pdf.text('• Biaya pengiriman tidak termasuk dalam harga produk', 20, introY + 170);
-    
-    // Add page break for product list
-    pdf.addPage();
-    
-    // Add first content page with header
-    let yPosition = addPageWithHeader();
-    let xPosition = 10;
-    const productsToExport = filteredProducts;
-    const itemsPerRow = 4;
-    const marginBetweenItems = 5; // Space between items
-    const pageMargin = 10; // Margin from page edges
-    
-    // Calculate item dimensions to fit the page properly
-    const availableWidth = pageWidth - (2 * pageMargin) - ((itemsPerRow - 1) * marginBetweenItems);
-    const itemWidth = availableWidth / itemsPerRow;
-    const itemHeight = itemWidth + 50; // Height is width plus space for text details
-    
-    // Draw a title for product list
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(0, 102, 87); // Teal green
-    pdf.setFontSize(14);
-    pdf.text(`Daftar Produk - ${productsToExport.length} Produk`, pageMargin, yPosition + 5);
-    yPosition += 10;
-    
-    // Process all products
-    for (let i = 0; i < productsToExport.length; i++) {
-      const product = productsToExport[i];
-      const regional = product.regions.find(r => r.area === area) || product.regions[0];
-      const usedPrice = regional?.distributorPrice ?? product.distributorPrice;
-      const usedMoq = regional?.moq ?? product.moq;
-      const margin = product.consumerPrice > 0 ? ((product.consumerPrice - usedPrice) / product.consumerPrice) * 100 : 0;
-      
-      // Calculate position
-      const col = i % itemsPerRow;
-      xPosition = pageMargin + (col * (itemWidth + marginBetweenItems));
-      
-      // Check if we need a new row
-      if (col === 0 && i > 0) {
-        yPosition += itemHeight + 10; // Add extra spacing between rows
-      }
-      
-      // Check if we need a new page
-      if (yPosition + itemHeight > pageHeight - pageMargin) {
-        pdf.addPage();
-        yPosition = addPageWithHeader();
-      }
-      
-      // Create a clean product card with shadow effect
-      // Draw shadow
-      pdf.setFillColor(240, 240, 240);
-      pdf.roundedRect(xPosition + 1, yPosition + 1, itemWidth, itemHeight, 3, 3, 'F');
-      
-      // Draw white box
-      pdf.setFillColor(255, 255, 255);
-      pdf.setDrawColor(230, 230, 230);
-      pdf.roundedRect(xPosition, yPosition, itemWidth, itemHeight, 3, 3, 'FD');
-      
-      // Draw the product image area
-      pdf.setFillColor(245, 245, 245); // Light gray background for product
-      pdf.roundedRect(xPosition + 5, yPosition + 5, itemWidth - 10, itemWidth - 10, 2, 2, 'F');
-      
-      // Draw product image placeholder text
-      pdf.setTextColor(120, 120, 120);
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'bold');
-      if (product.brand) {
-        pdf.text(product.brand.toUpperCase(), xPosition + itemWidth/2, yPosition + itemWidth/2 - 5, { align: 'center' });
-      }
-      if (product.name) {
-        const nameLines = pdf.splitTextToSize(product.name.toUpperCase(), itemWidth - 20);
-        pdf.text(nameLines, xPosition + itemWidth/2, yPosition + itemWidth/2 + 5, { align: 'center' });
-      }
-      
-      // Starting Y position for product details (below the image)
-      const detailsY = yPosition + itemWidth + 5;
-      
-      // Add category badge
-      if (product.category) {
-        pdf.setFillColor(242, 101, 34, 0.1); // Light orange background
-        pdf.setDrawColor(242, 101, 34); // Orange border
-        pdf.setTextColor(242, 101, 34); // Orange text
-        pdf.setFontSize(6);
+      // Add decorative elements - subtle pattern overlay
+      for (let i = 0; i < 12; i++) {
+        const opacity = 0.04;
+        const size = 30;
+        const xPos = (i % 4) * 60;
+        const yPos = Math.floor(i / 4) * 60 + 50;
         
-        const categoryText = product.category;
-        const categoryWidth = pdf.getStringUnitWidth(categoryText) * 6 / pdf.internal.scaleFactor;
-        
-        // Draw badge background
-        pdf.roundedRect(xPosition + 5, detailsY, categoryWidth + 6, 8, 2, 2, 'FD');
-        // Draw category text
-        pdf.text(categoryText, xPosition + 8, detailsY + 6);
+        pdf.setFillColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2], opacity);
+        pdf.circle(pageWidth - xPos - 20, yPos, size, 'F');
       }
       
-      // Product name
-      pdf.setTextColor(0, 102, 87); // Teal green for product name
+      // Add diagonal accent line
+      pdf.setDrawColor(COLORS.orange[0], COLORS.orange[1], COLORS.orange[2], 0.3);
+      pdf.setLineWidth(30);
+      pdf.line(pageWidth, 0, 0, pageHeight);
+      
+      // Add main title block in the center with clean white background
+      const titleBoxWidth = 160;
+      const titleBoxHeight = 200;
+      const titleBoxX = (pageWidth - titleBoxWidth) / 2;
+      const titleBoxY = (pageHeight - titleBoxHeight) / 2 - 10;
+      
+      // Create white background for title box
+      pdf.setFillColor(255, 255, 255, 0.9);
+      pdf.roundedRect(titleBoxX, titleBoxY, titleBoxWidth, titleBoxHeight, 6, 6, 'F');
+      
+      // Add subtle border
+      pdf.setDrawColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2], 0.3);
+      pdf.setLineWidth(1);
+      pdf.roundedRect(titleBoxX + 3, titleBoxY + 3, titleBoxWidth - 6, titleBoxHeight - 6, 4, 4, 'S');
+      
+      // Add baskit logo and title in the center box
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(9);
-      // Split name if too long
-      const nameLines = pdf.splitTextToSize(product.name, itemWidth - 10);
-      pdf.text(nameLines, xPosition + 5, detailsY + 12);
+      pdf.setFontSize(42);
+      pdf.setTextColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2]);
+      pdf.text('baskit', pageWidth/2, titleBoxY + 50, { align: 'center' });
       
-      // Product size/ID
-      pdf.setTextColor(100, 100, 100);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7);
-      pdf.text(`${product.size} • SKU: ${product.id}`, xPosition + 5, detailsY + 18);
+      // Draw colored squares for the logo - larger for cover
+      const logoSquareSize = 14;
+      const logoSquareGap = 2;
+      const logoX = pageWidth/2 - (logoSquareSize * 2 + logoSquareGap) / 2;
+      const logoY = titleBoxY + 60;
       
-      // Divider line
-      pdf.setDrawColor(240, 240, 240);
-      pdf.line(xPosition + 5, detailsY + 22, xPosition + itemWidth - 5, detailsY + 22);
+      // Draw logo squares with slight rounding
+      const drawCoverSquare = (x: number, y: number, color: number[]) => {
+        pdf.setFillColor(color[0], color[1], color[2]);
+        pdf.roundedRect(x, y, logoSquareSize, logoSquareSize, 2, 2, 'F');
+      };
       
-      // First row of details
-      const row1Y = detailsY + 30;
+      drawCoverSquare(logoX, logoY, COLORS.tealGreen);
+      drawCoverSquare(logoX + logoSquareSize + logoSquareGap, logoY, COLORS.orange);
+      drawCoverSquare(logoX + logoSquareSize + logoSquareGap, logoY + logoSquareSize + logoSquareGap, COLORS.lime);
+      drawCoverSquare(logoX, logoY + logoSquareSize + logoSquareGap, COLORS.yellow);
       
-      // Left column - Distributor Price
-      pdf.setFillColor(0, 102, 87, 0.1); // Light teal background
-      pdf.roundedRect(xPosition + 5, row1Y - 5, itemWidth/2 - 10, 22, 2, 2, 'F');
-      
-      pdf.setFontSize(6);
-      pdf.setTextColor(80, 80, 80);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text('Harga Distributor', xPosition + 8, row1Y);
-      
-      pdf.setFontSize(10);
-      pdf.setTextColor(0, 102, 87); // Teal green
+      // Add title text with premium styling
+      pdf.setFontSize(28);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(formatIDR(usedPrice), xPosition + 8, row1Y + 8);
+      pdf.setTextColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2]);
+      pdf.text('PRODUCT', pageWidth/2, titleBoxY + 115, { align: 'center' });
       
-      // Right column - Consumer Price
-      pdf.setFillColor(242, 101, 34, 0.1); // Light orange background
-      pdf.roundedRect(xPosition + itemWidth/2, row1Y - 5, itemWidth/2 - 5, 22, 2, 2, 'F');
+      pdf.setFontSize(38);
+      pdf.setTextColor(COLORS.orange[0], COLORS.orange[1], COLORS.orange[2]);
+      pdf.text('CATALOG', pageWidth/2, titleBoxY + 145, { align: 'center' });
       
-      pdf.setFontSize(6);
-      pdf.setTextColor(80, 80, 80);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text('Harga Konsumen', xPosition + itemWidth/2 + 3, row1Y);
+      // Add area information with better styling
+      const areaText = area || 'Semua Area';
+      pdf.setFillColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2], 0.1);
+      pdf.roundedRect(titleBoxX + 20, titleBoxY + 160, titleBoxWidth - 40, 25, 3, 3, 'F');
       
-      pdf.setFontSize(10);
-      pdf.setTextColor(242, 101, 34); // Orange
       pdf.setFont('helvetica', 'bold');
-      pdf.text(formatIDR(product.consumerPrice), xPosition + itemWidth/2 + 3, row1Y + 8);
+      pdf.setFontSize(16);
+      pdf.setTextColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2]);
+      pdf.text(areaText, pageWidth/2, titleBoxY + 178, { align: 'center' });
       
-      // Second row of details
-      const row2Y = row1Y + 25;
+      // Add date with premium styling
+      const formattedFullDate = new Date().toLocaleDateString('id-ID', { 
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
       
-      // Create grid layout for additional details
-      const columnWidth = (itemWidth - 10) / 2;
-      
-      // Margin and MOQ
-      // Draw margin indicator
-      let marginColor = [220, 53, 69]; // Red for low margin
-      if (margin >= 30) {
-        marginColor = [40, 167, 69]; // Green for high margin
-      } else if (margin >= 15) {
-        marginColor = [255, 193, 7]; // Yellow for medium margin
-      }
-      
-      // Left column - Margin with color indicator
-      pdf.setFillColor(marginColor[0], marginColor[1], marginColor[2], 0.1);
-      pdf.roundedRect(xPosition + 5, row2Y - 5, columnWidth, 18, 2, 2, 'F');
-      
-      pdf.setFontSize(6);
-      pdf.setTextColor(80, 80, 80);
-      pdf.text('Margin Distributor', xPosition + 8, row2Y);
-      
-      pdf.setFontSize(9);
-      pdf.setTextColor(marginColor[0], marginColor[1], marginColor[2]);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(`${margin.toFixed(1)}%`, xPosition + 8, row2Y + 8);
-      
-      // Right column - MOQ
-      pdf.setFillColor(240, 240, 240); // Light gray
-      pdf.roundedRect(xPosition + 5 + columnWidth + 2, row2Y - 5, columnWidth - 2, 18, 2, 2, 'F');
-      
-      pdf.setFontSize(6);
-      pdf.setTextColor(80, 80, 80);
-      pdf.text('Min. Qty Pesanan', xPosition + 8 + columnWidth + 2, row2Y);
-      
-      pdf.setFontSize(9);
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(`${usedMoq}`, xPosition + 8 + columnWidth + 2, row2Y + 8);
-      
-      // Third row - Area
-      const row3Y = row2Y + 20;
-      
-      pdf.setFontSize(6);
-      pdf.setTextColor(80, 80, 80);
+      // Add date box at bottom of title box
       pdf.setFont('helvetica', 'normal');
-      pdf.text('Area Distribusi', xPosition + 5, row3Y);
+      pdf.setFontSize(12);
+      pdf.setTextColor(COLORS.darkGray[0], COLORS.darkGray[1], COLORS.darkGray[2]);
+      pdf.text(formattedFullDate, pageWidth/2, pageHeight/2 + 110, { align: 'center' });
       
-      pdf.setFontSize(8);
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(regional?.area || 'Semua Area', xPosition + 5, row3Y + 6);
-      
-      // Add updated date in small text at bottom
-      const currentDate = new Date();
-      const day = String(currentDate.getDate()).padStart(2, '0');
-      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-      const year = String(currentDate.getFullYear()).substring(2);
-      
-      pdf.setFontSize(5);
-      pdf.setTextColor(150, 150, 150);
+      // Add product count information
+      const productCountText = `${filteredProducts.length} ${lang === 'id' ? 'Produk' : 'Products'}`;
+      pdf.setFontSize(12);
       pdf.setFont('helvetica', 'italic');
-      pdf.text(`Updated: ${day}/${month}/${year}`, xPosition + 5, yPosition + itemHeight - 3);
-    }
-    
-    // Add footer on each page with page numbers
-    // For jsPDF typings, access the internal object and use appropriate method
-    const totalPdfPages = pdf.internal.pages.length - 1;
-    
-    // Get current date for the footer
-    const footerDate = new Date();
-    
-    // Go through all pages to add consistent footer
-    for (let i = 1; i <= totalPdfPages; i++) {
-      pdf.setPage(i);
+      pdf.text(productCountText, pageWidth/2, pageHeight/2 + 130, { align: 'center' });
       
-      // Add colored footer
-      pdf.setFillColor(0, 102, 87); // Teal green
-      pdf.rect(0, pageHeight - 15, pageWidth, 15, 'F');
-      
-      // Add page number
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(8);
+      // Add contact info in the footer area
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`Page ${i} of ${totalPdfPages}`, pageWidth - 25, pageHeight - 5);
-      
-      // Add baskit info
+      pdf.setFontSize(11);
       pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(8);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`Baskit Distributor Catalog | ${footerDate.toLocaleDateString('id-ID')}`, 15, pageHeight - 5);
+      pdf.text('www.baskit-distributor.com', 25, pageHeight - 20);
+      pdf.text('info@baskit-distributor.com | +62 822 1234 5678', pageWidth - 25, pageHeight - 20, { align: 'right' });
       
-      // Add disclaimer text
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(6);
-      pdf.text('Harga dan ketersediaan stok dapat berubah sewaktu-waktu', pageWidth/2, pageHeight - 5, { align: 'center' });
-    }
-    
-    // Move back to the last page
-    pdf.setPage(totalPdfPages);
-    
-    // Add a final contact page
-    pdf.addPage();
-    const contactY = addPageWithHeader();
-    
-    // Add contact header
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(0, 102, 87); // Teal green
-    pdf.setFontSize(18);
-    pdf.text('Kontak dan Pemesanan', 20, contactY + 10);
-    
-    pdf.setDrawColor(200, 200, 200);
-    pdf.line(20, contactY + 15, pageWidth - 20, contactY + 15);
-    
-    // Add contact information
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(14);
-    pdf.setTextColor(242, 101, 34); // Orange
-    pdf.text('Hubungi Kami', 20, contactY + 40);
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(12);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text('Email: info@baskit-distributor.com', 20, contactY + 60);
-    pdf.text('Telepon: +62 822 1234 5678', 20, contactY + 75);
-    pdf.text('Website: www.baskit-distributor.com', 20, contactY + 90);
-    
-    // Add sales representative info
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(14);
-    pdf.setTextColor(242, 101, 34); // Orange
-    pdf.text('Tim Sales', 20, contactY + 120);
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(12);
-    pdf.setTextColor(0, 0, 0);
-    
-    // Dummy sales team information
-    const salesTeam = [
-      { name: 'Budi Santoso', area: 'Jakarta', phone: '+62 812 3456 7890' },
-      { name: 'Ani Wijaya', area: 'Bandung', phone: '+62 813 4567 8901' },
-      { name: 'Dedi Kurniawan', area: 'Surabaya', phone: '+62 814 5678 9012' }
-    ];
-    
-    let salesY = contactY + 140;
-    salesTeam.forEach(person => {
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(person.name, 20, salesY);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`Area: ${person.area}`, 100, salesY);
-      pdf.text(`${person.phone}`, 180, salesY);
-      salesY += 15;
-    });
-    
-    // Add QR code placeholder
-    pdf.setFillColor(240, 240, 240);
-    pdf.roundedRect(pageWidth - 80, contactY + 40, 60, 60, 2, 2, 'F');
-    pdf.setFont('helvetica', 'italic');
-    pdf.setFontSize(8);
-    pdf.setTextColor(100, 100, 100);
-    pdf.text('Scan for Website', pageWidth - 50, contactY + 110, { align: 'center' });
-    
-    // Create filename based on active filters and date
-    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    let filename = `baskit-distributor-catalog-${timestamp}`;
-    if (area) filename += '-' + area.toLowerCase().replace(/\s+/g, '-');
-    if (selectedBrand) filename += '-' + selectedBrand.toLowerCase().replace(/\s+/g, '-');
-    filename += '.pdf';
-    
-    pdf.save(filename);
-    
-    // Show success notification
-    toast({
-      title: lang === 'id' ? 'Katalog Berhasil Diekspor' : 'Catalog Successfully Exported',
-      description: lang === 'id' 
-        ? `Katalog ${area ? area + ' ' : ''}berhasil diunduh dengan ${filteredProducts.length} produk` 
-        : `${area ? area + ' ' : ''}Catalog successfully downloaded with ${filteredProducts.length} products`,
-      variant: 'default'
-    });
+      // Add first content page
+      pdf.addPage();
+      let yPosition = addPDFHeader(pdf, { 
+        title: 'Product Catalog',
+        subtitle: `${filteredProducts.length} Products`,
+        area: area || 'All Areas',
+        customColors: {
+          titleColor: [COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2]],
+          areaColor: [COLORS.orange[0], COLORS.orange[1], COLORS.orange[2]]
+        },
+        extraPadding: 5
+      });
+      
+      // For each category, add a section header and products
+      let productCount = 0;
+      for (const [category, products] of Object.entries(groupedProducts)) {
+        // Skip to a new page if we're close to the bottom and it's not the first category
+        if (yPosition > pageHeight - 50 && productCount > 0) {
+          pdf.addPage();
+          yPosition = addPDFHeader(pdf, { 
+            title: 'Product Catalog',
+            subtitle: `${filteredProducts.length} Products`,
+            area: area || 'All Areas'
+          });
+          yPosition += 10; // Add some padding after header
+        }
+        
+        // Draw category header with improved styling
+        const drawCategoryHeader = (pdf: jsPDF, category: string, y: number) => {
+          const headerHeight = 20;
+          
+          // Create an elegant gradient-style background
+          pdf.setFillColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2], 0.08);
+          pdf.roundedRect(10, y, pageWidth - 20, headerHeight, 3, 3, 'F');
+          
+          // Add left accent bar for visual interest
+          pdf.setFillColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2]);
+          pdf.rect(10, y, 4, headerHeight, 'F');
+          
+          // Add subtle right decoration
+          pdf.setFillColor(COLORS.orange[0], COLORS.orange[1], COLORS.orange[2], 0.15);
+          pdf.circle(pageWidth - 15, y + headerHeight/2, 8, 'F');
+          
+          // Add category text with better styling
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(16);
+          pdf.setTextColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2]);
+          pdf.text(category, 25, y + 14);
+          
+          // Add product count if available
+          const productCount = groupedProducts[category]?.length || 0;
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(10);
+          pdf.setTextColor(COLORS.gray[0], COLORS.gray[1], COLORS.gray[2]);
+          pdf.text(`${productCount} ${productCount === 1 ? 'product' : 'products'}`, pageWidth - 40, y + 14);
+          
+          return headerHeight;
+        };
+        
+        // Add the category header
+        const headerHeight = drawCategoryHeader(pdf, category, yPosition);
+        
+        yPosition += headerHeight + 10; // Space after category header
+        
+        let xPosition = 10;
+        const startingYPosition = yPosition;
+        
+        // Calculate cards per row based on page width - improved spacing
+        const itemsPerRow = 3;
+        const marginBetweenItems = 8; // Increased spacing between items
+        
+        // Calculate dimensions with better proportions
+        const availableWidth = pageWidth - 20 - ((itemsPerRow - 1) * marginBetweenItems);
+        const itemWidth = availableWidth / itemsPerRow;
+        const itemHeight = itemWidth + 80; // Increased height for better text layout
+        
+        // Add products for this category
+        for (let i = 0; i < products.length; i++) {
+          const product = products[i];
+          
+          // Calculate position
+          const col = i % itemsPerRow;
+          xPosition = 10 + (col * (itemWidth + marginBetweenItems));
+          
+          // Check if we need a new row
+          if (col === 0 && i > 0) {
+            yPosition += itemHeight + 10;
+          }
+          
+          // Check if we need a new page - with better spacing management
+          if (yPosition + itemHeight > pageHeight - 30) {
+            pdf.addPage();
+            yPosition = addPDFHeader(pdf, { 
+              title: 'Product Catalog',
+              subtitle: `${filteredProducts.length} Products`,
+              area: area || 'All Areas',
+              customColors: {
+                titleColor: [COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2]],
+                areaColor: [COLORS.orange[0], COLORS.orange[1], COLORS.orange[2]]
+              },
+              extraPadding: 5
+            });
+            yPosition += 10;
+          }
+          
+          // Draw product card
+          drawProductCard(pdf, product, xPosition, yPosition, itemWidth, itemHeight, area);
+          
+          productCount++;
+        }
+        
+        // Move position to after this category's products
+        if (products.length > 0) {
+          const rowsForCategory = Math.ceil(products.length / itemsPerRow);
+          yPosition = startingYPosition + (rowsForCategory * (itemHeight + 10)) + 20;
+        }
+      }
+      
+      // Add page numbers at the bottom
+      const totalPdfPages = pdf.internal.pages.length - 1;
+      for (let i = 1; i <= totalPdfPages; i++) {
+        pdf.setPage(i);
+        addPDFFooter(pdf, i, totalPdfPages, {
+          disclaimer: 'Harga dan stok dapat berubah sewaktu-waktu',
+          website: 'www.baskit-distributor.com',
+          showLogo: true,
+          customColors: {
+            footerColor: [COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2]]
+          }
+        });
+      }
+      
+      // Create filename based on active filters
+      const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      let filename = `baskit-catalog-${timestamp}`;
+      if (area) filename += '-' + area.toLowerCase().replace(/\s+/g, '-');
+      if (selectedBrand) filename += '-' + selectedBrand.toLowerCase().replace(/\s+/g, '-');
+      filename += '.pdf';
+      
+      pdf.save(filename);
+      
+      // Show success notification
+      toast({
+        title: lang === 'id' ? 'Katalog Berhasil Diunduh' : 'Catalog Successfully Downloaded',
+        description: lang === 'id' 
+          ? `Katalog produk ${area ? area + ' ' : ''}berhasil diunduh dengan ${filteredProducts.length} produk` 
+          : `${area ? area + ' ' : ''}Product catalog successfully downloaded with ${filteredProducts.length} products`,
+        variant: 'default'
+      });
     } catch (error) {
       console.error('Error exporting PDF:', error);
       toast({
-        title: lang === 'id' ? 'Gagal mengekspor PDF' : 'Failed to export PDF',
-        description: lang === 'id' ? 'Terjadi kesalahan saat mengekspor katalog' : 'An error occurred while exporting the catalog',
+        title: lang === 'id' ? 'Gagal mengunduh katalog' : 'Failed to download catalog',
+        description: lang === 'id' ? 'Terjadi kesalahan saat mengunduh katalog' : 'An error occurred while downloading the catalog',
         variant: 'destructive'
       });
-    } finally {
-      setIsExporting(false);
     }
   };
 
@@ -1177,61 +1067,18 @@ export default function DaftarProduk() {
               <div className="flex flex-col md:flex-row gap-2">
                 <Button 
                   variant="outline" 
-                  onClick={exportPDF} 
-                  className="flex-1 md:w-auto bg-gradient-to-r from-[#00685a]/10 to-[#f26522]/5 hover:from-[#00685a]/20 hover:to-[#f26522]/10" 
-                  disabled={isExporting}
+                  onClick={exportPDF}
+                  className="w-full md:w-auto flex items-center justify-center"
                 >
-                  {isExporting ? (
-                    <>
-                      <div className="mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      {lang === 'id' ? "Memproses Katalog..." : "Processing Catalog..."}
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      {lang === 'id' ? "Ekspor Katalog Lengkap" : "Export Full Catalog"}
-                    </>
-                  )}
+                  <svg className="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {lang === 'id' ? "Unduh Katalog" : "Download Catalog"}
                 </Button>
                 
-                <div className="relative group">
-                  <Button 
-                    variant="default" 
-                    className="w-full md:w-auto bg-[#00685a] hover:bg-[#00685a]/90" 
-                    disabled={isExporting}
-                    onClick={exportPDF}
-                  >
-                    {isExporting ? (
-                      <>
-                        <div className="mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      </>
-                    ) : (
-                      <>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-                        </svg>
-                      </>
-                    )}
-                    {lang === 'id' ? "Katalog Premium" : "Premium Catalog"}
-                  </Button>
-                  
-                  <div className="absolute hidden group-hover:block bottom-full mb-2 p-2 bg-[#00685a] text-white text-xs rounded shadow-lg w-48 right-0 z-10">
-                    {lang === 'id' ? "Katalog dengan desain premium, cover eksklusif dan fitur tambahan" : "Catalog with premium design, exclusive cover and additional features"}
-                  </div>
-                </div>
-                
                 <div className="text-xs text-muted-foreground text-right flex items-center md:ml-2">
-                  {isExporting && (
-                    <div className="flex items-center gap-2 text-green-600 animate-pulse">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      {lang === 'id' ? "Sedang memproses..." : "Processing..."}
-                    </div>
-                  )}
-                </div>
+                {/* Empty div to maintain layout */}
+              </div>
               </div>
             </div>
           </div>
