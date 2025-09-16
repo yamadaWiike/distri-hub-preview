@@ -15,6 +15,7 @@ import { addPDFHeader, addPDFFooter } from "@/utils/pdf-utils";
 import { translations } from "@/lib/translations";
 import { useToast } from "@/components/ui/use-toast";
 import { getAllProducts, getAllAreas, getAllBrands } from "@/services/product-service";
+import { generateCatalogPDF } from "@/utils/catalog";
 
 function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: Product; loggedIn: boolean; selectedFilterArea?: string }) {
   const { addItem } = useCart();
@@ -429,6 +430,7 @@ export default function DaftarProduk() {
     const startIndex = (currentPage - 1) * productsPerPage;
     return filteredProducts.slice(startIndex, startIndex + productsPerPage);
   }, [currentPage, filteredProducts, productsPerPage]);
+
   // Baskit brand colors
   const COLORS = {
     tealGreen: [0, 104, 90], // #00685A - Primary color
@@ -1067,7 +1069,7 @@ export default function DaftarProduk() {
               <div className="flex flex-col md:flex-row gap-2">
                 <Button 
                   variant="outline" 
-                  onClick={exportPDF}
+                  onClick={()=> generateCatalogPDF(currentProducts)}
                   className="w-full md:w-auto flex items-center justify-center"
                 >
                   <svg className="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1114,6 +1116,7 @@ export default function DaftarProduk() {
               ) : ''}
             </div>
           </div>
+          
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {currentProducts.map((p) => (
               <div key={p.id} className="h-full flex">
