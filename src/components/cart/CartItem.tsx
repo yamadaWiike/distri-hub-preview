@@ -17,15 +17,15 @@ export function CartItem({ item }: CartItemProps) {
   const t = translations[lang];
   
   const handleDecrease = () => {
-    updateQuantity(item.id, item.province, item.qty - 1);
+    updateQuantity(item.id, item.province, item.qty - 1, item.variant?.id);
   };
   
   const handleIncrease = () => {
-    updateQuantity(item.id, item.province, item.qty + 1);
+    updateQuantity(item.id, item.province, item.qty + 1, item.variant?.id);
   };
   
   const handleRemove = () => {
-    removeItem(item.id, item.province);
+    removeItem(item.id, item.province, item.variant?.id);
   };
   
   return (
@@ -40,6 +40,11 @@ export function CartItem({ item }: CartItemProps) {
         <h3 className="font-semibold">{item.name}</h3>
         <p className="text-gray-600 text-sm">
           {item.size} • {formatIDR(item.unitPrice)}
+          {item.variant && (
+            <span className="ml-1 text-primary-foreground bg-primary rounded-sm px-1.5 py-0.5 text-xs font-medium">
+              {item.variant.name}
+            </span>
+          )}
         </p>
         
         <div className="flex items-center justify-between mt-2">

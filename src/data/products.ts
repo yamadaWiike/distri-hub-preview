@@ -4,6 +4,23 @@ export type RegionPricing = {
   moq: number;
 };
 
+export type VariantOption = {
+  option_name: string;
+  option_values: string[];
+};
+
+export type ProductVariant = {
+  id: string;
+  variantName: string;
+  variantDescription?: string;
+  additionalPrice: number;
+  isActive: boolean;
+  options?: {
+    name: string;
+    value: string;
+  }[];
+};
+
 export type Product = {
   id: string;
   category: string;
@@ -15,11 +32,15 @@ export type Product = {
   moq: number;
   description: string;
   regions: RegionPricing[];
+  variants?: ProductVariant[]; // Product variants
+  variantOptions?: VariantOption[]; // Available options for variants
+  hasVariants?: boolean; // Quick flag to check if product has variants
   image?: string; // URL or imported asset path
   stock?: number; // Stock quantity
   margin?: number;
   area?: string;
   units?: number;
+  sku?: string; // Product SKU (may be different from ID in some cases)
 };
 
 export const PRODUCTS: Product[] = [
@@ -39,6 +60,73 @@ export const PRODUCTS: Product[] = [
       { area: 'Kota Surabaya', distributorPrice: 4550, moq: 100 },
     ],
     image: '/placeholder.svg',
+    hasVariants: true,
+    variantOptions: [
+      { option_name: 'Size', option_values: ['Small', 'Medium', 'Large'] },
+      { option_name: 'Packaging', option_values: ['Standard Box', 'Gift Box', 'Eco-friendly'] }
+    ],
+    variants: [
+      {
+        id: 'var-chips-10-1',
+        variantName: 'Small - Standard Box',
+        additionalPrice: 0,
+        isActive: true,
+        options: [
+          { name: 'Size', value: 'Small' },
+          { name: 'Packaging', value: 'Standard Box' }
+        ]
+      },
+      {
+        id: 'var-chips-10-2',
+        variantName: 'Medium - Standard Box',
+        additionalPrice: 1000,
+        isActive: true,
+        options: [
+          { name: 'Size', value: 'Medium' },
+          { name: 'Packaging', value: 'Standard Box' }
+        ]
+      },
+      {
+        id: 'var-chips-10-3',
+        variantName: 'Large - Standard Box',
+        additionalPrice: 2000,
+        isActive: true,
+        options: [
+          { name: 'Size', value: 'Large' },
+          { name: 'Packaging', value: 'Standard Box' }
+        ]
+      },
+      {
+        id: 'var-chips-10-4',
+        variantName: 'Small - Gift Box',
+        additionalPrice: 1500,
+        isActive: true,
+        options: [
+          { name: 'Size', value: 'Small' },
+          { name: 'Packaging', value: 'Gift Box' }
+        ]
+      },
+      {
+        id: 'var-chips-10-5',
+        variantName: 'Medium - Gift Box',
+        additionalPrice: 2500,
+        isActive: true,
+        options: [
+          { name: 'Size', value: 'Medium' },
+          { name: 'Packaging', value: 'Gift Box' }
+        ]
+      },
+      {
+        id: 'var-chips-10-6',
+        variantName: 'Eco-friendly Package',
+        variantDescription: 'Environmentally friendly packaging using biodegradable materials',
+        additionalPrice: 1200,
+        isActive: true,
+        options: [
+          { name: 'Packaging', value: 'Eco-friendly' }
+        ]
+      }
+    ]
   },
   {
     id: 'SKU-CHIPS-11',
