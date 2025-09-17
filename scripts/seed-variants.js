@@ -4,16 +4,21 @@ import fs from 'fs';
 
 dotenv.config();
 
+// Get Supabase credentials from environment variables (with or without VITE_ prefix)
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
 // Make sure environment variables are loaded
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY environment variables');
+  console.error('Please check your .env file or set them manually');
   process.exit(1);
 }
 
 // Initialize the Supabase client
 const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
 );
 
 // Define schema structures as JSDoc comments instead of TypeScript types

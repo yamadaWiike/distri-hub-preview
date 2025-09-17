@@ -81,6 +81,27 @@ npm i
 npm run dev
 ```
 
+### Database Setup
+This project includes several scripts to help set up and maintain the database:
+
+1. **Apply Database View Fixes**
+   ```sh
+   ./scripts/apply-db-fixes.sh
+   ```
+   This script creates the necessary views for product data, including `products_with_variants` and `variants_view`.
+
+2. **Apply Variant Schema Updates**
+   ```sh
+   ./scripts/apply-variant-schema.sh
+   ```
+   This script updates the database schema to support product variants, including creating tables for variant groups and options.
+
+3. **Seed Variant Data**
+   ```sh
+   node scripts/seed-variants.js
+   ```
+   This script populates the database with sample variant data. Make sure you've applied the variant schema updates first.
+
 ### Usage
 - Buka `http://localhost:5173` di browser
 - Daftar sebagai distributor untuk akses harga khusus
