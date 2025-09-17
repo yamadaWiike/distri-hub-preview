@@ -21,6 +21,32 @@ const supabase = createClient(
   SUPABASE_ANON_KEY
 );
 
+/**
+ * @typedef {Object} SupabaseResponseData
+ * @property {string} id
+ * @property {string} [name]
+ * @property {string} [description]
+ * @property {string} [group_id]
+ * @property {string} [product_id]
+ * @property {string} [option_id]
+ * @property {string} [area]
+ * @property {number} [distributor_price]
+ * @property {number} [moq]
+ * @property {string} [brand_id]
+ * @property {string} [category_id]
+ * @property {number} [base_distributor_price]
+ * @property {number} [consumer_price]
+ * @property {number} [base_moq]
+ * @property {string} [size]
+ * @property {boolean} [has_variants]
+ * @property {number} [additional_price]
+ * @property {boolean} [is_active]
+ * @property {number} [stock_quantity]
+ * @property {string} [image_url]
+ * @property {string} [created_at]
+ * @property {string} [updated_at]
+ */
+
 // Define schema structures as JSDoc comments instead of TypeScript types
 /**
  * @typedef {Object} VariantGroup
@@ -369,7 +395,12 @@ async function seed() {
     console.log('\nSeeding complete!');
 
   } catch (error) {
-    console.error('Unexpected error during seeding:', error);
+    // Handle errors with proper formatting
+    if (error instanceof Error) {
+      console.error('Unexpected error during seeding:', error.message);
+    } else {
+      console.error('Unexpected error during seeding:', String(error));
+    }
   }
 }
 

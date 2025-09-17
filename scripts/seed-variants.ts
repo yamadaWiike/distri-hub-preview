@@ -19,7 +19,28 @@ const supabase = createClient(
 // Type for Supabase responses
 interface SupabaseResponseData {
   id: string;
-  [key: string]: any;
+  name?: string;
+  description?: string;
+  group_id?: string;
+  product_id?: string;
+  option_id?: string;
+  area?: string;
+  distributor_price?: number;
+  moq?: number;
+  brand_id?: string;
+  category_id?: string;
+  base_distributor_price?: number;
+  consumer_price?: number;
+  base_moq?: number;
+  size?: string;
+  has_variants?: boolean;
+  additional_price?: number;
+  is_active?: boolean;
+  stock_quantity?: number;
+  image_url?: string;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: unknown; // For any other properties, use unknown instead of any
 }
 
 // Define types
@@ -169,7 +190,7 @@ async function seed() {
         .from('product_variant_groups')
         .insert({ name: group.name })
         .select()
-        .single();
+        .single<SupabaseResponseData>();
 
       if (groupError) {
         console.error(`Error inserting group ${group.name}:`, groupError);
@@ -239,7 +260,7 @@ async function seed() {
         .from('brands')
         .select('id')
         .eq('name', product.brandName)
-        .single();
+        .single<SupabaseResponseData>();
 
       if (brandError) {
         console.error(`Error finding brand ${product.brandName}:`, brandError);
@@ -251,7 +272,7 @@ async function seed() {
         .from('product_categories')
         .select('id')
         .eq('name', product.categoryName)
-        .single();
+        .single<SupabaseResponseData>();
 
       if (categoryError) {
         console.error(`Error finding category ${product.categoryName}:`, categoryError);
@@ -275,7 +296,7 @@ async function seed() {
           has_variants: hasVariants
         })
         .select()
-        .single();
+        .single<SupabaseResponseData>();
 
       if (productError) {
         console.error(`Error inserting product ${product.name}:`, productError);
@@ -312,7 +333,7 @@ async function seed() {
             .from('product_variant_groups')
             .select('id')
             .eq('name', variant.groupName)
-            .single();
+            .single<SupabaseResponseData>();
 
           if (groupError) {
             console.error(`Error finding variant group ${variant.groupName}:`, groupError);
@@ -325,7 +346,7 @@ async function seed() {
             .select('id')
             .eq('group_id', groupData.id)
             .eq('name', variant.optionName)
-            .single();
+            .single<SupabaseResponseData>();
 
           if (optionError) {
             console.error(`Error finding variant option ${variant.optionName}:`, optionError);
@@ -353,8 +374,13 @@ async function seed() {
 
     console.log('\nSeeding complete!');
 
-  } catch (error) {
-    console.error('Unexpected error during seeding:', error);
+  } catch (error: unknown) {
+    // Handle errors with proper type checking
+    if (error instanceof Error) {
+      console.error('Unexpected error during seeding:', error.message);
+    } else {
+      console.error('Unexpected error during seeding:', String(error));
+    }
   }
 }
 
