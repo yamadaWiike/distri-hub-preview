@@ -63,13 +63,8 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
         try {
           const { fetchProductVariants } = await import('@/services/product-service');
           const variants = await fetchProductVariants(product.id);
-          setProductVariants(variants.map(v => ({
-            id: v.id,
-            variantName: v.variant_name,
-            variantDescription: v.variant_description || '',
-            additionalPrice: v.additional_price,
-            isActive: v.is_active
-          })));
+          // The fetchProductVariants function already returns objects with the correct camelCase property names
+          setProductVariants(variants);
         } catch (error) {
           console.error('Error fetching variants:', error);
         } finally {
