@@ -19,6 +19,7 @@ export type ProductFromDB = {
   brands?: { name: string };
   product_categories?: { name: string };
   variant_count?: number;
+  has_variants?: boolean; // Add this field
 };
 
 export type RegionPricingFromDB = {
@@ -454,11 +455,14 @@ export async function getProductById(id: string): Promise<Product | null> {
       return null;
     }
     
+    // Explicitly type the product
+    const typedProduct = product as ProductFromDB;
+    
     // Fetch the region pricing for this product
     const { data: regions, error: regionsError } = await supabase
       .from('region_pricing')
       .select('*')
-      .eq('product_id', product.id); // Always use product.id here
+      .eq('product_id', typedProduct.id); // Always use product.id here
       
     if (regionsError || !regions) {
       console.error(`Error fetching region pricing for product ${id}:`, regionsError);
@@ -467,11 +471,11 @@ export async function getProductById(id: string): Promise<Product | null> {
     
     // Fetch variants if the product has any
     let variants = [];
-    if (product.has_variants) {
+    if (typedProduct.has_variants) {
       const { data: variantData, error: variantError } = await supabase
         .from('product_variants')
         .select('*')
-        .eq('product_id', product.id)
+        .eq('product_id', typedProduct.id)
         .eq('is_active', true);
         
       if (!variantError) {
@@ -480,7 +484,7 @@ export async function getProductById(id: string): Promise<Product | null> {
     }
     
     return mapDBProductToProduct(
-      product as ProductFromDB, 
+      typedProduct, 
       regions as RegionPricingFromDB[],
       variants
     );
