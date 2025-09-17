@@ -139,8 +139,8 @@ export const addPDFHeader = (pdf: jsPDF, options: PDFHeaderOptions = {}): number
     pdf.text(`${day}/${month}/${year}`, dateX, logoY + 16);
   }
   
-  // Draw a stronger separator line with gradient effect
-  const gradient = pdf.setLineDash([0.5, 0], 0); // Reset line dash
+  // Draw a stronger separator line
+  // Note: Using direct draw methods instead of setLineDash which is not in TypeScript definitions
   pdf.setDrawColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2]);
   pdf.setLineWidth(1.2);
   pdf.line(15, headerHeight - 3, pageWidth - 15, headerHeight - 3);

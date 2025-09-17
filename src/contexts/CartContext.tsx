@@ -21,36 +21,58 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }, [items]);
 
-  const addItem = useCallback((item: CartItem) => {
-    setItems((prev) => {
-      // Check if the product already exists in the cart
-      const idx = prev.findIndex((p) => p.id === item.id && p.province === item.province);
-      if (idx >= 0) {
-        // Replace the entire item with the new one but use the exact quantity passed
-        // instead of adding quantities together
-        const copy = [...prev];
-        copy[idx] = { ...item };
-        return copy;
-      }
-      return [...prev, item];
-    });
-  }, []);
+const addItem = useCallback((item: CartItem) => {
+  setItems((prev) => {
+    // Check if the product already exists in the cart with the same variant
+    const idx = prev.findIndex((p) => 
+      p.id === item.id && 
+      p.province === item.province && 
+      ((!p.variant && !item.variant) || // Both don't have variants
+       (p.variant && item.variant && p.variant.id === item.variant.id)) // Same variant
+    );
+    
+    if (idx >= 0) {
+      // Replace the entire item with the new one but use the exact quantity passed
+      // instead of adding quantities together
+      const copy = [...prev];
+      copy[idx] = { ...item };
+      return copy;
+    }
+    return [...prev, item];
+  });
   
-  const removeItem = useCallback((id: string, province: string) => {
+  // Log the current cart for debugging
+  console.log(`Added item to cart: ${item.name} ${item.variant ? `(${item.variant.name})` : ''}`);
+}, []);  const removeItem = useCallback((id: string, province: string, variantId?: string) => {
     setItems((prev) => 
-      prev.filter(item => !(item.id === id && item.province === province))
+      prev.filter(item => {
+        // If variantId is provided, we need to match it as well
+        if (variantId) {
+          return !(item.id === id && 
+                   item.province === province && 
+                   item.variant?.id === variantId);
+        }
+        // Otherwise, just match product ID and province
+        return !(item.id === id && item.province === province);
+      })
     );
   }, []);
 
-  const updateQuantity = useCallback((id: string, province: string, qty: number) => {
+  const updateQuantity = useCallback((id: string, province: string, qty: number, variantId?: string) => {
     if (qty <= 0) {
-      removeItem(id, province);
+      removeItem(id, province, variantId);
       return;
     }
     
     setItems((prev) => {
       return prev.map(item => {
-        if (item.id === id && item.province === province) {
+        // If variantId is provided, match it as well
+        if (variantId) {
+          if (item.id === id && item.province === province && item.variant?.id === variantId) {
+            return { ...item, qty };
+          }
+        } else if (item.id === id && item.province === province) {
+          // If no variantId is provided, just match product ID and province
           return { ...item, qty };
         }
         return item;

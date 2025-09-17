@@ -1,6 +1,6 @@
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
-import { Product } from "@/data/products";
+import { Product, ProductVariant } from "@/data/products";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
@@ -14,7 +14,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { addPDFHeader, addPDFFooter } from "@/utils/pdf-utils";
 import { translations } from "@/lib/translations";
 import { useToast } from "@/components/ui/use-toast";
-import { getAllProducts, getAllAreas, getAllBrands } from "@/services/product-service";
+import { getAllProducts, getAllAreas, getAllBrands, fetchProductsWithVariants } from "@/services/product-service";
 
 function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: Product; loggedIn: boolean; selectedFilterArea?: string }) {
   const { addItem } = useCart();
@@ -31,10 +31,16 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
   })();
   
   const [selectedArea, setSelectedArea] = useState(initialSelectedArea);
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [loadingVariants, setLoadingVariants] = useState(false);
+  const [productVariants, setProductVariants] = useState<ProductVariant[]>([]);
   
   // Find the regional pricing based on selected area
   const regional = product.regions.find((r) => r.area === selectedArea) || product.regions[0];
-  const usedPrice = regional?.distributorPrice ?? product.distributorPrice;
+  const basePrice = regional?.distributorPrice ?? product.distributorPrice;
+  const usedPrice = selectedVariant 
+    ? basePrice + selectedVariant.additionalPrice
+    : basePrice;
   const usedMoq = regional?.moq ?? product.moq;
   const [qty, setQty] = useState(usedMoq);
   
@@ -47,6 +53,34 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
       setQty(prev => Math.max(prev, newMoq));
     }
   }, [selectedFilterArea, product.regions, product.moq]);
+  
+  // Fetch variants when the product has variants flag is true
+  useEffect(() => {
+    if (product.hasVariants && !product.variants) {
+      const fetchVariants = async () => {
+        setLoadingVariants(true);
+        try {
+          const { fetchProductVariants } = await import('@/services/product-service');
+          const variants = await fetchProductVariants(product.id);
+          setProductVariants(variants.map(v => ({
+            id: v.id,
+            variantName: v.variant_name,
+            variantDescription: v.variant_description || '',
+            additionalPrice: v.additional_price,
+            isActive: v.is_active
+          })));
+        } catch (error) {
+          console.error('Error fetching variants:', error);
+        } finally {
+          setLoadingVariants(false);
+        }
+      };
+      
+      fetchVariants();
+    } else if (product.variants) {
+      setProductVariants(product.variants);
+    }
+  }, [product.id, product.hasVariants, product.variants]);
   const subtotalDistributor = qty * usedPrice;
   const potentialRevenue = qty * product.consumerPrice;
   const profit = potentialRevenue - subtotalDistributor;
@@ -64,7 +98,14 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
       </div>
       <header className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-xs text-muted-foreground">{product.category} • {product.brand}</div>
+          <div className="flex items-center gap-2">
+            <div className="text-xs text-muted-foreground">{product.category} • {product.brand}</div>
+            {product.hasVariants && (
+              <span className="bg-orange-100 text-orange-800 text-xs px-1.5 py-0.5 rounded-sm">
+                {lang === 'id' ? "Varian" : "Variants"}
+              </span>
+            )}
+          </div>
           <h3 className="text-lg font-semibold">{product.name} — {product.size}</h3>
         </div>
         <Link to={`/produk/${product.id}`} className="text-sm text-primary underline-offset-4 hover:underline">
@@ -102,7 +143,7 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
       <div className="mt-auto pt-2">
         {loggedIn ? (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className={`grid gap-2 ${productVariants.length > 0 ? 'grid-cols-1' : 'grid-cols-2'}`}>
               <div>
                 <label className="text-xs text-muted-foreground">Area Distribusi</label>
                 <select
@@ -125,7 +166,47 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
                   ))}
                 </select>
               </div>
-              <div>
+              
+              {/* Variant selection */}
+              {(productVariants.length > 0 || loadingVariants) && (
+                <div>
+                  <label className="text-xs text-muted-foreground">Pilihan Varian</label>
+                  <select
+                    disabled={loadingVariants}
+                    value={selectedVariant?.id || ''}
+                    onChange={(e) => {
+                      const variantId = e.target.value;
+                      if (!variantId) {
+                        setSelectedVariant(null);
+                      } else {
+                        const variant = productVariants.find(v => v.id === variantId);
+                        if (variant) {
+                          setSelectedVariant(variant);
+                        }
+                      }
+                    }}
+                    className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-xs"
+                  >
+                    <option value="">Standar (No Variant)</option>
+                    {loadingVariants ? (
+                      <option disabled>Loading variants...</option>
+                    ) : (
+                      productVariants.map((variant) => (
+                        <option key={variant.id} value={variant.id}>
+                          {variant.variantName} {variant.additionalPrice > 0 && `(+${formatIDR(variant.additionalPrice)})`}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  {selectedVariant?.variantDescription && (
+                    <p className="text-xs text-muted-foreground mt-1 italic">
+                      {selectedVariant.variantDescription}
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              <div className={productVariants.length > 0 ? "col-span-1" : "col-span-1"}>
                 <label className="text-xs text-muted-foreground">Kuantitas</label>
                 <input
                   type="number"
@@ -162,7 +243,7 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
                 size="sm"
                 className="w-full h-full"
                 onClick={() => {
-                  // Add to cart with exact quantity specified
+                  // Add to cart with exact quantity specified and variant if selected
                   addItem({
                     id: product.id,
                     name: product.name,
@@ -173,6 +254,11 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
                     moq: usedMoq,
                     qty: qty, // Use exactly what the user specified
                     consumerPrice: product.consumerPrice,
+                    variant: selectedVariant ? {
+                      id: selectedVariant.id,
+                      name: selectedVariant.variantName,
+                      additionalPrice: selectedVariant.additionalPrice
+                    } : undefined,
                   });
                   
                   // Show toast notification
@@ -242,8 +328,8 @@ export default function DaftarProduk() {
       setLoading(true);
       
       try {
-        // Fetch products
-        const productsData = await getAllProducts();
+        // Fetch products with variant information
+        const productsData = await fetchProductsWithVariants();
         setProducts(productsData);
         
         // Set fixed areas instead of fetching them
@@ -437,7 +523,17 @@ export default function DaftarProduk() {
     yellow: [253, 187, 48],  // #FDBB30 - Accent color
     lightGray: [245, 245, 245], // #F5F5F5 - Background
     gray: [100, 100, 100],   // #646464 - Text
-    darkGray: [51, 51, 51]   // #333333 - Dark text
+    darkGray: [51, 51, 51],  // #333333 - Dark text
+    purple: [128, 90, 213]   // #805AD5 - Variant color
+  };
+  
+  // Utility function to calculate product card height based on variants
+  const getItemHeight = (product: Product, baseHeight: number) => {
+    if (product.hasVariants && product.variants && product.variants.length > 0) {
+      // Add extra height for variants section
+      return baseHeight + Math.min(product.variants.length, 3) * 8 + 20;
+    }
+    return baseHeight;
   };
   
   // Helper function to draw a product card
@@ -455,16 +551,19 @@ export default function DaftarProduk() {
     const usedMoq = regional?.moq ?? product.moq;
     const margin = product.consumerPrice > 0 ? ((product.consumerPrice - usedPrice) / product.consumerPrice) * 100 : 0;
     
+    // Calculate actual card height based on product
+    const actualHeight = getItemHeight(product, height);
+    
     // Create a clean product card with better shadow effect
     // Draw shadow
     pdf.setFillColor(230, 230, 230);
-    pdf.roundedRect(x + 1.5, y + 1.5, width, height, 4, 4, 'F');
+    pdf.roundedRect(x + 1.5, y + 1.5, width, actualHeight, 4, 4, 'F');
     
     // Draw white box with proper border
     pdf.setFillColor(255, 255, 255);
     pdf.setDrawColor(240, 240, 240);
     pdf.setLineWidth(0.5);
-    pdf.roundedRect(x, y, width, height, 4, 4, 'FD');
+    pdf.roundedRect(x, y, width, actualHeight, 4, 4, 'FD');
     
     // Draw the product image area with improved styling
     pdf.setFillColor(250, 250, 250); // Very light gray background for product
@@ -524,6 +623,22 @@ export default function DaftarProduk() {
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(7.5);
     pdf.text(`${product.size} • SKU: ${product.id}`, x + 7, detailsY + 20 + (nameLines.length * 5) + 3);
+    
+    // If product has variants, add a badge
+    if (product.hasVariants) {
+      const variantText = "Available Variants";
+      const textWidth = pdf.getStringUnitWidth(variantText) * 7.5 / pdf.internal.scaleFactor;
+      
+      // Draw variant badge
+      pdf.setFillColor(COLORS.purple[0], COLORS.purple[1], COLORS.purple[2], 0.1);
+      pdf.setDrawColor(COLORS.purple[0], COLORS.purple[1], COLORS.purple[2]);
+      pdf.roundedRect(x + width - textWidth - 12, detailsY + 20 + (nameLines.length * 5), textWidth + 8, 10, 2, 2, 'FD');
+      
+      // Add variant text
+      pdf.setTextColor(COLORS.purple[0], COLORS.purple[1], COLORS.purple[2]);
+      pdf.setFontSize(7);
+      pdf.text(variantText, x + width - textWidth - 8, detailsY + 20 + (nameLines.length * 5) + 7);
+    }
     
     // Divider line with proper styling
     pdf.setDrawColor(240, 240, 240);
@@ -614,6 +729,51 @@ export default function DaftarProduk() {
     pdf.setTextColor(COLORS.darkGray[0], COLORS.darkGray[1], COLORS.darkGray[2]);
     pdf.setFont('helvetica', 'bold');
     pdf.text(regional?.area || 'Semua Area', x + 7, row3Y + 8);
+    
+    // Add variant information if product has variants
+    if (product.hasVariants && product.variants && product.variants.length > 0) {
+      const row4Y = row3Y + 18;
+      
+      // Create a variant section header
+      pdf.setFillColor(COLORS.purple[0], COLORS.purple[1], COLORS.purple[2], 0.08);
+      pdf.roundedRect(x + 7, row4Y - 3, width - 14, 12, 2, 2, 'F');
+      
+      pdf.setFontSize(7);
+      pdf.setTextColor(COLORS.purple[0], COLORS.purple[1], COLORS.purple[2]);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Available Variants:', x + 10, row4Y + 4);
+      
+      // List up to 3 variants with their prices
+      const maxVariants = Math.min(3, product.variants.length);
+      for (let i = 0; i < maxVariants; i++) {
+        const variant = product.variants[i];
+        pdf.setFontSize(6.5);
+        pdf.setTextColor(COLORS.darkGray[0], COLORS.darkGray[1], COLORS.darkGray[2]);
+        pdf.setFont('helvetica', 'normal');
+        
+        // Create a variant entry with name and price
+        const variantText = `• ${variant.variantName}`;
+        const priceText = variant.additionalPrice > 0 
+          ? `+${formatIDR(variant.additionalPrice)}` 
+          : 'No extra charge';
+        
+        pdf.text(variantText, x + 10, row4Y + 12 + (i * 6));
+        
+        // Add price info for the variant
+        pdf.setTextColor(variant.additionalPrice > 0 ? COLORS.orange[0] : COLORS.tealGreen[0], 
+                       variant.additionalPrice > 0 ? COLORS.orange[1] : COLORS.tealGreen[1], 
+                       variant.additionalPrice > 0 ? COLORS.orange[2] : COLORS.tealGreen[2]);
+        pdf.text(priceText, x + width - 40, row4Y + 12 + (i * 6));
+      }
+      
+      // If there are more variants than we showed
+      if (product.variants.length > 3) {
+        pdf.setFontSize(6);
+        pdf.setTextColor(COLORS.gray[0], COLORS.gray[1], COLORS.gray[2]);
+        pdf.setFont('helvetica', 'italic');
+        pdf.text(`+${product.variants.length - 3} more variants...`, x + 10, row4Y + 12 + (3 * 6));
+      }
+    }
   };
   
   const exportPDF = async () => {
@@ -825,7 +985,12 @@ export default function DaftarProduk() {
         // Calculate dimensions with better proportions
         const availableWidth = pageWidth - 20 - ((itemsPerRow - 1) * marginBetweenItems);
         const itemWidth = availableWidth / itemsPerRow;
-        const itemHeight = itemWidth + 80; // Increased height for better text layout
+        
+        // Base height calculation
+        const baseItemHeight = itemWidth + 80; // Base height for standard product
+        
+        // For layout calculation we use maximum height
+        const itemHeight = itemWidth + 110; // Maximum possible height with variants
         
         // Add products for this category
         for (let i = 0; i < products.length; i++) {
@@ -857,7 +1022,7 @@ export default function DaftarProduk() {
           }
           
           // Draw product card
-          drawProductCard(pdf, product, xPosition, yPosition, itemWidth, itemHeight, area);
+          drawProductCard(pdf, product, xPosition, yPosition, itemWidth, baseItemHeight, area);
           
           productCount++;
         }
