@@ -31,12 +31,27 @@ const formatRp = (n?: number) =>
 const today = format(new Date(), 'dd/MM/yy');
 
 /**
- * Generate a product catalog PDF and open it in a new browser window.
- * 
- * @param products Array of Product objects to include in the catalog
- * @param fileName Optional file name for the PDF (default: "catalog.pdf")
+ * Parameters for generating a catalog PDF.
+ * @property products - Array of Product objects to include in the catalog.
+ * @property distributionArea - (Optional) The area where the catalog will be distributed.
+ * @property fileName - (Optional) The desired name for the generated PDF file.
  */
-export async function generateCatalogPDF(products: Product[], fileName = "catalog.pdf") {
+type GenerateCatalogPDF = {
+  products: Product[];
+  distributionArea?: string;
+  fileName?: string;
+}
+
+/**
+ * Generates a catalog PDF from a list of products.
+ * @param props - The parameters required to generate the catalog PDF.
+ * @returns A Promise that resolves when the PDF generation is complete.
+ */
+export async function generateCatalogPDF(props: GenerateCatalogPDF) {
+  const products = props.products || [];
+  const distributionArea = props.distributionArea || '-';
+  const fileName = props.fileName || 'catalog.pdf';
+
   // Create jsPDF instance (A4 portrait, units = mm)
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
 
@@ -52,7 +67,7 @@ export async function generateCatalogPDF(products: Product[], fileName = "catalo
 
   // compute card width and height
   const cardWidth = (pageWidth - margin * 2 - gap * (cols - 1)) / cols;
-  const cardHeight = 90; // mm (adjust if want taller/shorter)
+  const cardHeight = 85; // mm (adjust if want taller/shorter)
   const availHeight = pageHeight - margin - headerHeight - footerBottom;
   const rowsPerPage = Math.floor((availHeight + gap) / (cardHeight + gap));
   const perPage = cols * rowsPerPage;
@@ -78,25 +93,26 @@ export async function generateCatalogPDF(products: Product[], fileName = "catalo
     // Right area texts
     doc.setFontSize(9);
     doc.setTextColor(33);
-    doc.text("Area Distribusi", pageWidth - margin - 52, margin + 12);
+    doc.text("Area Distribusi", pageWidth - margin - 30, margin + 12, { align: "right" });
     doc.setFontSize(16);
     doc.setTextColor(0, 104, 90);
+    doc.text(distributionArea, pageWidth - margin - 30, margin + 18, { align: "right" });
 
     // Get unique areas from all products
-    const allAreas = [...new Set(products.flatMap(p => p.regions.map(r => r.area)))];
-    const areasText = allAreas.length > 0 ? allAreas.join(", ") : "Semua Area";
-    
+    // const allAreas = [...new Set(products.flatMap(p => p.regions.map(r => r.area)))];
+    // const areasText = allAreas.length > 0 ? allAreas.join(", ") : "Semua Area";
+
     // Truncate if too long for display
-    const maxLen = 30;
-    const displayText = areasText.length > maxLen ? areasText.substring(0, maxLen) + "..." : areasText;
-    doc.text(displayText, pageWidth - margin - 60, margin + 18);
+    // const maxLen = 30;
+    // const displayText = areasText.length > maxLen ? areasText.substring(0, maxLen) + "..." : areasText;
+    //doc.text(displayText, pageWidth - margin - 60, margin + 18);
 
     doc.setFontSize(9);
     doc.setTextColor(33);
-    doc.text("Tanggal Katalog", pageWidth - margin - 28, margin + 12);
+    doc.text("Tanggal Katalog", pageWidth - margin, margin + 12, { align: "right" });
     doc.setFontSize(16);
     doc.setTextColor(0, 104, 90);
-    doc.text(today, pageWidth - margin - 27, margin + 18);
+    doc.text(today, pageWidth - margin, margin + 18, { align: "right" });
 
     // small line under header
     doc.setDrawColor(220);
@@ -167,7 +183,7 @@ export async function generateCatalogPDF(products: Product[], fileName = "catalo
     let leftY = textY;
     let rightY = textY;
 
-    doc.setFontSize(7);
+    doc.setFontSize(6.5);
     doc.setTextColor(107); // gray-500
 
     /**
@@ -186,28 +202,31 @@ export async function generateCatalogPDF(products: Product[], fileName = "catalo
       value: string,
       sub?: string
     ) => {
-      doc.setTextColor(107);
-      doc.text(label, startX, startY);
-      doc.setTextColor(33);
-      doc.setFontSize(9);
-      doc.text(value, startX, startY + 4);
-      if (sub) {
-        doc.setFontSize(7);
         doc.setTextColor(107);
-        doc.text(sub, startX, startY + 8);
-      }
-      return startY + 14; // next block Y
+        doc.text(label, startX, startY);
+        doc.setTextColor(33);
+        doc.setFontSize(9);
+        const wrappedValue = doc.splitTextToSize(value, colW);
+        doc.text(wrappedValue, startX, startY + 3.8);
+        let nextY = startY + 1.8 + wrappedValue.length * 5;
+        if (sub) {
+          doc.setFontSize(6);
+          doc.setTextColor(107);
+          doc.text(sub, startX, nextY);
+          nextY += 6;
+        }
+        return nextY; // next block Y
     };
 
     // Left column
     leftY = renderBlock(leftX, leftY, "Harga Distributor", formatRp(p?.distributorPrice), "per karton");
-    leftY = renderBlock(leftX, leftY, "Margin Distributor", `${p?.margin ?? "-"}%`, "Rp24.000/karton");
+    leftY = renderBlock(leftX, leftY, "Margin Distributor", `${p?.margin ? p.margin + "%" : "-"}`, "Rp24.000/karton");
     leftY = renderBlock(leftX, leftY, "MOQ", `${p?.moq ?? "-"}`, "karton");
 
     // Right column
     rightY = renderBlock(rightX, rightY, "Harga Konsumen", formatRp(p?.consumerPrice), "per karton");
     rightY = renderBlock(rightX, rightY, "Isi Per Karton", `${p?.units ?? "-"}`, "pieces");
-    
+
     // Format regions for display - show first area and count if more exist
     const areaDisplay = p?.regions?.length
       ? p.regions.length === 1
