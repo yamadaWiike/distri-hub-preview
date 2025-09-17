@@ -82,8 +82,14 @@ export async function generateCatalogPDF(products: Product[], fileName = "catalo
     doc.setFontSize(16);
     doc.setTextColor(0, 104, 90);
 
-    // Please adjust the distributor name here
-    doc.text("Jawa Barat", pageWidth - margin - 60, margin + 18);
+    // Get unique areas from all products
+    const allAreas = [...new Set(products.flatMap(p => p.regions.map(r => r.area)))];
+    const areasText = allAreas.length > 0 ? allAreas.join(", ") : "Semua Area";
+    
+    // Truncate if too long for display
+    const maxLen = 30;
+    const displayText = areasText.length > maxLen ? areasText.substring(0, maxLen) + "..." : areasText;
+    doc.text(displayText, pageWidth - margin - 60, margin + 18);
 
     doc.setFontSize(9);
     doc.setTextColor(33);
@@ -117,26 +123,24 @@ export async function generateCatalogPDF(products: Product[], fileName = "catalo
     doc.roundedRect(x, y, cardW, cardH, 3, 3, "DF");
 
     // ── Product Image ───────────────────────────────
-    // Please adjust the card's image styles here
     const imageH = 28;                          // image area height
-    const defaultImage = '/assets/baskit-product.jpg';
+    const defaultImage = '/placeholder.svg';    // fallback image
+    
+    // Draw rounded border first
     doc.setDrawColor(200, 200, 200); // light gray border
     doc.setLineWidth(0.2);
     doc.roundedRect(x + pad, y + pad, cardW - pad * 2, imageH, 3, 3, "D");
-    doc.addImage(defaultImage, "JPEG", x + pad + 1, y + pad + 1, cardW - pad * 2 - 2, imageH - 2);
-
-    // Please adjust the card's image logic here
-    // if (p.imageUrl) {
-    //   // Draw rounded border first
-    //   doc.setDrawColor(200, 200, 200); // light gray border
-    //   doc.setLineWidth(0.5);
-    //   doc.roundedRect(x + pad, y + pad, cardW - pad * 2, imageH, 3, 3, "D");
-    //   // Draw image inside border (slightly inset)
-    //   doc.addImage(p.imageUrl, "JPEG", x + pad + 1, y + pad + 1, cardW - pad * 2 - 2, imageH - 2);
-    // } else {
-    //   doc.setFillColor(255, 186, 122);            // bg-orange-200
-    //   doc.roundedRect(x + pad, y + pad, cardW - pad * 2, imageH, 3, 3, "F");
-    // }
+    
+    try {
+      // Use product image if available, otherwise use default
+      const imageUrl = p.image || defaultImage;
+      doc.addImage(imageUrl, "JPEG", x + pad + 1, y + pad + 1, cardW - pad * 2 - 2, imageH - 2);
+    } catch (err) {
+      // If image loading fails, draw a colored rectangle
+      console.warn("Failed to load image for product:", p.name, err);
+      doc.setFillColor(255, 186, 122);  // bg-orange-200
+      doc.roundedRect(x + pad, y + pad, cardW - pad * 2, imageH, 3, 3, "F");
+    }
 
     // Y position for text after image
     let textY = y + pad + imageH + 5;
@@ -203,7 +207,14 @@ export async function generateCatalogPDF(products: Product[], fileName = "catalo
     // Right column
     rightY = renderBlock(rightX, rightY, "Harga Konsumen", formatRp(p?.consumerPrice), "per karton");
     rightY = renderBlock(rightX, rightY, "Isi Per Karton", `${p?.units ?? "-"}`, "pieces");
-    rightY = renderBlock(rightX, rightY, "Area Distribusi", p?.area ?? "-");
+    
+    // Format regions for display - show first area and count if more exist
+    const areaDisplay = p?.regions?.length
+      ? p.regions.length === 1
+        ? p.regions[0].area
+        : `${p.regions[0].area} +${p.regions.length - 1}`
+      : "-";
+    rightY = renderBlock(rightX, rightY, "Area Distribusi", areaDisplay);
   }
 
   // Loop through products and render cards, paginating as needed
