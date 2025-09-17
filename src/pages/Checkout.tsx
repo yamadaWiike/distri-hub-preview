@@ -132,7 +132,7 @@ export default function Checkout() {
   };
 
   // Handle form submission
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
     // Validate the form
@@ -154,22 +154,94 @@ export default function Checkout() {
     };
     console.log('Submitting order:', orderData);
 
-    // Process the order
-    // In a real app, this would send the order to the backend
-    // For now, we'll just show a success message and clear the cart
+    try {
+      // Prepare order details for email
+      const orderItemsText = items.map(item => 
+        `• ${item.name} - ${item.size} (${item.province})
+  Qty: ${item.qty} x ${formatIDR(item.unitPrice)} = ${formatIDR(item.qty * item.unitPrice)}`
+      ).join('\n');
 
-    toast({
-      title: t.orderSuccess,
-      description: t.orderProcessed,
-    });
+      const addressTypeText = deliveryDetails.addressType === 'default' 
+        ? (lang === 'id' ? 'Alamat Utama' : 'Default Address')
+        : (lang === 'id' ? 'Alamat Gudang' : 'Warehouse Address');
 
-    // Clear the cart
-    clear();
+      // Prepare email data for Web3Forms
+      const emailData = {
+        access_key: "aaf6ab03-78a5-4e84-94bc-0acd0a51273c",
+        subject: `[Baskit] New Order from ${deliveryDetails.fullName}`,
+        from_name: "Baskit Order System",
+        message: `
+=== NEW ORDER RECEIVED ===
 
-    // Redirect to homepage after a brief delay
-    setTimeout(() => {
-      navigate("/");
-    }, 2000);
+Customer Information:
+- Name: ${deliveryDetails.fullName}
+- Phone: ${deliveryDetails.phone}
+- Email: ${user?.email || 'N/A'}
+
+Shipping Information:
+- Address Type: ${addressTypeText}
+- Address: ${deliveryDetails.address}
+- City: ${deliveryDetails.city}
+- Postal Code: ${deliveryDetails.postalCode || 'N/A'}
+- Additional Notes: ${deliveryDetails.notes || 'None'}
+
+Order Details:
+${orderItemsText}
+
+Order Summary:
+- Total Amount: ${formatIDR(totalAmount)}
+- Order Date: ${new Date().toLocaleString()}
+
+Please process this order and contact the customer for shipping arrangements.
+        `,
+        // Additional fields for better email formatting
+        "Customer Name": deliveryDetails.fullName,
+        "Phone Number": deliveryDetails.phone,
+        "Customer Email": user?.email || 'N/A',
+        "Shipping Address": deliveryDetails.address,
+        "City": deliveryDetails.city,
+        "Total Amount": formatIDR(totalAmount),
+        "Order Items": orderItemsText
+      };
+
+      // Send email via Web3Forms
+      const response = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(emailData)
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: t.orderSuccess,
+          description: t.orderProcessed,
+        });
+
+        // Clear the cart
+        clear();
+
+        // Redirect to homepage after a brief delay
+        setTimeout(() => {
+          navigate("/");
+        }, 2000);
+      } else {
+        throw new Error(result.message || "Failed to send order email");
+      }
+    } catch (error) {
+      console.error('Error submitting order:', error);
+      toast({
+        title: "Error",
+        description: lang === 'id' 
+          ? "Gagal mengirim pesanan. Silakan coba lagi." 
+          : "Failed to submit order. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

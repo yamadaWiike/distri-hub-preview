@@ -48,8 +48,6 @@ export default function Hubungi() {
     setIsSubmitting(true);
     
     try {
-      const apiKey = import.meta.env.VITE_WEB3FORMS_KEY;
-      
       const response = await fetch("https://api.web3forms.com/submit", {
         method: "POST",
         headers: {
@@ -57,7 +55,7 @@ export default function Hubungi() {
           Accept: "application/json",
         },
         body: JSON.stringify({
-          access_key: apiKey,
+          access_key: "aaf6ab03-78a5-4e84-94bc-0acd0a51273c",
           name: form.name,
           business: form.business,
           area: form.area,
