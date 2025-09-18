@@ -185,18 +185,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           user_id: authData.user.id,
           nama_bisnis: data.namaBisnis,
           alamat_lengkap: data.alamatLengkap,
-          provinsi_id: data.provinsiId,
           kota: data.kota,
           nama_pemilik: data.namaPemilik,
           kontak_pemilik: data.kontakPemilik,
           status: 'pending'
+          // Note: Removed provinsi_id for now since it expects UUID but we're sending string
+          // The province data is stored as string in kota field for now
         };
         
         try {
-          // Type assertion to match Supabase client's expected types
-          const { error } = await supabase
+          console.log('Creating distributor profile with data:', profileData);
+          
+          // Create profile - bypass TypeScript issues with explicit any
+          const { data: insertResult, error } = await supabase
             .from('distributor_profiles')
-            .insert(profileData as never);
+            .insert(profileData as never)
+            .select();
+            
+          console.log('Profile creation result:', { insertResult, error });
           profileError = error;
         } catch (err) {
           console.error('Profile creation error:', err);
@@ -205,10 +211,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (profileError) {
           console.error('Profile creation error:', profileError);
+          console.error('Profile error details:', {
+            message: profileError.message,
+            details: profileError.details,
+            hint: profileError.hint,
+            code: profileError.code
+          });
+          
           // If profile creation fails, still continue since the auth account was created
           toast({
             title: "Pendaftaran Berhasil",
-            description: "Akun Anda berhasil dibuat tetapi ada masalah dengan data profil. Silakan hubungi admin.",
+            description: `Akun Anda berhasil dibuat tetapi ada masalah dengan data profil: ${profileError.message}. Silakan hubungi admin.`,
+            variant: "default"
+          });
+        } else {
+          toast({
+            title: "Pendaftaran Berhasil",
+            description: "Akun distributor Anda telah berhasil dibuat.",
             variant: "default"
           });
         }
@@ -225,12 +244,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(userData);
         // Keep local storage for fallback/development
         localStorage.setItem('baskit_user', JSON.stringify(userData));
-        
-        toast({
-          title: "Pendaftaran Berhasil",
-          description: "Akun distributor Anda telah berhasil dibuat.",
-          variant: "default"
-        });
       }
     } catch (error: unknown) {
       console.error('Registration error:', error);
