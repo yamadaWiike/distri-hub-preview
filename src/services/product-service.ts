@@ -31,14 +31,16 @@ export type RegionPricingFromDB = {
   created_at?: string;
 };
 
-// Define the new DB structure for variants
+// Define the new DB structure for variants - updated to match actual schema
 export type ProductVariantFromDB = {
   id: string;
   product_id: string;
-  option_id: string;
+  variant_name: string;
+  variant_description?: string;
   additional_price: number;
   is_active: boolean;
   created_at?: string;
+  updated_at?: string;
 };
 
 // Define a structure for variants view that returns complete information
@@ -111,71 +113,44 @@ export type VariantOptionFromDB = {
   option_values: string[];
 };
 
+// Define type for product variant with option name
+type ProductVariantWithOption = ProductVariantFromDB & {
+  product_variant_options?: {
+    id: string;
+    name: string;
+  };
+};
+
 // Fetch product variants for a specific product
 export async function fetchProductVariants(productId: string) {
   try {
     console.log(`Fetching variants for product: ${productId}`);
     
-    // First try variants_view
+    // Query the product_variants table directly - this matches your actual schema
     const { data, error } = await supabase
-      .from('variants_view')
+      .from('product_variants')
       .select('*')
       .eq('product_id', productId)
       .eq('is_active', true);
     
     if (error) {
-      console.error('Error fetching from variants_view:', error);
-      console.log('Trying alternative: product_variants table...');
-      
-      // Fallback to product_variants table if variants_view doesn't exist
-      const { data: variantData, error: variantError } = await supabase
-        .from('product_variants')
-        .select('*')
-        .eq('product_id', productId)
-        .eq('is_active', true);
-        
-      if (variantError) {
-        console.error('Error fetching from product_variants:', variantError);
-        console.log('No variant data found, creating test variants for demo...');
-        
-        // For demo purposes, create some test variants for products that have hasVariants=true
-        // In production, remove this and ensure your database has proper variant data
-        return [
-          {
-            id: `${productId}_test_variant_1`,
-            variantName: 'Size L',
-            variantDescription: 'Large Size',
-            additionalPrice: 5000,
-            isActive: true
-          },
-          {
-            id: `${productId}_test_variant_2`, 
-            variantName: 'Size XL',
-            variantDescription: 'Extra Large Size',
-            additionalPrice: 10000,
-            isActive: true
-          }
-        ];
-      }
-      
-      console.log(`Found ${variantData?.length || 0} variants in product_variants table`);
-      return (variantData || []).map((variant: ProductVariantFromDB) => ({
-        id: variant.id,
-        variantName: 'Unknown Variant', // Since we don't have the option name in this table structure
-        variantDescription: '',
-        additionalPrice: variant.additional_price || 0,
-        isActive: variant.is_active
-      }));
+      console.error('Error fetching product variants:', error);
+      return [];
     }
     
-    console.log(`Found ${data?.length || 0} variants in variants_view`);
+    if (!data || data.length === 0) {
+      console.log(`No variants found for product ${productId}`);
+      return [];
+    }
     
-    // Convert to the CartItemVariant format needed by the cart
-    return (data as VariantViewFromDB[]).map(variant => ({
+    console.log(`Found ${data.length} real variants for product ${productId}:`, data);
+    
+    // Convert to the format needed by the frontend using the actual variant_name field
+    return data.map((variant: ProductVariantFromDB) => ({
       id: variant.id,
-      variantName: variant.option_name,
-      variantDescription: `${variant.group_name}: ${variant.option_name}`,
-      additionalPrice: variant.additional_price,
+      variantName: variant.variant_name || 'Unnamed Variant',
+      variantDescription: variant.variant_description || `Variant: ${variant.variant_name}`,
+      additionalPrice: variant.additional_price || 0,
       isActive: variant.is_active
     }));
   } catch (error) {
@@ -611,27 +586,10 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
         const variants = await fetchProductVariants(product.id);
         console.log(`Variants found for ${product.name}:`, variants.length);
         
-        // For testing - always create at least one variant for products marked as having variants
-        const testVariants = variants.length > 0 ? variants : [
-          {
-            id: `${product.id}_test_variant_1`,
-            variantName: 'Test Variant A',
-            variantDescription: 'Test variant for demonstration',
-            additionalPrice: 2500,
-            isActive: true
-          },
-          {
-            id: `${product.id}_test_variant_2`,
-            variantName: 'Test Variant B',
-            variantDescription: 'Another test variant',
-            additionalPrice: 5000,
-            isActive: true
-          }
-        ];
-        
-        if (testVariants.length > 0) {
+        // For testing - only add real variants, no test data
+        if (variants.length > 0) {
           // Create a separate product entry for each variant
-          for (const variant of testVariants) {
+          for (const variant of variants) {
             console.log(`Creating variant product for: ${variant.variantName}`);
             const variantProduct: ProductWithVariant = {
               ...product,

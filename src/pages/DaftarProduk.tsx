@@ -241,6 +241,7 @@ export default function DaftarProduk() {
   // State for products and areas - updated to use ProductWithVariant
   const [products, setProducts] = useState<ProductWithVariant[]>([]);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [errorInfo, setErrorInfo] = useState<string>('');
   const [areas, setAreas] = useState<string[]>([]);
   const [allBrands, setAllBrands] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
