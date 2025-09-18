@@ -183,6 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Create the profile data object
         const profileData = {
           user_id: authData.user.id,
+          email: data.email, // Add email to distributor_profiles
           nama_bisnis: data.namaBisnis,
           alamat_lengkap: data.alamatLengkap,
           kota: data.kota,

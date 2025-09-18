@@ -1,512 +1,66 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+// Minimal valid Supabase types for distributor_profiles and orders
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export interface Database {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "13.0.4"
-  }
   public: {
     Tables: {
-      brands: {
-        Row: {
-          id: string
-          name: string
-          description?: string
-          logo_url?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          description?: string
-          logo_url?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          description?: string
-          logo_url?: string
-        }
-      }
-      skus: {
-        Row: {
-          id: string
-          name: string
-          description: string
-          size: string
-          brand: string
-          sku: string
-          image_url: string
-          consumer_price: number
-          is_active: boolean
-        }
-        Insert: {
-          id?: string
-          name: string
-          description: string
-          size: string
-          brand: string
-          sku: string
-          image_url: string
-          consumer_price: number
-          is_active: boolean
-        }
-        Update: {
-          id?: string
-          name?: string
-          description?: string
-          size?: string
-          brand?: string
-          sku?: string
-          image_url?: string
-          consumer_price?: number
-          is_active?: boolean
-        }
-      }
-      region_pricing: {
-        Row: {
-          id: string
-          sku_id: string
-          area: string
-          distributor_price: number
-          moq: number
-        }
-        Insert: {
-          id?: string
-          sku_id: string
-          area: string
-          distributor_price: number
-          moq: number
-        }
-        Update: {
-          id?: string
-          sku_id?: string
-          area?: string
-          distributor_price?: number
-          moq?: number
-        }
-      }
       distributor_profiles: {
         Row: {
-          id: string
-          user_id: string
-          nama_bisnis: string
-          alamat_lengkap: string
-          kota: string
-          nama_pemilik: string
-          kontak_pemilik: string
-          created_at: string
-          updated_at: string
-          omzet: string | null
-          alamat_kantor: string | null
-          alamat_gudang: string | null
-          bentuk_usaha: string | null
-          foto_gudang: string | null
-          koordinat: string | null
-          bank: string | null
-          norek: string | null
-          nama_rek: string | null
-          nib: string | null
-          status: 'pending' | 'approved' | 'rejected'
-          approved_at: string | null
-          approved_by: string | null
-          email_pemilik: string | null
-          website_perusahaan: string | null
-          jumlah_karyawan: number | null
-          npwp: string | null
-        }
+          id: string;
+          user_id: string;
+          nama_bisnis: string;
+          alamat_lengkap: string;
+          kota: string;
+          nama_pemilik: string;
+          kontak_pemilik: string;
+          email?: string | null;
+          status: string;
+          created_at?: string;
+          updated_at?: string;
+        };
         Insert: {
-          id?: string
-          user_id: string
-          nama_bisnis: string
-          alamat_lengkap: string
-          kota: string
-          nama_pemilik: string
-          kontak_pemilik: string
-          created_at?: string
-          updated_at?: string
-          omzet?: string | null
-          alamat_kantor?: string | null
-          alamat_gudang?: string | null
-          bentuk_usaha?: string | null
-          foto_gudang?: string | null
-          koordinat?: string | null
-          bank?: string | null
-          norek?: string | null
-          nama_rek?: string | null
-          nib?: string | null
-          status?: 'pending' | 'approved' | 'rejected'
-          approved_at?: string | null
-          approved_by?: string | null
-          email_pemilik?: string | null
-          website_perusahaan?: string | null
-          jumlah_karyawan?: number | null
-          npwp?: string | null
-        }
+          id?: string;
+          user_id: string;
+          nama_bisnis: string;
+          alamat_lengkap: string;
+          kota: string;
+          nama_pemilik: string;
+          kontak_pemilik: string;
+          email?: string | null;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
         Update: {
-          id?: string
-          user_id?: string
-          nama_bisnis?: string
-          alamat_lengkap?: string
-          kota?: string
-          nama_pemilik?: string
-          kontak_pemilik?: string
-          created_at?: string
-          updated_at?: string
-          omzet?: string | null
-          alamat_kantor?: string | null
-          alamat_gudang?: string | null
-          bentuk_usaha?: string | null
-          foto_gudang?: string | null
-          koordinat?: string | null
-          bank?: string | null
-          norek?: string | null
-          nama_rek?: string | null
-          nib?: string | null
-          status?: 'pending' | 'approved' | 'rejected'
-          approved_at?: string | null
-          approved_by?: string | null
-          email_pemilik?: string | null
-          website_perusahaan?: string | null
-          jumlah_karyawan?: number | null
-          npwp?: string | null
-        }
-      }
-      product_categories: {
+          id?: string;
+          user_id?: string;
+          nama_bisnis?: string;
+          alamat_lengkap?: string;
+          kota?: string;
+          nama_pemilik?: string;
+          kontak_pemilik?: string;
+          email?: string | null;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      orders: {
         Row: {
-          id: string
-          name: string
-          description?: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          description?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          description?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-      }
-      product_variants: {
-        Row: {
-          id: string
-          product_id: string
-          variant_name: string
-          variant_value: string
-          price_adjustment: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          product_id: string
-          variant_name: string
-          variant_value: string
-          price_adjustment?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          product_id?: string
-          variant_name?: string
-          variant_value?: string
-          price_adjustment?: number
-          created_at?: string
-          updated_at?: string
-        }
-      }
-      products: {
-        Row: {
-          id: string
-          sku: string
-          category_id: string
-          brand_id: string
-          name: string
-          size: string
-          base_distributor_price: number
-          consumer_price: number
-          base_moq: number
-          description: string | null
-          image_url: string | null
-          is_active: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          sku: string
-          category_id: string
-          brand_id: string
-          name: string
-          size: string
-          base_distributor_price: number
-          consumer_price: number
-          base_moq?: number
-          description?: string | null
-          image_url?: string | null
-          is_active?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          sku?: string
-          category_id?: string
-          brand_id?: string
-          name?: string
-          size?: string
-          base_distributor_price?: number
-          consumer_price?: number
-          base_moq?: number
-          description?: string | null
-          image_url?: string | null
-          is_active?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-      }
-      variant_pricing: {
-        Row: {
-          id: string
-          product_id: string
-          variant_name: string
-          area: string
-          distributor_price: number
-          moq: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          product_id: string
-          variant_name: string
-          area: string
-          distributor_price: number
-          moq?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          product_id?: string
-          variant_name?: string
-          area?: string
-          distributor_price?: number
-          moq?: number
-          created_at?: string
-          updated_at?: string
-        }
-      }
-      regional_pricing: {
-        Row: {
-          id: string
-          product_id: string
-          region_id: string
-          distributor_price: number
-          moq: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          product_id: string
-          region_id: string
-          distributor_price: number
-          moq?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          product_id?: string
-          region_id?: string
-          distributor_price?: number
-          moq?: number
-          created_at?: string
-          updated_at?: string
-        }
-      }
-      regions: {
-        Row: {
-          id: string
-          name: string
-          province: string
-          latitude: number | null
-          longitude: number | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          province: string
-          latitude?: number | null
-          longitude?: number | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          province?: string
-          latitude?: number | null
-          longitude?: number | null
-          created_at?: string
-          updated_at?: string
-        }
-      }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      [_ in never]: never
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
+          id: string;
+          distributor_id: string;
+          total_amount: number;
+          status: string;
+          order_number: string;
+          shipping_address: string;
+          shipping_city: string;
+          shipping_notes: string | null;
+          payment_status: string;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["orders"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["orders"]["Row"]>;
+      };
+    };
+  };
 }
-
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
-
-export type Tables<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
-    }
-    ? R
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
-
-export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
-
-export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
-    }
-    ? U
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
-
-export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
-
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
-
-export const Constants = {
-  public: {
-    Enums: {},
-  },
-} as const

@@ -11,7 +11,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { translations } from "@/lib/translations";
 import { useToast } from "@/components/ui/use-toast";
 import { fetchProductBySku } from "@/lib/db";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription } from "@/components/ui/dialog";
 
 export default function ProdukDetail() {
   const { id } = useParams();
@@ -128,6 +128,9 @@ export default function ProdukDetail() {
           {/* Image Dialog */}
           <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
             <DialogContent className="max-w-3xl p-1 border-none">
+              <DialogDescription className="sr-only">
+                Product image preview for {product.name}
+              </DialogDescription>
               <img 
                 src={product.image || '/placeholder.svg'} 
                 alt={`${product.name} — ${product.size}`} 

@@ -64,7 +64,7 @@ interface VariantPricing {
  */
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -1256,14 +1256,14 @@ const SKUManager = () => {
           if (open) loadBrands(); // Reload brands when dialog opens
           setIsDialogOpen(open);
         }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" aria-describedby="sku-form-description">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editMode ? t.editSku : t.addNewSku}
             </DialogTitle>
-            <p id="sku-form-description" className="text-sm text-muted-foreground">
+            <DialogDescription>
               {editMode ? "Edit product details below" : "Fill in the product details below"}
-            </p>
+            </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">

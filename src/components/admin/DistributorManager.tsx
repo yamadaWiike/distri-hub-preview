@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,66 +52,15 @@ const DistributorManager = () => {
   const fetchDistributors = async () => {
     setIsLoading(true);
     try {
-      // Select specific columns to avoid any schema issues
+      // In the fetchDistributors function, revert to original:
       const { data, error } = await supabase
         .from('distributor_profiles')
-        .select(`
-          id,
-          user_id,
-          business_name,
-          contact_person,
-          email,
-          phone,
-          address,
-          city,
-          province,
-          postal_code,
-          business_type,
-          distributor_license,
-          tax_id,
-          bank_account,
-          bank_name,
-          role,
-          created_at,
-          updated_at,
-          nama_bisnis,
-          nama_pemilik,
-          email_pemilik,
-          kontak_pemilik,
-          alamat_lengkap,
-          kota
-        `)
-        .order('created_at', { ascending: false });
-      
+        .select('*');
       if (error) {
         console.error('Error fetching distributors:', error);
         throw error;
       }
-      
-      // Transform data to handle mixed schema (Indonesian + English columns)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const transformedData = (data || []).map((profile: any) => ({
-        id: profile.id,
-        user_id: profile.user_id,
-        business_name: profile.business_name || profile.nama_bisnis || '',
-        contact_person: profile.contact_person || profile.nama_pemilik || '',
-        email: profile.email || profile.email_pemilik || '',
-        phone: profile.phone || profile.kontak_pemilik || '',
-        address: profile.address || profile.alamat_lengkap || '',
-        city: profile.city || profile.kota || '',
-        province: profile.province || profile.kota || '', // fallback to city if no province
-        postal_code: profile.postal_code || '',
-        business_type: profile.business_type || 'distributor',
-        distributor_license: profile.distributor_license || '',
-        tax_id: profile.tax_id || profile.npwp || '',
-        bank_account: profile.bank_account || profile.norek || '',
-        bank_name: profile.bank_name || profile.bank || '',
-        role: profile.role || 'distributor',
-        created_at: profile.created_at,
-        updated_at: profile.updated_at
-      }));
-      
-      setDistributors(transformedData);
+      setDistributors(data || []);
     } catch (error) {
       console.error('Error fetching distributors:', error);
       toast({
@@ -413,6 +362,9 @@ const DistributorManager = () => {
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>{t.distributorDetails}</DialogTitle>
+            <DialogDescription>
+              View detailed information about the selected distributor including business details and contact information.
+            </DialogDescription>
           </DialogHeader>
           {selectedDistributor && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -476,6 +428,9 @@ const DistributorManager = () => {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{t.editDistributor}</DialogTitle>
+            <DialogDescription>
+              Edit distributor information including business details, contact information, and location settings.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
