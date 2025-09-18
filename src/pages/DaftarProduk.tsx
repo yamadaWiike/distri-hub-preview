@@ -2,6 +2,7 @@ import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import { Product, ProductVariant } from "@/data/products";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import html2canvas from "html2canvas";
@@ -16,6 +17,9 @@ import { translations } from "@/lib/translations";
 import { useToast } from "@/components/ui/use-toast";
 import { getAllProducts, getAllAreas, getAllBrands, fetchProductsWithVariants, fetchProductsExpandedByVariants, ProductWithVariant } from "@/services/product-service";
 import { generateCatalogPDF } from "@/utils/catalog";
+
+// Cache duration constant
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 
 function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: ProductWithVariant; loggedIn: boolean; selectedFilterArea?: string }) {
   const { addItem } = useCart();
@@ -55,8 +59,9 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
   const margin = potentialRevenue > 0 ? (profit / potentialRevenue) * 100 : 0;
 
   return (
-    <article className="border rounded-lg p-4 flex flex-col gap-3 h-full">
-      <div className="relative w-full overflow-hidden rounded-md">
+    <article className="border rounded-lg p-4 flex flex-col h-full bg-white shadow-sm hover:shadow-md transition-shadow">
+      {/* Product Image */}
+      <div className="relative w-full overflow-hidden rounded-md mb-4">
         <img
           src={product.image || '/placeholder.svg'}
           alt={`${product.displayName} — ${product.size}`}
@@ -64,51 +69,78 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
           className="w-full h-40 object-cover"
         />
       </div>
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="text-xs text-muted-foreground">{product.category} • {product.brand}</div>
-            {product.isVariant && (
-              <span className="bg-purple-100 text-purple-800 text-xs px-1.5 py-0.5 rounded-sm">
-                {product.variantInfo?.variantName}
+      
+      {/* Product Header */}
+      <div className="mb-4">
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+              <span>{product.category}</span>
+              <span>•</span>
+              <span>{product.brand}</span>
+            </div>
+            <h3 className="text-base font-semibold leading-tight text-foreground mb-1">
+              {product.displayName}
+            </h3>
+            <div className="text-sm text-muted-foreground">{product.size}</div>
+          </div>
+          <div className="flex flex-col items-end gap-2 min-w-0">
+            <Link 
+              to={`/produk/${product.baseProductId}`} 
+              className="text-xs text-primary hover:text-primary/80 font-medium px-2 py-1 rounded-md hover:bg-primary/10 transition-colors"
+            >
+              {lang === 'id' ? "Lihat Detail" : "View Details"}
+            </Link>
+            
+            {/* Variant Info - Under Lihat Detail in same column */}
+            {product.isVariant && product.variantInfo && (
+              <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full font-medium">
+                Variant: {product.variantInfo.variantName}
               </span>
             )}
           </div>
-          <h3 className="text-lg font-semibold">{product.displayName} — {product.size}</h3>
-          {product.isVariant && product.variantInfo?.variantDescription && (
-            <p className="text-sm text-muted-foreground mt-1">
+        </div>
+        
+        {/* Variant Description - Full width if exists */}
+        {product.isVariant && product.variantInfo?.variantDescription && (
+          <div className="pt-2">
+            <p className="text-sm text-muted-foreground">
               {product.variantInfo.variantDescription}
             </p>
-          )}
-        </div>
-        <Link to={`/produk/${product.baseProductId}`} className="text-sm text-primary underline-offset-4 hover:underline">
-          {lang === 'id' ? "Pelajari Lebih Lanjut" : "Learn More"}
-        </Link>
-      </header>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">
-            {lang === 'id' ? "Harga Konsumen" : "Consumer Price"}
           </div>
-          <div className="text-base font-medium">{formatIDR(product.consumerPrice)}</div>
-        </div>
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">
-            {lang === 'id' ? "Harga Distributor" : "Distributor Price"}
+        )}
+      </div>
+      
+      {/* Pricing Section */}
+      <div className="mb-4">
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="bg-gray-50 rounded-lg p-3">
+            <div className="text-xs font-medium text-muted-foreground mb-2">
+              {lang === 'id' ? "Harga Konsumen" : "Consumer Price"}
+            </div>
+            <div className="text-sm font-bold text-foreground">{formatIDR(product.consumerPrice)}</div>
           </div>
-          {loggedIn ? (
-            <div className="text-base font-medium">{formatIDR(basePrice)}</div>
-          ) : (
-            <div className="text-base font-medium blur-sm select-none">{formatIDR(basePrice)}</div>
-          )}
+          <div className="bg-gray-50 rounded-lg p-3">
+            <div className="text-xs font-medium text-muted-foreground mb-2">
+              {lang === 'id' ? "Harga Distributor" : "Distributor Price"}
+            </div>
+            {loggedIn ? (
+              <div className="text-sm font-bold text-foreground">{formatIDR(basePrice)}</div>
+            ) : (
+              <div className="text-sm font-bold text-foreground blur-sm select-none">{formatIDR(basePrice)}</div>
+            )}
+          </div>
         </div>
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">MOQ</div>
-          <div className="text-base font-medium">{usedMoq} pcs</div>
-        </div>
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">Area Distribusi</div>
-          <div className="text-base font-medium">{regional?.area ?? '-'}</div>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div className="text-center">
+            <div className="text-xs font-medium text-muted-foreground mb-1">MOQ</div>
+            <div className="text-sm font-semibold text-foreground">{usedMoq} pcs</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs font-medium text-muted-foreground mb-1">Area Distribusi</div>
+            <div className="text-sm font-semibold text-foreground">{regional?.area ?? '-'}</div>
+          </div>
         </div>
       </div>
 
@@ -256,11 +288,27 @@ export default function DaftarProduk() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 500000]);
   const [sortOrder, setSortOrder] = useState('price-asc');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Add cache ref to prevent repeated API calls
+  const dataCacheRef = useRef<{
+    products: ProductWithVariant[] | null;
+    timestamp: number;
+  }>({ products: null, timestamp: 0 });
   const ref = useRef<HTMLDivElement>(null);
   
   // Fetch products, areas and brands from Supabase when component mounts
   useEffect(() => {
     const fetchData = async () => {
+      // Check cache first
+      const now = Date.now();
+      const cache = dataCacheRef.current;
+      if (cache.products && (now - cache.timestamp) < CACHE_DURATION) {
+        console.log('Using cached product data');
+        setProducts(cache.products);
+        setLoading(false);
+        return;
+      }
+      
       setLoading(true);
       
       try {
@@ -271,6 +319,13 @@ export default function DaftarProduk() {
         console.log('Number of products with variants expanded:', productsData.length);
         console.log('Variants found:', productsData.filter(p => p.isVariant).length);
         console.log('Sample variant product:', productsData.find(p => p.isVariant));
+        
+        // Update cache
+        dataCacheRef.current = {
+          products: productsData,
+          timestamp: now
+        };
+        
         setProducts(productsData);
         
         // Set debug info for display
@@ -434,6 +489,18 @@ export default function DaftarProduk() {
   const filteredProducts = useMemo(() => {
     let filtered = products;
     
+    // Filter by search query (SKU, name, description)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(p => 
+        (p.sku && p.sku.toLowerCase().includes(query)) ||
+        (p.name && p.name.toLowerCase().includes(query)) ||
+        (p.description && p.description.toLowerCase().includes(query)) ||
+        (p.variantInfo?.variantName && p.variantInfo.variantName.toLowerCase().includes(query)) ||
+        (p.displayName && p.displayName.toLowerCase().includes(query))
+      );
+    }
+    
     // Filter by area
     if (area) {
       filtered = filtered.filter(p => p.regions.some(r => r.area === area));
@@ -450,7 +517,7 @@ export default function DaftarProduk() {
     );
     
     return filtered;
-  }, [area, selectedBrand, priceRange, products]);
+  }, [searchQuery, area, selectedBrand, priceRange, products]);
   
   // Pagination logic
   const paginationTotalPages = useMemo(() => Math.ceil(filteredProducts.length / productsPerPage), [filteredProducts, productsPerPage]);
@@ -1032,8 +1099,8 @@ export default function DaftarProduk() {
         {/* Filter Bar - Redesigned for cleaner UX */}
         <div className="bg-background border rounded-lg p-4 shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-            {/* Area Distribution Filter - 3 columns */}
-            <div className="md:col-span-3">
+            {/* Area Distribution Filter - 4 columns */}
+            <div className="md:col-span-4">
               <div className="flex flex-col">
                 <label className="text-sm font-medium mb-1.5">
                   {lang === 'id' ? "Area Distribusi" : "Distribution Area"}
@@ -1185,36 +1252,70 @@ export default function DaftarProduk() {
             </div>
           </div>
         </div>
-        <p className="text-muted-foreground text-sm">
-          {lang === 'id'
-            ? "Harga distributor akan terlihat setelah Anda masuk / mendaftar."
-            : "Distributor prices will be visible after you login / register."
-          }
-        </p>
+        {!user && (
+          <p className="text-muted-foreground text-sm">
+            {lang === 'id'
+              ? "Harga distributor akan terlihat setelah Anda masuk / mendaftar."
+              : "Distributor prices will be visible after you login / register."
+            }
+          </p>
+        )}
         <div ref={ref} className="space-y-4">
           <div className="border rounded-md p-3 text-sm flex items-center justify-between">
             <div>
               <div className="font-medium">
-                {lang === 'id' ? "Ringkasan Ekspor" : "Export Summary"}
+                {lang === 'id' ? "Filter & Tampilan" : "Filter & Display"}
               </div>
               <div className="text-muted-foreground">
+                {searchQuery && (
+                  <>
+                    {lang === 'id' ? "Pencarian: " : "Search: "}"{searchQuery}" • 
+                  </>
+                )}
                 {lang === 'id' ? "Area: " : "Area: "}{area || (lang === 'id' ? 'Semua Area' : 'All Areas')} • 
                 Brand: {selectedBrand || (lang === 'id' ? 'Semua Brand' : 'All Brands')} • 
-                {lang === 'id' ? " Harga: " : " Price: "}{formatIDR(priceRange[0])} - {formatIDR(priceRange[1])} • 
-                {lang === 'id' ? " Tanggal: " : " Date: "}{new Date().toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US')}
-                {debugInfo && ` • DEBUG: ${debugInfo}`}
+                {lang === 'id' ? " Rentang Harga: " : " Price Range: "}{formatIDR(priceRange[0])} - {formatIDR(priceRange[1])}
               </div>
             </div>
-            <div className="text-muted-foreground">
-              {lang === 'id' ? "Total Produk: " : "Total Products: "}{filteredProducts.length} 
-              {currentPage > 1 && (lang === 'id' 
-                ? ` (Halaman ${currentPage}/${paginationTotalPages})` 
-                : ` (Page ${currentPage}/${paginationTotalPages})`
+            <div className="text-right text-muted-foreground">
+              <div className="text-sm font-medium text-foreground">
+                {lang === 'id' ? "Menampilkan: " : "Showing: "}{filteredProducts.length} {lang === 'id' ? 'produk' : 'products'}
+              </div>
+              {currentPage > 1 && (
+                <div className="text-xs">
+                  {lang === 'id' 
+                    ? `Halaman ${currentPage} dari ${paginationTotalPages}` 
+                    : `Page ${currentPage} of ${paginationTotalPages}`
+                  }
+                </div>
               )}
-              {items?.length ? (lang === 'id' 
-                ? ` • Item di Keranjang: ${items.length}` 
-                : ` • Items in Cart: ${items.length}`
-              ) : ''}
+              {items?.length > 0 && (
+                <div className="text-xs">
+                  {lang === 'id' 
+                    ? `${items.length} item di keranjang` 
+                    : `${items.length} items in cart`
+                  }
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Search Bar - Positioned above product cards */}
+          <div className="bg-background border rounded-lg p-4 shadow-sm">
+            <div className="max-w-md">
+              <label className="text-sm font-medium mb-2 block">
+                {lang === 'id' ? "Cari SKU/Produk" : "Search SKU/Product"}
+              </label>
+              <Input
+                type="text"
+                placeholder={lang === 'id' ? "Masukkan SKU atau nama produk..." : "Enter SKU or product name..."}
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full"
+              />
             </div>
           </div>
           

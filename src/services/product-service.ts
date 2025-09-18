@@ -149,7 +149,7 @@ export async function fetchProductVariants(productId: string) {
     return data.map((variant: ProductVariantFromDB) => ({
       id: variant.id,
       variantName: variant.variant_name || 'Unnamed Variant',
-      variantDescription: variant.variant_description || `Variant: ${variant.variant_name}`,
+      variantDescription: variant.variant_description || '', // Don't add "Variant:" prefix here
       additionalPrice: variant.additional_price || 0,
       isActive: variant.is_active
     }));
