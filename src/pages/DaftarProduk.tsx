@@ -1236,7 +1236,7 @@ export default function DaftarProduk() {
               <div className="flex flex-col md:flex-row gap-2">
                 <Button 
                   variant="outline" 
-                  onClick={()=> generateCatalogPDF(currentProducts)}
+                  onClick={()=> generateCatalogPDF({ products: currentProducts, distributionArea: area || 'Semua Area' })}
                   className="w-full md:w-auto flex items-center justify-center"
                 >
                   <svg className="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
