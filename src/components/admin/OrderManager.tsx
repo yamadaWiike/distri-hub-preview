@@ -30,7 +30,7 @@ type Order = {
   payment_status: 'unpaid' | 'partial' | 'paid';
   created_at: string;
   updated_at: string;
-  items: OrderItem[];
+  order_items: OrderItem[];
   distributor?: {
     nama_bisnis: string;
     nama_pemilik: string;
@@ -184,7 +184,24 @@ const OrderManager = () => {
   const fetchOrders = async () => {
     setIsLoading(true);
     try {
-      // Fetch orders with distributor and order items data
+      // Debug: Check current user and auth state
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error('Auth error:', userError);
+      }
+      console.log('Current user:', user?.email);
+      
+      // Check admin access using the same logic as client.ts
+      const adminEmails = ['rudy@baskit.app', 'admin.commercial@baskit.app'];
+      const isAdminUser = adminEmails.includes(user?.email || '');
+      console.log('Is admin user:', isAdminUser);
+      
+      if (!isAdminUser) {
+        throw new Error('Access denied. Admin privileges required.');
+      }
+      
+      // Query with the correct database schema
+      console.log('Fetching orders with correct schema...');
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -206,7 +223,7 @@ const OrderManager = () => {
             email_pemilik,
             kontak_pemilik
           ),
-          items:order_items(
+          order_items (
             id,
             order_id,
             product_id,
@@ -225,15 +242,23 @@ const OrderManager = () => {
         
       if (error) {
         console.error('Database error:', error);
+        console.error('Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
         throw error;
       }
+      
+      console.log('Raw query result:', { data, error, dataLength: data?.length });
       
       if (data && data.length > 0) {
         console.log('Fetched orders data:', data);
         setOrders(data);
         setFilteredOrders(data);
       } else {
-        console.log('No orders found in database');
+        console.log('No orders found in database - this could be due to RLS policies or no data');
         setOrders([]);
         setFilteredOrders([]);
       }
@@ -250,6 +275,46 @@ const OrderManager = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Debug function to test database access
+  const debugDatabaseAccess = async () => {
+    console.log('=== DATABASE DEBUG STARTED ===');
+    
+    try {
+      // 1. Check authentication
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      console.log('1. Current user:', { email: user?.email, id: user?.id, error: userError });
+      
+      // 2. Test admin function
+      const { data: adminResult, error: adminError } = await supabase.rpc('is_admin_user');
+      console.log('2. Admin function result:', { result: adminResult, error: adminError });
+      
+      // 3. Test simple orders count
+      const { count, error: countError } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true });
+      console.log('3. Orders count:', { count, error: countError });
+      
+      // 4. Test orders query without joins
+      const { data: simpleOrders, error: simpleError } = await supabase
+        .from('orders')
+        .select('id, order_number, status, created_at')
+        .limit(5);
+      console.log('4. Simple orders query:', { data: simpleOrders, error: simpleError });
+      
+      // 5. Test RLS policies existence
+      const { data: policies, error: policyError } = await supabase
+        .from('pg_policies')
+        .select('tablename, policyname, cmd')
+        .in('tablename', ['orders', 'order_items']);
+      console.log('5. RLS policies:', { policies, error: policyError });
+      
+    } catch (error) {
+      console.error('Debug error:', error);
+    }
+    
+    console.log('=== DATABASE DEBUG COMPLETED ===');
   };
   
   const openOrderDialog = (order: Order) => {
@@ -457,24 +522,36 @@ const OrderManager = () => {
                     <p className="text-sm">{selectedOrder.shipping_address}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{t.shippingCity}</p>
+                    <p className="text-sm font-medium">Distributor</p>
+                    <p className="text-sm">{selectedOrder.distributor?.nama_bisnis || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Contact Person</p>
+                    <p className="text-sm">{selectedOrder.distributor?.nama_pemilik || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Contact Email</p>
+                    <p className="text-sm">{selectedOrder.distributor?.email_pemilik || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Shipping City</p>
                     <p className="text-sm">{selectedOrder.shipping_city}</p>
                   </div>
                   {selectedOrder.shipping_notes && (
                     <div className="col-span-2">
-                      <p className="text-sm font-medium">{t.shippingNotes}</p>
+                      <p className="text-sm font-medium">Shipping Notes</p>
                       <p className="text-sm">{selectedOrder.shipping_notes}</p>
                     </div>
                   )}
                   {selectedOrder.payment_method && (
                     <div>
-                      <p className="text-sm font-medium">{t.paymentMethod}</p>
+                      <p className="text-sm font-medium">Payment Method</p>
                       <p className="text-sm">{selectedOrder.payment_method}</p>
                     </div>
                   )}
                   <div>
-                    <p className="text-sm font-medium">{t.paymentStatus}</p>
-                    <p className="text-sm">{t[selectedOrder.payment_status as keyof typeof t]}</p>
+                    <p className="text-sm font-medium">Payment Status</p>
+                    <p className="text-sm">{selectedOrder.payment_status}</p>
                   </div>
                 </div>
               </div>
@@ -494,7 +571,7 @@ const OrderManager = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedOrder.items.map((item) => (
+                      {selectedOrder.order_items.map((item) => (
                         <TableRow key={item.id}>
                           <TableCell>{item.product?.name || 'N/A'}</TableCell>
                           <TableCell>{item.product?.sku || 'N/A'}</TableCell>

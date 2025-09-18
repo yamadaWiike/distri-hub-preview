@@ -5,10 +5,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { Eye, Edit, Trash2, Search, Loader2, Calendar, Phone, Mail, MapPin } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { provinces, getCitiesByProvince, City } from '@/data/indonesia';
 
 // Define distributor profile type (simplified without status)
 type DistributorProfile = {
@@ -44,6 +46,7 @@ const DistributorManager = () => {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editForm, setEditForm] = useState<Partial<DistributorProfile>>({});
+  const [availableCities, setAvailableCities] = useState<City[]>([]);
 
   // Fetch distributors from database
   const fetchDistributors = async () => {
@@ -124,6 +127,20 @@ const DistributorManager = () => {
   useEffect(() => {
     fetchDistributors();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update available cities when province changes in edit form
+  useEffect(() => {
+    if (editForm.province) {
+      // Find province by name to get the ID
+      const province = provinces.find(p => p.name === editForm.province);
+      if (province) {
+        const citiesList = getCitiesByProvince(province.id);
+        setAvailableCities(citiesList);
+      }
+    } else {
+      setAvailableCities([]);
+    }
+  }, [editForm.province]);
 
   // Save distributor changes
   const saveDistributor = async () => {
@@ -219,6 +236,16 @@ const DistributorManager = () => {
       bank_account: distributor.bank_account,
       bank_name: distributor.bank_name,
     });
+    
+    // Load cities for the current province
+    if (distributor.province) {
+      const province = provinces.find(p => p.name === distributor.province);
+      if (province) {
+        const citiesList = getCitiesByProvince(province.id);
+        setAvailableCities(citiesList);
+      }
+    }
+    
     setIsEditDialogOpen(true);
   };
 
@@ -493,20 +520,41 @@ const DistributorManager = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="city">{t.city}</Label>
-              <Input
-                id="city"
-                value={editForm.city || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, city: e.target.value }))}
-              />
+              <Label htmlFor="province">{t.province}</Label>
+              <Select 
+                value={editForm.province || ''} 
+                onValueChange={(value) => setEditForm(prev => ({ ...prev, province: value, city: '' }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={lang === 'id' ? "Pilih Provinsi" : "Select Province"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {provinces.map((province) => (
+                    <SelectItem key={province.id} value={province.name}>
+                      {province.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="province">{t.province}</Label>
-              <Input
-                id="province"
-                value={editForm.province || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, province: e.target.value }))}
-              />
+              <Label htmlFor="city">{t.city}</Label>
+              <Select 
+                value={editForm.city || ''} 
+                onValueChange={(value) => setEditForm(prev => ({ ...prev, city: value }))}
+                disabled={!editForm.province}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={lang === 'id' ? "Pilih Kota/Kabupaten" : "Select City/Regency"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableCities.map((city) => (
+                    <SelectItem key={city.id} value={city.name}>
+                      {city.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
