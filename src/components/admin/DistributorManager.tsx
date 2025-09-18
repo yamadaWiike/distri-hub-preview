@@ -12,26 +12,19 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { provinces, getCitiesByProvince, City } from '@/data/indonesia';
 
-// Define distributor profile type (simplified without status)
+// Define distributor profile type based on actual database schema
 type DistributorProfile = {
   id: string;
   user_id: string;
-  business_name: string;
-  contact_person: string;
-  email: string;
-  phone: string;
-  address: string;
-  city: string;
-  province: string;
-  postal_code: string;
-  business_type: string;
-  distributor_license: string;
-  tax_id: string;
-  bank_account: string;
-  bank_name: string;
-  role: string;
-  created_at: string;
-  updated_at: string;
+  nama_bisnis: string;
+  alamat_lengkap: string;
+  kota: string;
+  nama_pemilik: string;
+  kontak_pemilik: string;
+  email?: string | null;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 const DistributorManager = () => {
@@ -79,38 +72,24 @@ const DistributorManager = () => {
 
   // Update available cities when province changes in edit form
   useEffect(() => {
-    if (editForm.province) {
-      // Find province by name to get the ID
-      const province = provinces.find(p => p.name === editForm.province);
-      if (province) {
-        const citiesList = getCitiesByProvince(province.id);
-        setAvailableCities(citiesList);
-      }
-    } else {
-      setAvailableCities([]);
-    }
-  }, [editForm.province]);
+    // Province field does not exist in distributor profile, so skip updating available cities
+    setAvailableCities([]);
+  }, [editForm]);
 
   // Save distributor changes
   const saveDistributor = async () => {
     if (!selectedDistributor) return;
 
     try {
-      // Use a more flexible approach to avoid TypeScript issues
+      // Use correct field names matching database schema
       const updateData = {
-        business_name: editForm.business_name,
-        contact_person: editForm.contact_person,
+        nama_bisnis: editForm.nama_bisnis,
+        nama_pemilik: editForm.nama_pemilik,
         email: editForm.email,
-        phone: editForm.phone,
-        address: editForm.address,
-        city: editForm.city,
-        province: editForm.province,
-        postal_code: editForm.postal_code,
-        business_type: editForm.business_type,
-        distributor_license: editForm.distributor_license,
-        tax_id: editForm.tax_id,
-        bank_account: editForm.bank_account,
-        bank_name: editForm.bank_name
+        kontak_pemilik: editForm.kontak_pemilik,
+        alamat_lengkap: editForm.alamat_lengkap,
+        kota: editForm.kota,
+        status: editForm.status
       };
 
       // Use a direct approach without type assertion
@@ -171,29 +150,14 @@ const DistributorManager = () => {
   const openEditDialog = (distributor: DistributorProfile) => {
     setSelectedDistributor(distributor);
     setEditForm({
-      business_name: distributor.business_name,
-      contact_person: distributor.contact_person,
+      nama_bisnis: distributor.nama_bisnis,
+      nama_pemilik: distributor.nama_pemilik,
       email: distributor.email,
-      phone: distributor.phone,
-      address: distributor.address,
-      city: distributor.city,
-      province: distributor.province,
-      postal_code: distributor.postal_code,
-      business_type: distributor.business_type,
-      distributor_license: distributor.distributor_license,
-      tax_id: distributor.tax_id,
-      bank_account: distributor.bank_account,
-      bank_name: distributor.bank_name,
+      kontak_pemilik: distributor.kontak_pemilik,
+      alamat_lengkap: distributor.alamat_lengkap,
+      kota: distributor.kota,
+      status: distributor.status,
     });
-    
-    // Load cities for the current province
-    if (distributor.province) {
-      const province = provinces.find(p => p.name === distributor.province);
-      if (province) {
-        const citiesList = getCitiesByProvince(province.id);
-        setAvailableCities(citiesList);
-      }
-    }
     
     setIsEditDialogOpen(true);
   };
@@ -202,11 +166,11 @@ const DistributorManager = () => {
   const filteredDistributors = distributors.filter(distributor => {
     const searchLower = searchQuery.toLowerCase();
     return (
-      distributor.business_name?.toLowerCase().includes(searchLower) ||
-      distributor.contact_person?.toLowerCase().includes(searchLower) ||
+      distributor.nama_bisnis?.toLowerCase().includes(searchLower) ||
+      distributor.nama_pemilik?.toLowerCase().includes(searchLower) ||
       distributor.email?.toLowerCase().includes(searchLower) ||
-      distributor.phone?.toLowerCase().includes(searchLower) ||
-      distributor.city?.toLowerCase().includes(searchLower)
+      distributor.kontak_pemilik?.toLowerCase().includes(searchLower) ||
+      distributor.kota?.toLowerCase().includes(searchLower)
     );
   });
 
@@ -308,6 +272,7 @@ const DistributorManager = () => {
                   <TableHead>{t.email}</TableHead>
                   <TableHead>{t.phone}</TableHead>
                   <TableHead>{t.city}</TableHead>
+                  <TableHead>{t.status}</TableHead>
                   <TableHead>{t.registrationDate}</TableHead>
                   <TableHead>{t.actions}</TableHead>
                 </TableRow>
@@ -315,12 +280,21 @@ const DistributorManager = () => {
               <TableBody>
                 {filteredDistributors.map((distributor) => (
                   <TableRow key={distributor.id}>
-                    <TableCell className="font-medium">{distributor.business_name}</TableCell>
-                    <TableCell>{distributor.contact_person}</TableCell>
+                    <TableCell className="font-medium">{distributor.nama_bisnis}</TableCell>
+                    <TableCell>{distributor.nama_pemilik}</TableCell>
                     <TableCell>{distributor.email}</TableCell>
-                    <TableCell>{distributor.phone}</TableCell>
-                    <TableCell>{distributor.city}</TableCell>
-                    <TableCell>{formatDate(distributor.created_at)}</TableCell>
+                    <TableCell>{distributor.kontak_pemilik}</TableCell>
+                    <TableCell>{distributor.kota}</TableCell>
+                    <TableCell>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        distributor.status === 'active' ? 'bg-green-100 text-green-800' :
+                        distributor.status === 'inactive' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {distributor.status}
+                      </span>
+                    </TableCell>
+                    <TableCell>{formatDate(distributor.created_at || '')}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Button
@@ -379,11 +353,11 @@ const DistributorManager = () => {
                 <div className="space-y-3">
                   <div>
                     <Label className="text-sm font-medium">{t.businessName}</Label>
-                    <p className="text-sm">{selectedDistributor.business_name}</p>
+                    <p className="text-sm">{selectedDistributor.nama_bisnis}</p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium">{t.contactPerson}</Label>
-                    <p className="text-sm">{selectedDistributor.contact_person}</p>
+                    <p className="text-sm">{selectedDistributor.nama_pemilik}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Mail className="h-4 w-4 text-muted-foreground" />
@@ -391,31 +365,35 @@ const DistributorManager = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <Phone className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm">{selectedDistributor.phone}</p>
+                    <p className="text-sm">{selectedDistributor.kontak_pemilik}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm">{selectedDistributor.address}, {selectedDistributor.city}, {selectedDistributor.province} {selectedDistributor.postal_code}</p>
+                    <p className="text-sm">{selectedDistributor.alamat_lengkap}, {selectedDistributor.kota}</p>
                   </div>
                 </div>
               </div>
               
               <div className="space-y-3">
                 <div>
+                  <Label className="text-sm font-medium">{t.status}</Label>
+                  <p className="text-sm">{selectedDistributor.status}</p>
+                </div>
+                <div>
                   <Label className="text-sm font-medium">{t.businessType}</Label>
-                  <p className="text-sm">{selectedDistributor.business_type}</p>
+                  <p className="text-sm text-muted-foreground">Not Available</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium">{t.distributorLicense}</Label>
-                  <p className="text-sm">{selectedDistributor.distributor_license}</p>
+                  <p className="text-sm text-muted-foreground">Not Available</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium">{t.taxId}</Label>
-                  <p className="text-sm">{selectedDistributor.tax_id}</p>
+                  <p className="text-sm text-muted-foreground">Not Available</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium">{t.bankInfo}</Label>
-                  <p className="text-sm">{selectedDistributor.bank_name} - {selectedDistributor.bank_account}</p>
+                  <p className="text-sm text-muted-foreground">Not Available</p>
                 </div>
               </div>
             </div>
@@ -434,19 +412,19 @@ const DistributorManager = () => {
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="business_name">{t.businessName}</Label>
+              <Label htmlFor="nama_bisnis">{t.businessName}</Label>
               <Input
-                id="business_name"
-                value={editForm.business_name || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, business_name: e.target.value }))}
+                id="nama_bisnis"
+                value={editForm.nama_bisnis || ''}
+                onChange={(e) => setEditForm(prev => ({ ...prev, nama_bisnis: e.target.value }))}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="contact_person">{t.contactPerson}</Label>
+              <Label htmlFor="nama_pemilik">{t.contactPerson}</Label>
               <Input
-                id="contact_person"
-                value={editForm.contact_person || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, contact_person: e.target.value }))}
+                id="nama_pemilik"
+                value={editForm.nama_pemilik || ''}
+                onChange={(e) => setEditForm(prev => ({ ...prev, nama_pemilik: e.target.value }))}
               />
             </div>
             <div className="space-y-2">
@@ -459,55 +437,42 @@ const DistributorManager = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">{t.phone}</Label>
+              <Label htmlFor="kontak_pemilik">{t.phone}</Label>
               <Input
-                id="phone"
-                value={editForm.phone || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+                id="kontak_pemilik"
+                value={editForm.kontak_pemilik || ''}
+                onChange={(e) => setEditForm(prev => ({ ...prev, kontak_pemilik: e.target.value }))}
               />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="address">{t.address}</Label>
+              <Label htmlFor="alamat_lengkap">{t.address}</Label>
               <Input
-                id="address"
-                value={editForm.address || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, address: e.target.value }))}
+                id="alamat_lengkap"
+                value={editForm.alamat_lengkap || ''}
+                onChange={(e) => setEditForm(prev => ({ ...prev, alamat_lengkap: e.target.value }))}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="province">{t.province}</Label>
-              <Select 
-                value={editForm.province || ''} 
-                onValueChange={(value) => setEditForm(prev => ({ ...prev, province: value, city: '' }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={lang === 'id' ? "Pilih Provinsi" : "Select Province"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {provinces.map((province) => (
-                    <SelectItem key={province.id} value={province.name}>
-                      {province.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="kota">{t.city}</Label>
+              <Input
+                id="kota"
+                value={editForm.kota || ''}
+                onChange={(e) => setEditForm(prev => ({ ...prev, kota: e.target.value }))}
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="city">{t.city}</Label>
+              <Label htmlFor="status">{t.status}</Label>
               <Select 
-                value={editForm.city || ''} 
-                onValueChange={(value) => setEditForm(prev => ({ ...prev, city: value }))}
-                disabled={!editForm.province}
+                value={editForm.status || ''} 
+                onValueChange={(value) => setEditForm(prev => ({ ...prev, status: value }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={lang === 'id' ? "Pilih Kota/Kabupaten" : "Select City/Regency"} />
+                  <SelectValue placeholder="Select Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableCities.map((city) => (
-                    <SelectItem key={city.id} value={city.name}>
-                      {city.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -555,6 +520,7 @@ const translations = {
     bankInfo: "Info Bank",
     editDistributor: "Edit Distributor",
     province: "Provinsi",
+    status: "Status",
     cancel: "Batal",
     saveChanges: "Simpan Perubahan",
     confirmDelete: "Apakah Anda yakin ingin menghapus distributor ini?",
@@ -593,6 +559,7 @@ const translations = {
     bankInfo: "Bank Info",
     editDistributor: "Edit Distributor",
     province: "Province",
+    status: "Status",
     cancel: "Cancel",
     saveChanges: "Save Changes",
     confirmDelete: "Are you sure you want to delete this distributor?",
