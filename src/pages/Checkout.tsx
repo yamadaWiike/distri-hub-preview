@@ -29,6 +29,27 @@ interface DeliveryDetails {
   addressType: AddressType;
 }
 
+// Database types for order operations
+interface DbDistributorProfile {
+  id: string;
+}
+
+interface DbOrder {
+  id: string;
+  order_number: string;
+  total_amount: number;
+}
+
+interface DbOrderItem {
+  id: string;
+  order_id: string;
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  consumer_price: number;
+  subtotal: number;
+}
+
 export default function Checkout() {
   const { items, totalAmount, clear } = useCart();
   const { toast } = useToast();
@@ -155,6 +176,110 @@ export default function Checkout() {
     console.log('Submitting order:', orderData);
 
     try {
+      // Import supabase client
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      // First, get the distributor profile ID
+      const { data: distributorProfile, error: profileError } = await supabase
+        .from('distributor_profiles')
+        .select('id')
+        .eq('user_id', user?.id)
+        .single();
+        
+      if (profileError || !distributorProfile) {
+        throw new Error('Distributor profile not found. Please complete your profile first.');
+      }
+
+      const typedDistributorProfile = distributorProfile as DbDistributorProfile;
+
+      // Generate unique order number with retry logic
+      let orderNumber: string;
+      let attempts = 0;
+      const maxAttempts = 5;
+      
+      do {
+        const now = new Date();
+        const dateStr = now.getFullYear().toString() + 
+                      (now.getMonth() + 1).toString().padStart(2, '0') + 
+                      now.getDate().toString().padStart(2, '0');
+        const randomNum = Math.floor(Math.random() * 99999).toString().padStart(5, '0');
+        orderNumber = `ORD-${dateStr}-${randomNum}`;
+        
+        // Check if order number already exists
+        const { data: existingOrder } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('order_number', orderNumber)
+          .single();
+          
+        if (!existingOrder) {
+          break; // Order number is unique, we can use it
+        }
+        
+        attempts++;
+      } while (attempts < maxAttempts);
+      
+      if (attempts >= maxAttempts) {
+        throw new Error('Unable to generate unique order number. Please try again.');
+      }
+
+      // Calculate shipping address based on address type
+      const shippingAddress = deliveryDetails.address;
+      const shippingCity = deliveryDetails.city;
+      const shippingNotes = deliveryDetails.notes || null;
+
+      // Insert order into database with type assertion
+      const { data: orderData, error: orderError } = await (supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from('orders') as any)
+        .insert({
+          distributor_id: typedDistributorProfile.id,
+          order_number: orderNumber,
+          status: 'pending',
+          total_amount: totalAmount,
+          shipping_address: shippingAddress,
+          shipping_city: shippingCity,
+          shipping_notes: shippingNotes,
+          payment_status: 'unpaid'
+        })
+        .select()
+        .single();
+
+      if (orderError || !orderData) {
+        throw new Error('Failed to create order: ' + (orderError?.message || 'Unknown error'));
+      }
+
+      // Insert order items with type assertion
+      const typedOrderData = orderData as DbOrder;
+
+      // Create order items
+      const orderItems = items.map(item => ({
+        order_id: typedOrderData.id,
+        product_id: item.id, // assuming cart item.id is the product UUID
+        quantity: item.qty,
+        unit_price: item.unitPrice,
+        consumer_price: item.consumerPrice || item.unitPrice, // fallback to unit price if consumer price not available
+        subtotal: item.qty * item.unitPrice
+      }));
+
+      // Insert order items with type assertion
+      const { error: itemsError } = await (supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from('order_items') as any)
+        .insert(orderItems);
+
+      if (itemsError) {
+        // If order items insertion fails, we should delete the order to maintain data integrity
+        await supabase.from('orders').delete().eq('id', typedOrderData.id);
+        throw new Error('Failed to create order items: ' + itemsError.message);
+      }
+
+      console.log('Order successfully saved to database:', {
+        orderId: typedOrderData.id,
+        orderNumber: orderNumber,
+        itemsCount: orderItems.length
+      });
+
       // Prepare order details for email
       const orderItemsText = items.map(item => 
         `• ${item.name} - ${item.size} (${item.province})
@@ -168,10 +293,14 @@ export default function Checkout() {
       // Prepare email data for Web3Forms
       const emailData = {
         access_key: "aaf6ab03-78a5-4e84-94bc-0acd0a51273c",
-        subject: `[Baskit] New Order from ${deliveryDetails.fullName}`,
+        subject: `[Baskit] New Order #${orderNumber} from ${deliveryDetails.fullName}`,
         from_name: "Baskit Order System",
         message: `
 === NEW ORDER RECEIVED ===
+
+Order Information:
+- Order Number: ${orderNumber}
+- Order ID: ${typedOrderData.id}
 
 Customer Information:
 - Name: ${deliveryDetails.fullName}
@@ -191,10 +320,14 @@ ${orderItemsText}
 Order Summary:
 - Total Amount: ${formatIDR(totalAmount)}
 - Order Date: ${new Date().toLocaleString()}
+- Payment Status: Unpaid
 
 Please process this order and contact the customer for shipping arrangements.
+
+You can view this order in the admin panel using Order Number: ${orderNumber}
         `,
         // Additional fields for better email formatting
+        "Order Number": orderNumber,
         "Customer Name": deliveryDetails.fullName,
         "Phone Number": deliveryDetails.phone,
         "Customer Email": user?.email || 'N/A',
@@ -219,7 +352,7 @@ Please process this order and contact the customer for shipping arrangements.
       if (result.success) {
         toast({
           title: t.orderSuccess,
-          description: t.orderProcessed,
+          description: `${t.orderProcessed} Order #${orderNumber}`,
         });
 
         // Clear the cart
@@ -230,15 +363,32 @@ Please process this order and contact the customer for shipping arrangements.
           navigate("/");
         }, 2000);
       } else {
-        throw new Error(result.message || "Failed to send order email");
+        console.warn('Email failed to send, but order was saved:', result);
+        toast({
+          title: t.orderSuccess,
+          description: `Order #${orderNumber} ${t.orderProcessed} (Email notification may have failed)`,
+        });
+
+        // Still clear cart and redirect even if email fails
+        clear();
+        setTimeout(() => {
+          navigate("/");
+        }, 2000);
       }
     } catch (error) {
       console.error('Error submitting order:', error);
+      
+      let errorMessage = lang === 'id' 
+        ? "Gagal mengirim pesanan. Silakan coba lagi." 
+        : "Failed to submit order. Please try again.";
+        
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error",
-        description: lang === 'id' 
-          ? "Gagal mengirim pesanan. Silakan coba lagi." 
-          : "Failed to submit order. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }

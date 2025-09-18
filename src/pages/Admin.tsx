@@ -9,7 +9,8 @@ import {
   Users, 
   ShoppingBag, 
   AlertTriangle,
-  ArrowRight
+  BarChart3,
+  UserCheck
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,8 @@ import { useNavigate } from "react-router-dom";
 import SKUManager from "@/components/admin/SKUManager";
 import UserManager from "@/components/admin/UserManager";
 import OrderManager from "@/components/admin/OrderManager";
+import DistributorManager from "@/components/admin/DistributorManager";
+import DistributorAnalytics from "@/components/admin/DistributorAnalytics";
 
 export default function Admin() {
   const { lang } = useLanguage();
@@ -122,6 +125,14 @@ export default function Admin() {
               <Package2 className="h-4 w-4" />
               {t.products}
             </TabsTrigger>
+            <TabsTrigger value="distributors" className="flex items-center gap-2">
+              <UserCheck className="h-4 w-4" />
+              {t.distributors}
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              {t.analytics}
+            </TabsTrigger>
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               {t.users}
@@ -134,6 +145,14 @@ export default function Admin() {
           
           <TabsContent value="products" className="space-y-4">
             <SKUManager />
+          </TabsContent>
+          
+          <TabsContent value="distributors" className="space-y-4">
+            <DistributorManager />
+          </TabsContent>
+          
+          <TabsContent value="analytics" className="space-y-4">
+            <DistributorAnalytics />
           </TabsContent>
           
           <TabsContent value="users" className="space-y-4">
@@ -160,6 +179,8 @@ const id = {
   backToHome: "Kembali ke Beranda",
   loggedInAs: "Masuk sebagai:",
   products: "Produk",
+  distributors: "Distributor",
+  analytics: "Analitik",
   users: "Pengguna",
   orders: "Pesanan",
   loginRequired: "Login diperlukan untuk mengakses halaman admin."
@@ -175,6 +196,8 @@ const en = {
   backToHome: "Back to Home",
   loggedInAs: "Logged in as:",
   products: "Products",
+  distributors: "Distributors",
+  analytics: "Analytics",
   users: "Users",
   orders: "Orders",
   loginRequired: "Login required to access admin page."

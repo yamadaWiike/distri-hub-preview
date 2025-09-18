@@ -16,28 +16,42 @@ import {
   SelectValue
 } from '@/components/ui/select';
 
-// Define types for orders
+// Define types for orders matching the actual database schema
 type Order = {
   id: string;
-  user_id: string;
-  status: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
+  distributor_id: string;
+  order_number: string;
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   total_amount: number;
-  items: OrderItem[];
+  shipping_address: string;
+  shipping_city: string;
+  shipping_notes?: string;
+  payment_method?: string;
+  payment_status: 'unpaid' | 'partial' | 'paid';
   created_at: string;
   updated_at: string;
-  shipping_address: string;
-  customer_name: string;
-  customer_email: string;
-  customer_phone: string;
+  items: OrderItem[];
+  distributor?: {
+    nama_bisnis: string;
+    nama_pemilik: string;
+    email_pemilik?: string;
+    kontak_pemilik: string;
+  };
 };
 
 type OrderItem = {
   id: string;
   order_id: string;
-  product_id: string; // Now a VARCHAR string from products table, not a UUID
+  product_id: string;
   quantity: number;
   unit_price: number;
-  product_name: string;
+  consumer_price: number;
+  subtotal: number;
+  created_at: string;
+  product?: {
+    name: string;
+    sku: string;
+  };
 };
 
 // English and Indonesian translations
@@ -46,31 +60,41 @@ const en = {
   searchOrders: "Search orders...",
   exportCSV: "Export CSV",
   noOrders: "No orders found.",
-  orderId: "Order ID",
-  customer: "Customer",
+  orderNumber: "Order Number",
+  distributor: "Distributor",
   date: "Date",
   total: "Total",
   status: "Status",
+  paymentStatus: "Payment Status",
   actions: "Actions",
   viewDetails: "View Details",
   orderDetails: "Order Details",
-  customerInfo: "Customer Information",
-  name: "Name",
+  distributorInfo: "Distributor Information",
+  businessName: "Business Name",
+  ownerName: "Owner Name",
   email: "Email",
   phone: "Phone",
-  address: "Address",
+  shippingAddress: "Shipping Address",
+  shippingCity: "Shipping City",
+  shippingNotes: "Shipping Notes",
+  paymentMethod: "Payment Method",
   items: "Items",
   product: "Product",
+  sku: "SKU",
   quantity: "Quantity",
   unitPrice: "Unit Price",
+  consumerPrice: "Consumer Price",
   subtotal: "Subtotal",
   updateStatus: "Update Status",
   close: "Close",
   pending: "Pending",
-  confirmed: "Confirmed",
+  processing: "Processing",
   shipped: "Shipped",
   delivered: "Delivered",
   cancelled: "Cancelled",
+  unpaid: "Unpaid",
+  partial: "Partial",
+  paid: "Paid",
   statusUpdated: "Status Updated",
   statusUpdatedDesc: "The order status has been updated successfully.",
   errorFetching: "Error Fetching Orders",
@@ -82,31 +106,41 @@ const id = {
   searchOrders: "Cari pesanan...",
   exportCSV: "Ekspor CSV",
   noOrders: "Tidak ada pesanan ditemukan.",
-  orderId: "ID Pesanan",
-  customer: "Pelanggan",
+  orderNumber: "Nomor Pesanan",
+  distributor: "Distributor",
   date: "Tanggal",
   total: "Total",
   status: "Status",
+  paymentStatus: "Status Pembayaran",
   actions: "Tindakan",
   viewDetails: "Lihat Detail",
   orderDetails: "Detail Pesanan",
-  customerInfo: "Informasi Pelanggan",
-  name: "Nama",
+  distributorInfo: "Informasi Distributor",
+  businessName: "Nama Bisnis",
+  ownerName: "Nama Pemilik",
   email: "Email",
   phone: "Telepon",
-  address: "Alamat",
+  shippingAddress: "Alamat Pengiriman",
+  shippingCity: "Kota Pengiriman",
+  shippingNotes: "Catatan Pengiriman",
+  paymentMethod: "Metode Pembayaran",
   items: "Item",
   product: "Produk",
+  sku: "SKU",
   quantity: "Jumlah",
   unitPrice: "Harga Satuan",
+  consumerPrice: "Harga Konsumen",
   subtotal: "Subtotal",
   updateStatus: "Perbarui Status",
   close: "Tutup",
   pending: "Tertunda",
-  confirmed: "Dikonfirmasi",
+  processing: "Diproses",
   shipped: "Dikirim",
   delivered: "Diterima",
   cancelled: "Dibatalkan",
+  unpaid: "Belum Bayar",
+  partial: "Sebagian",
+  paid: "Lunas",
   statusUpdated: "Status Diperbarui",
   statusUpdatedDesc: "Status pesanan telah berhasil diperbarui.",
   errorFetching: "Kesalahan Mengambil Pesanan",
@@ -138,8 +172,10 @@ const OrderManager = () => {
       const query = searchQuery.toLowerCase();
       setFilteredOrders(orders.filter(order => 
         order.id.toLowerCase().includes(query) ||
-        order.customer_name.toLowerCase().includes(query) ||
-        order.customer_email.toLowerCase().includes(query) ||
+        order.order_number.toLowerCase().includes(query) ||
+        order.distributor?.nama_bisnis?.toLowerCase().includes(query) ||
+        order.distributor?.nama_pemilik?.toLowerCase().includes(query) ||
+        order.distributor?.email_pemilik?.toLowerCase().includes(query) ||
         order.status.toLowerCase().includes(query)
       ));
     }
@@ -148,57 +184,59 @@ const OrderManager = () => {
   const fetchOrders = async () => {
     setIsLoading(true);
     try {
-      // Try to fetch from Supabase if available
-      try {
-        // Fetch orders and join with order_items table
-        // Note: This query expects product_id to reference the 'products' table, not 'skus'
-        const { data, error } = await supabase
-          .from('orders')
-          .select(`
-            id, 
-            user_id,
-            status, 
-            total_amount,
-            created_at, 
-            updated_at,
-            shipping_address,
-            customer_name,
-            customer_email,
-            customer_phone,
-            items:order_items(
-              id,
-              order_id,
-              product_id,
-              quantity,
-              unit_price,
-              product_name
+      // Fetch orders with distributor and order items data
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          distributor_id,
+          order_number,
+          status,
+          total_amount,
+          shipping_address,
+          shipping_city,
+          shipping_notes,
+          payment_method,
+          payment_status,
+          created_at,
+          updated_at,
+          distributor:distributor_profiles(
+            nama_bisnis,
+            nama_pemilik,
+            email_pemilik,
+            kontak_pemilik
+          ),
+          items:order_items(
+            id,
+            order_id,
+            product_id,
+            quantity,
+            unit_price,
+            consumer_price,
+            subtotal,
+            created_at,
+            product:products(
+              name,
+              sku
             )
-          `)
-          .order('created_at', { ascending: false });
-          
-        if (!error && data && data.length > 0) {
-          console.log('Fetched orders data:', data);
-          setOrders(data);
-          setFilteredOrders(data);
-          setIsLoading(false);
-          return;
-        }
-      } catch (supabaseError) {
-        console.warn('Supabase fetch failed, using mock data instead', supabaseError);
+          )
+        `)
+        .order('created_at', { ascending: false });
+        
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
       }
       
-      // Fall back to mock data if Supabase fetch fails
-      console.log('Using mock order data');
-      import('@/data/mockData').then(({ mockOrders }) => {
-        console.log('Loaded mock order data:', mockOrders);
-        setOrders(mockOrders);
-        setFilteredOrders(mockOrders);
-        setIsLoading(false);
-      }).catch(e => {
-        console.error('Failed to load mock data:', e);
-        setIsLoading(false);
-      });
-      return; // Early return to avoid setting isLoading=false twice
+      if (data && data.length > 0) {
+        console.log('Fetched orders data:', data);
+        setOrders(data);
+        setFilteredOrders(data);
+      } else {
+        console.log('No orders found in database');
+        setOrders([]);
+        setFilteredOrders([]);
+      }
     } catch (error) {
       console.error('Error fetching orders:', error);
       toast({
@@ -206,6 +244,9 @@ const OrderManager = () => {
         description: error instanceof Error ? error.message : String(error),
         variant: "destructive"
       });
+      // Set empty array on error instead of mock data
+      setOrders([]);
+      setFilteredOrders([]);
     } finally {
       setIsLoading(false);
     }
@@ -258,25 +299,27 @@ const OrderManager = () => {
   const exportToCSV = () => {
     // Create CSV content
     const headers = [
-      t.orderId, 
-      t.customer, 
+      t.orderNumber, 
+      t.distributor, 
       t.email, 
       t.phone, 
-      t.address, 
+      t.shippingAddress, 
       t.date, 
       t.total, 
-      t.status
+      t.status,
+      t.paymentStatus
     ].join(',');
     
     const rows = filteredOrders.map(order => [
-      order.id,
-      order.customer_name,
-      order.customer_email,
-      order.customer_phone,
+      order.order_number,
+      order.distributor?.nama_bisnis || '',
+      order.distributor?.email_pemilik || '',
+      order.distributor?.kontak_pemilik || '',
       `"${order.shipping_address.replace(/"/g, '""')}"`,
       new Date(order.created_at).toLocaleDateString(),
       order.total_amount.toFixed(2),
-      order.status
+      order.status,
+      order.payment_status
     ].join(','));
     
     const csvContent = [headers, ...rows].join('\n');
@@ -297,7 +340,7 @@ const OrderManager = () => {
   const getStatusColor = (status: Order['status']) => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'confirmed': return 'bg-blue-100 text-blue-800';
+      case 'processing': return 'bg-blue-100 text-blue-800';
       case 'shipped': return 'bg-purple-100 text-purple-800';
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
@@ -343,8 +386,8 @@ const OrderManager = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t.orderId}</TableHead>
-                <TableHead>{t.customer}</TableHead>
+                <TableHead>{t.orderNumber}</TableHead>
+                <TableHead>{t.distributor}</TableHead>
                 <TableHead>{t.date}</TableHead>
                 <TableHead>{t.total}</TableHead>
                 <TableHead>{t.status}</TableHead>
@@ -354,8 +397,8 @@ const OrderManager = () => {
             <TableBody>
               {filteredOrders.map((order) => (
                 <TableRow key={order.id}>
-                  <TableCell className="font-medium">{order.id.substring(0, 8)}...</TableCell>
-                  <TableCell>{order.customer_name}</TableCell>
+                  <TableCell className="font-medium">{order.order_number}</TableCell>
+                  <TableCell>{order.distributor?.nama_bisnis || 'N/A'}</TableCell>
                   <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
                   <TableCell>Rp {order.total_amount.toLocaleString()}</TableCell>
                   <TableCell>
@@ -391,23 +434,47 @@ const OrderManager = () => {
           {selectedOrder && (
             <div className="space-y-6">
               <div>
-                <h4 className="text-sm font-medium mb-2">{t.customerInfo}</h4>
+                <h4 className="text-sm font-medium mb-2">{t.distributorInfo}</h4>
                 <div className="grid grid-cols-2 gap-4 bg-muted p-4 rounded-md">
                   <div>
-                    <p className="text-sm font-medium">{t.name}</p>
-                    <p className="text-sm">{selectedOrder.customer_name}</p>
+                    <p className="text-sm font-medium">{t.businessName}</p>
+                    <p className="text-sm">{selectedOrder.distributor?.nama_bisnis || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{t.ownerName}</p>
+                    <p className="text-sm">{selectedOrder.distributor?.nama_pemilik || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium">{t.email}</p>
-                    <p className="text-sm">{selectedOrder.customer_email}</p>
+                    <p className="text-sm">{selectedOrder.distributor?.email_pemilik || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium">{t.phone}</p>
-                    <p className="text-sm">{selectedOrder.customer_phone}</p>
+                    <p className="text-sm">{selectedOrder.distributor?.kontak_pemilik || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{t.address}</p>
+                    <p className="text-sm font-medium">{t.shippingAddress}</p>
                     <p className="text-sm">{selectedOrder.shipping_address}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{t.shippingCity}</p>
+                    <p className="text-sm">{selectedOrder.shipping_city}</p>
+                  </div>
+                  {selectedOrder.shipping_notes && (
+                    <div className="col-span-2">
+                      <p className="text-sm font-medium">{t.shippingNotes}</p>
+                      <p className="text-sm">{selectedOrder.shipping_notes}</p>
+                    </div>
+                  )}
+                  {selectedOrder.payment_method && (
+                    <div>
+                      <p className="text-sm font-medium">{t.paymentMethod}</p>
+                      <p className="text-sm">{selectedOrder.payment_method}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-sm font-medium">{t.paymentStatus}</p>
+                    <p className="text-sm">{t[selectedOrder.payment_status as keyof typeof t]}</p>
                   </div>
                 </div>
               </div>
@@ -419,18 +486,22 @@ const OrderManager = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>{t.product}</TableHead>
+                        <TableHead>{t.sku}</TableHead>
                         <TableHead className="w-24">{t.quantity}</TableHead>
                         <TableHead className="w-32">{t.unitPrice}</TableHead>
+                        <TableHead className="w-32">{t.consumerPrice}</TableHead>
                         <TableHead className="w-32">{t.subtotal}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {selectedOrder.items.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell>{item.product_name}</TableCell>
+                          <TableCell>{item.product?.name || 'N/A'}</TableCell>
+                          <TableCell>{item.product?.sku || 'N/A'}</TableCell>
                           <TableCell>{item.quantity}</TableCell>
                           <TableCell>Rp {item.unit_price.toLocaleString()}</TableCell>
-                          <TableCell>Rp {(item.quantity * item.unit_price).toLocaleString()}</TableCell>
+                          <TableCell>Rp {item.consumer_price.toLocaleString()}</TableCell>
+                          <TableCell>Rp {item.subtotal.toLocaleString()}</TableCell>
                         </TableRow>
                       ))}
                       <TableRow>
@@ -458,7 +529,7 @@ const OrderManager = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="pending">{t.pending}</SelectItem>
-                      <SelectItem value="confirmed">{t.confirmed}</SelectItem>
+                      <SelectItem value="processing">{t.processing}</SelectItem>
                       <SelectItem value="shipped">{t.shipped}</SelectItem>
                       <SelectItem value="delivered">{t.delivered}</SelectItem>
                       <SelectItem value="cancelled">{t.cancelled}</SelectItem>

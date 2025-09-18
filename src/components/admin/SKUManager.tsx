@@ -192,38 +192,69 @@ const SKUManager = () => {
   
   // Fetch all SKUs
   useEffect(() => {
-    fetchSKUs();
-    loadBrands(); // Load brands on component mount
-    loadCategories(); // Load categories on component mount
+    // Load brands first, then fetch SKUs
+    const initializeData = async () => {
+      await loadBrands(); // Load brands first to populate cache
+      await loadCategories(); // Load categories 
+      await fetchSKUs(); // Then fetch SKUs with brand cache populated
+    };
+    
+    initializeData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   // Load categories from database
-  const loadCategories = async () => {
+  const loadCategories = async (): Promise<void> => {
     try {
+      console.log('Loading categories...');
       const { data, error } = await supabase
         .from('product_categories')
         .select('id, name')
         .order('name', { ascending: true });
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading categories:', error);
+        console.error('Category error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        
+        // If table doesn't exist, create some fallback categories
+        if (error.message?.includes('does not exist') || error.message?.includes('not found')) {
+          console.log('Categories table does not exist, using fallback categories');
+        }
+        
+        throw error;
+      }
+      
+      console.log('Loaded categories:', data);
       setCategories(data || []);
     } catch (error) {
       console.error('Error loading categories:', error);
       // Set some default categories if the table doesn't exist yet
+      console.log('Setting fallback categories due to error');
       setCategories([
         { id: 'snack', name: 'Snack' },
         { id: 'beverage', name: 'Beverage' },
         { id: 'food', name: 'Food' },
+        { id: 'minuman', name: 'Minuman' },
+        { id: 'rokok', name: 'Rokok' },
+        { id: 'cokelat', name: 'Cokelat dan Permen' },
+        { id: 'bakery', name: 'Bakery' },
       ]);
     }
   };
   
   // Load brands from database
-  const loadBrands = async () => {
+  const loadBrands = async (): Promise<void> => {
     try {
+      console.log('Loading brands...');
       const brandData = await fetchAllBrands();
+      console.log('Loaded brands:', brandData);
       setBrands(brandData);
+      console.log('Brand cache should now be populated');
     } catch (error) {
       console.error('Error loading brands:', error);
       toast({
@@ -304,13 +335,31 @@ const SKUManager = () => {
     }
 
     try {
+      console.log('Attempting to create category:', newCategoryName.trim());
+      
       const { data, error } = await supabase
         .from('product_categories')
         // @ts-expect-error - Temporary fix until database types are regenerated
         .insert([{ name: newCategoryName.trim() }])
         .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Insert error details:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        
+        // If it's a permissions error, provide more specific guidance
+        if (error.message?.includes('permission denied') || error.message?.includes('policy')) {
+          throw new Error('Permission denied. Please check if you have admin privileges or if the table policies allow this operation.');
+        }
+        
+        // If it's a table not found error, provide guidance
+        if (error.message?.includes('does not exist') || error.message?.includes('not found')) {
+          throw new Error('Categories table does not exist. Please ensure database migrations have been applied.');
+        }
+        
+        throw error;
+      }
 
       if (data && data[0]) {
         // @ts-expect-error - Data typing issue with Supabase
@@ -333,9 +382,10 @@ const SKUManager = () => {
       }
     } catch (error) {
       console.error('Error creating category:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: "Failed to create category",
+        description: `Failed to create category: ${errorMessage}`,
         variant: 'destructive',
       });
     }
@@ -443,7 +493,7 @@ const SKUManager = () => {
     ));
   };
 
-  const fetchSKUs = async () => {
+  const fetchSKUs = async (): Promise<void> => {
     setIsLoading(true);
     try {
       // Try to fetch from Supabase if available
@@ -467,7 +517,9 @@ const SKUManager = () => {
             
             // Get actual brand name using the lookup function
             const brandId = (p.brand_id as string) || '';
+            console.log(`Product ${p.name}: brand_id = "${brandId}"`);
             const brandName = getBrandNameFromCache(brandId);
+            console.log(`Resolved brand name: "${brandName}"`);
             
             return {
               ...p,
@@ -486,15 +538,9 @@ const SKUManager = () => {
       
       // Fall back to mock data if Supabase fetch fails
       console.log('Using mock SKU data');
-      import('@/data/mockData').then(({ mockSKUs }) => {
-        console.log('Loaded mock SKU data:', mockSKUs);
-        setSkus(mockSKUs);
-        setIsLoading(false);
-      }).catch(e => {
-        console.error('Failed to load mock data:', e);
-        setIsLoading(false);
-      });
-      return; // Early return to avoid setting isLoading=false twice
+      const { mockSKUs } = await import('@/data/mockData');
+      console.log('Loaded mock SKU data:', mockSKUs);
+      setSkus(mockSKUs);
     } catch (error) {
       console.error('Error fetching SKUs:', error);
       toast({
