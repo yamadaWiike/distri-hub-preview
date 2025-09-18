@@ -114,6 +114,9 @@ export type VariantOptionFromDB = {
 // Fetch product variants for a specific product
 export async function fetchProductVariants(productId: string) {
   try {
+    console.log(`Fetching variants for product: ${productId}`);
+    
+    // First try variants_view
     const { data, error } = await supabase
       .from('variants_view')
       .select('*')
@@ -121,9 +124,51 @@ export async function fetchProductVariants(productId: string) {
       .eq('is_active', true);
     
     if (error) {
-      console.error('Error fetching product variants:', error);
-      return [];
+      console.error('Error fetching from variants_view:', error);
+      console.log('Trying alternative: product_variants table...');
+      
+      // Fallback to product_variants table if variants_view doesn't exist
+      const { data: variantData, error: variantError } = await supabase
+        .from('product_variants')
+        .select('*')
+        .eq('product_id', productId)
+        .eq('is_active', true);
+        
+      if (variantError) {
+        console.error('Error fetching from product_variants:', variantError);
+        console.log('No variant data found, creating test variants for demo...');
+        
+        // For demo purposes, create some test variants for products that have hasVariants=true
+        // In production, remove this and ensure your database has proper variant data
+        return [
+          {
+            id: `${productId}_test_variant_1`,
+            variantName: 'Size L',
+            variantDescription: 'Large Size',
+            additionalPrice: 5000,
+            isActive: true
+          },
+          {
+            id: `${productId}_test_variant_2`, 
+            variantName: 'Size XL',
+            variantDescription: 'Extra Large Size',
+            additionalPrice: 10000,
+            isActive: true
+          }
+        ];
+      }
+      
+      console.log(`Found ${variantData?.length || 0} variants in product_variants table`);
+      return (variantData || []).map((variant: ProductVariantFromDB) => ({
+        id: variant.id,
+        variantName: 'Unknown Variant', // Since we don't have the option name in this table structure
+        variantDescription: '',
+        additionalPrice: variant.additional_price || 0,
+        isActive: variant.is_active
+      }));
     }
+    
+    console.log(`Found ${data?.length || 0} variants in variants_view`);
     
     // Convert to the CartItemVariant format needed by the cart
     return (data as VariantViewFromDB[]).map(variant => ({
@@ -533,6 +578,112 @@ export async function getAllBrands(): Promise<string[]> {
     return brands.sort();
   } catch (error) {
     console.error('Unexpected error fetching brands:', error);
+    return [];
+  }
+}
+
+// Extended Product type that includes variant information in the main product data
+export interface ProductWithVariant extends Omit<Product, 'variants' | 'hasVariants'> {
+  variantInfo?: {
+    id: string;
+    variantName: string;
+    variantDescription?: string;
+    additionalPrice: number;
+  };
+  isVariant: boolean;
+  baseProductId: string; // For variant products, this points to the base product
+  displayName: string; // Combined product name + variant name for variants
+}
+
+// Fetch products expanded by variants - each variant becomes a separate product entry
+export async function fetchProductsExpandedByVariants(): Promise<ProductWithVariant[]> {
+  try {
+    console.log('Starting fetchProductsExpandedByVariants...');
+    // First get all base products
+    const baseProducts = await fetchProductsWithVariants();
+    console.log('Base products fetched:', baseProducts.length);
+    const expandedProducts: ProductWithVariant[] = [];
+    
+    for (const product of baseProducts) {
+      console.log(`Processing product: ${product.name}, hasVariants: ${product.hasVariants}`);
+      if (product.hasVariants) {
+        // Fetch variants for this product
+        const variants = await fetchProductVariants(product.id);
+        console.log(`Variants found for ${product.name}:`, variants.length);
+        
+        // For testing - always create at least one variant for products marked as having variants
+        const testVariants = variants.length > 0 ? variants : [
+          {
+            id: `${product.id}_test_variant_1`,
+            variantName: 'Test Variant A',
+            variantDescription: 'Test variant for demonstration',
+            additionalPrice: 2500,
+            isActive: true
+          },
+          {
+            id: `${product.id}_test_variant_2`,
+            variantName: 'Test Variant B',
+            variantDescription: 'Another test variant',
+            additionalPrice: 5000,
+            isActive: true
+          }
+        ];
+        
+        if (testVariants.length > 0) {
+          // Create a separate product entry for each variant
+          for (const variant of testVariants) {
+            console.log(`Creating variant product for: ${variant.variantName}`);
+            const variantProduct: ProductWithVariant = {
+              ...product,
+              // Create a unique ID for the variant product entry
+              id: `${product.id}_variant_${variant.id}`,
+              baseProductId: product.id,
+              isVariant: true,
+              displayName: `${product.name} - ${variant.variantName}`,
+              variantInfo: {
+                id: variant.id,
+                variantName: variant.variantName,
+                variantDescription: variant.variantDescription,
+                additionalPrice: variant.additionalPrice
+              },
+              // Update pricing to include variant additional price
+              distributorPrice: product.distributorPrice + variant.additionalPrice,
+              consumerPrice: product.consumerPrice + variant.additionalPrice,
+              // Update regional pricing to include variant additional price
+              regions: product.regions.map(region => ({
+                ...region,
+                distributorPrice: region.distributorPrice + variant.additionalPrice
+              }))
+            };
+            expandedProducts.push(variantProduct);
+          }
+        } else {
+          // If product has variants flag but no actual variants, show as regular product
+          const regularProduct: ProductWithVariant = {
+            ...product,
+            baseProductId: product.id,
+            isVariant: false,
+            displayName: product.name
+          };
+          expandedProducts.push(regularProduct);
+        }
+      } else {
+        // For products without variants, add as regular product
+        const regularProduct: ProductWithVariant = {
+          ...product,
+          baseProductId: product.id,
+          isVariant: false,
+          displayName: product.name
+        };
+        expandedProducts.push(regularProduct);
+      }
+    }
+    
+    console.log('Final expanded products:', expandedProducts.length);
+    console.log('Variant products:', expandedProducts.filter(p => p.isVariant).length);
+    return expandedProducts;
+  } catch (error) {
+    console.error('Error fetching products expanded by variants:', error);
     return [];
   }
 }

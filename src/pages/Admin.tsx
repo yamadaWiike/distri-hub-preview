@@ -14,8 +14,8 @@ import {
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-// Using the fixed version of SKUManager
-import SKUManager from "@/components/admin/SKUManager.fixed";
+// Using the main version of SKUManager with category and variant functionality
+import SKUManager from "@/components/admin/SKUManager";
 import UserManager from "@/components/admin/UserManager";
 import OrderManager from "@/components/admin/OrderManager";
 
@@ -36,7 +36,8 @@ export default function Admin() {
         // For demo purposes, we'll consider certain emails as admin
         // In production, use proper role-based access control
         const adminEmails = [
-          "rudy@baskit.app"
+          "rudy@baskit.app",
+          "admin.commercial@baskit.app"
         ];
         
         setIsAdmin(adminEmails.includes(user.email || ""));

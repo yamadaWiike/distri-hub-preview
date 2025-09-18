@@ -91,7 +91,7 @@ const UserManager = () => {
           const usersWithProfiles = (profiles as UserProfile[]).map(profile => ({
             id: profile.user_id,
             email: profile.email_pemilik || `user_${profile.user_id.substring(0, 5)}@example.com`,
-            role: profile.email_pemilik === 'rudy@baskit.app' ? 'admin' : 'user', // Check for admin email
+            role: (profile.email_pemilik === 'rudy@baskit.app' || profile.email_pemilik === 'admin.commercial@baskit.app') ? 'admin' : 'user', // Check for admin emails
             profile: profile,
           }));          setUsers(usersWithProfiles);
           setIsLoading(false);
@@ -110,7 +110,7 @@ const UserManager = () => {
         const mockUsersWithProfiles = mockUserProfiles.map(profile => ({
           id: profile.user_id,
           email: profile.email_pemilik,
-          role: profile.email_pemilik === 'rudy@baskit.app' ? 'admin' : 'user',
+          role: (profile.email_pemilik === 'rudy@baskit.app' || profile.email_pemilik === 'admin.commercial@baskit.app') ? 'admin' : 'user',
           profile: profile,
         }));
         

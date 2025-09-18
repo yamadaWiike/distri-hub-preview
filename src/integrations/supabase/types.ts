@@ -180,6 +180,58 @@ export interface Database {
           npwp?: string | null
         }
       }
+      product_categories: {
+        Row: {
+          id: string
+          name: string
+          description?: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      product_variants: {
+        Row: {
+          id: string
+          product_id: string
+          variant_name: string
+          variant_value: string
+          price_adjustment: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          variant_name: string
+          variant_value: string
+          price_adjustment?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          variant_name?: string
+          variant_value?: string
+          price_adjustment?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
       products: {
         Row: {
           id: string
@@ -226,6 +278,38 @@ export interface Database {
           description?: string | null
           image_url?: string | null
           is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      variant_pricing: {
+        Row: {
+          id: string
+          product_id: string
+          variant_name: string
+          area: string
+          distributor_price: number
+          moq: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          variant_name: string
+          area: string
+          distributor_price: number
+          moq?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          variant_name?: string
+          area?: string
+          distributor_price?: number
+          moq?: number
           created_at?: string
           updated_at?: string
         }

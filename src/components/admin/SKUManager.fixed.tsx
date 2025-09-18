@@ -76,6 +76,7 @@ const SKUManager = () => {
   const [skus, setSkus] = useState<SKU[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
   
   // New brand state
   const [showNewBrandInput, setShowNewBrandInput] = useState(false);
@@ -95,10 +96,19 @@ const SKUManager = () => {
     description: '',
     size: '',
     brand: '',
+    category: '', // Add category to form
     sku: '',
     image_url: '',
     consumer_price: 0,
-    is_active: true
+    is_active: true,
+    has_variants: false // Add variants flag
+  });
+  
+  // Variant states
+  const [productVariants, setProductVariants] = useState<{variant_name: string, additional_price: number}[]>([]);
+  const [newVariant, setNewVariant] = useState({
+    variant_name: '',
+    additional_price: 0
   });
   
   // Region form states
@@ -117,8 +127,30 @@ const SKUManager = () => {
   useEffect(() => {
     fetchSKUs();
     loadBrands(); // Load brands on component mount
+    loadCategories(); // Load categories on component mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  
+  // Load categories from database
+  const loadCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('product_categories')
+        .select('id, name')
+        .order('name', { ascending: true });
+        
+      if (error) throw error;
+      setCategories(data || []);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      // Set some default categories if the table doesn't exist yet
+      setCategories([
+        { id: 'snack', name: 'Snack' },
+        { id: 'beverage', name: 'Beverage' },
+        { id: 'food', name: 'Food' },
+      ]);
+    }
+  };
   
   // Load brands from database
   const loadBrands = async () => {
@@ -476,6 +508,41 @@ const SKUManager = () => {
     setRegions(regions.filter((_, i) => i !== index));
   };
   
+  // Handle adding a new variant
+  const addVariant = () => {
+    if (newVariant.variant_name.trim()) {
+      setProductVariants([...productVariants, { ...newVariant }]);
+      setNewVariant({ variant_name: '', additional_price: 0 });
+    }
+  };
+  
+  // Handle removing a variant
+  const removeVariant = (index: number) => {
+    setProductVariants(productVariants.filter((_, i) => i !== index));
+  };
+  
+  // Fetch variants for a specific SKU
+  const fetchVariantsForSKU = async (skuId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('product_variants')
+        .select('variant_name, additional_price')
+        .eq('product_id', skuId)
+        .eq('is_active', true);
+        
+      if (error) throw error;
+      
+      setProductVariants(data || []);
+    } catch (error) {
+      console.error('Error fetching variants:', error);
+      toast({
+        title: t.errorFetchingVariants,
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive"
+      });
+    }
+  };
+  
   // Open dialog to create a new SKU
   const openCreateDialog = () => {
     setEditMode(false);
@@ -485,11 +552,14 @@ const SKUManager = () => {
       description: '',
       size: '',
       brand: '',
+      category: '',
       sku: '',
       image_url: '',
       consumer_price: 0,
-      is_active: true
+      is_active: true,
+      has_variants: false
     });
+    setProductVariants([]);
     setRegions([]);
     setShowRegions(false);
     setIsDialogOpen(true);
@@ -511,14 +581,19 @@ const SKUManager = () => {
       description: sku.description || '',
       size: sku.size,
       brand: brandId, // Use the brand ID for the dropdown
+      category: sku.category_id || '', // Add category
       sku: sku.sku || '',
       image_url: sku.image_url || '',
       consumer_price: sku.consumer_price,
-      is_active: sku.is_active !== false // Default to true if not set
+      is_active: sku.is_active !== false, // Default to true if not set
+      has_variants: Boolean(sku.has_variants) || false // Add variants flag
     });
     
     // Fetch regions for this SKU
     await fetchRegionsForSKU(sku.id);
+    
+    // Fetch variants for this SKU
+    await fetchVariantsForSKU(sku.id);
     
     setShowRegions(false);
     setIsDialogOpen(true);
@@ -1030,6 +1105,7 @@ const id = {
   delete: 'Hapus',
   errorFetching: 'Gagal memuat SKU',
   errorFetchingRegions: 'Gagal memuat data area',
+  errorFetchingVariants: 'Gagal memuat data varian',
   errorSaving: 'Gagal menyimpan SKU',
   errorDeleting: 'Gagal menghapus SKU',
   skuCreated: 'SKU berhasil dibuat',
@@ -1078,6 +1154,7 @@ const en = {
   delete: 'Delete',
   errorFetching: 'Failed to fetch SKUs',
   errorFetchingRegions: 'Failed to fetch region data',
+  errorFetchingVariants: 'Failed to fetch variant data',
   errorSaving: 'Failed to save SKU',
   errorDeleting: 'Failed to delete SKU',
   skuCreated: 'SKU created successfully',

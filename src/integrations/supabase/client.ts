@@ -40,7 +40,7 @@ export const isAdmin = async (): Promise<boolean> => {
     }
     
     // Alternatively check email against admin list
-    const adminEmails = ['rudy@baskit.app', 'admin@example.com'];
+    const adminEmails = ['rudy@baskit.app', 'admin.commercial@baskit.app', 'admin@example.com'];
     return adminEmails.includes(user.email || '');
   } catch (error) {
     console.error('Error checking admin status:', error);
