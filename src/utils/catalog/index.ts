@@ -141,12 +141,12 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     // ── Product Image ───────────────────────────────
     const imageH = 28;                          // image area height
     const defaultImage = '/placeholder.svg';    // fallback image
-    
+
     // Draw rounded border first
     doc.setDrawColor(200, 200, 200); // light gray border
     doc.setLineWidth(0.2);
     doc.roundedRect(x + pad, y + pad, cardW - pad * 2, imageH, 3, 3, "D");
-    
+
     try {
       // Use product image if available, otherwise use default
       const imageUrl = p.image || defaultImage;
@@ -202,20 +202,20 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
       value: string,
       sub?: string
     ) => {
+      doc.setTextColor(107);
+      doc.text(label, startX, startY);
+      doc.setTextColor(33);
+      doc.setFontSize(9);
+      const wrappedValue = doc.splitTextToSize(value, colW);
+      doc.text(wrappedValue, startX, startY + 3.8);
+      let nextY = startY + 1.8 + wrappedValue.length * 5;
+      if (sub) {
+        doc.setFontSize(6);
         doc.setTextColor(107);
-        doc.text(label, startX, startY);
-        doc.setTextColor(33);
-        doc.setFontSize(9);
-        const wrappedValue = doc.splitTextToSize(value, colW);
-        doc.text(wrappedValue, startX, startY + 3.8);
-        let nextY = startY + 1.8 + wrappedValue.length * 5;
-        if (sub) {
-          doc.setFontSize(6);
-          doc.setTextColor(107);
-          doc.text(sub, startX, nextY);
-          nextY += 6;
-        }
-        return nextY; // next block Y
+        doc.text(sub, startX, nextY);
+        nextY += 6;
+      }
+      return nextY; // next block Y
     };
 
     // Left column
@@ -228,11 +228,16 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     rightY = renderBlock(rightX, rightY, "Isi Per Karton", `${p?.units ?? "-"}`, "pieces");
 
     // Format regions for display - show first area and count if more exist
-    const areaDisplay = p?.regions?.length
+    let areaDisplay = p?.regions?.length
       ? p.regions.length === 1
         ? p.regions[0].area
         : `${p.regions[0].area} +${p.regions.length - 1}`
       : "-";
+
+    if (distributionArea !== 'Semua Area') {
+      areaDisplay = distributionArea;
+    }
+
     rightY = renderBlock(rightX, rightY, "Area Distribusi", areaDisplay);
   }
 
