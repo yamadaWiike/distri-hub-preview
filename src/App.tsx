@@ -20,6 +20,7 @@ import { useAuth } from "./hooks/use-auth";
 import { CartProvider } from "./contexts/CartContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import GoogleAnalytics from "./components/seo/GoogleAnalytics";
+import Hotjar from "./components/seo/Hotjar";
 
 const queryClient = new QueryClient();
 
@@ -39,8 +40,9 @@ const App = () => (
           <AuthProvider>
             <CartProvider>
               <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                {/* Google Analytics tracking - place inside BrowserRouter to use useLocation */}
+                {/* Analytics tracking components */}
                 <GoogleAnalytics />
+                <Hotjar />
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/daftar-produk" element={<DaftarProduk />} />

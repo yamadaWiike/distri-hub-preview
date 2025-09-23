@@ -8,11 +8,13 @@ import { BarChart3, Box, Clock, CreditCard, MapPin, PackageCheck, ShieldCheck, T
 import { useLanguage } from "@/contexts/LanguageContext";
 import { translations } from "@/lib/translations";
 import { useAnalytics } from "@/hooks/use-analytics";
+import { useHotjar } from "@/hooks/use-hotjar";
 
 const Index = () => {
   const { lang } = useLanguage();
   const t = translations[lang];
   const { trackEvent } = useAnalytics();
+  const { triggerEvent } = useHotjar();
   
   return (
     <div className="min-h-screen bg-background">
@@ -48,13 +50,25 @@ const Index = () => {
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link to="/daftar-produk" onClick={() => trackEvent('view_catalog_clicked')}>
+                <Link 
+                  to="/daftar-produk" 
+                  onClick={() => {
+                    trackEvent('view_catalog_clicked');
+                    triggerEvent('catalog_view');
+                  }}
+                >
                   <Button variant="hero" size="lg" className="w-full sm:w-auto">
                     <Box className="mr-1" size={20} />
                     {lang === 'id' ? "Katalog Produk" : "Product Catalog"}
                   </Button>
                 </Link>
-                <Link to="/daftar" onClick={() => trackEvent('register_distributor_clicked')}>
+                <Link 
+                  to="/daftar" 
+                  onClick={() => {
+                    trackEvent('register_distributor_clicked');
+                    triggerEvent('distributor_registration');
+                  }}
+                >
                   <Button variant="soft" size="lg" className="w-full sm:w-auto">
                     <ShieldCheck className="mr-1" size={20} />
                     {lang === 'id' ? "Daftar Distributor" : "Register as Distributor"}
@@ -254,12 +268,24 @@ const Index = () => {
                     }
                   </p>
                   <div className="flex flex-wrap gap-4">
-                    <Link to="/daftar">
+                    <Link 
+                      to="/daftar"
+                      onClick={() => {
+                        trackEvent('register_cta_clicked');
+                        triggerEvent('register_cta');
+                      }}
+                    >
                       <Button variant="hero" size="lg">
                         {lang === 'id' ? "Daftar Sekarang" : "Register Now"}
                       </Button>
                     </Link>
-                    <Link to="/hubungi">
+                    <Link 
+                      to="/hubungi"
+                      onClick={() => {
+                        trackEvent('contact_cta_clicked');
+                        triggerEvent('contact_cta');
+                      }}
+                    >
                       <Button variant="outline" size="lg">
                         {lang === 'id' ? "Konsultasi Dengan Tim" : "Consult With Our Team"}
                       </Button>
