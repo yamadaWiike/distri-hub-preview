@@ -643,6 +643,33 @@ const SKUManager = () => {
     }
   };
   
+  // Check if a SKU already exists in the database
+  const checkIfSkuExists = async (skuCode: string, currentProductId?: string): Promise<boolean> => {
+    try {
+      const query = supabase
+        .from('products')
+        .select('id, sku')
+        .eq('sku', skuCode);
+        
+      // If we're in edit mode and have a current product ID, exclude it from the check
+      if (currentProductId) {
+        query.neq('id', currentProductId);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('Error checking SKU existence:', error);
+        return false;
+      }
+      
+      return data && data.length > 0;
+    } catch (error) {
+      console.error('Exception checking SKU existence:', error);
+      return false;
+    }
+  };
+
   // Add or update a SKU
   const saveSKU = async () => {
     try {
@@ -651,6 +678,19 @@ const SKUManager = () => {
         toast({
           title: "Error",
           description: "Please fill in all required fields (Name, SKU, Consumer Price)",
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Check for duplicate SKU before saving
+      const currentProductId = editMode && currentSKU ? currentSKU.id : undefined;
+      const skuExists = await checkIfSkuExists(form.sku, currentProductId);
+      
+      if (skuExists) {
+        toast({
+          title: t.duplicateSku,
+          description: `${form.sku}: ${t.duplicateSkuDesc}`,
           variant: 'destructive',
         });
         return;
@@ -905,6 +945,20 @@ const SKUManager = () => {
       console.error('Current SKU at time of error:', currentSKU);
       console.error('Edit mode:', editMode);
       
+      // Handle specific error cases
+      const pgError = error as PostgrestError;
+      
+      // Check if this is a duplicate key error for SKU
+      if (pgError?.code === '23505' && pgError?.details?.includes('products_sku_key')) {
+        toast({
+          title: t.duplicateSku,
+          description: `${form.sku}: ${t.duplicateSkuDesc}`,
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // General error handling
       let errorMessage = 'Unknown error occurred';
       if (error instanceof Error) {
         errorMessage = error.message;
@@ -1043,6 +1097,38 @@ const SKUManager = () => {
   // Handle removing a variant
   const removeVariant = (index: number) => {
     setProductVariants(productVariants.filter((_, i) => i !== index));
+  };
+  
+  // Generate a unique SKU code
+  const generateUniqueSku = async () => {
+    // Generate a prefix based on current date
+    const today = new Date();
+    const prefix = `BK${today.getFullYear().toString().substring(2)}${(today.getMonth() + 1).toString().padStart(2, '0')}`;
+    
+    // Generate a random suffix with letters and numbers
+    const generateRandomSuffix = () => {
+      // Generate a random 4-character alphanumeric string
+      const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed similar looking characters (I, O, 1, 0)
+      let result = '';
+      for (let i = 0; i < 4; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+      }
+      return result;
+    };
+    
+    // Try up to 10 times to generate a unique SKU
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const suffix = generateRandomSuffix();
+      const candidateSku = `${prefix}-${suffix}`;
+      
+      const exists = await checkIfSkuExists(candidateSku);
+      if (!exists) {
+        return candidateSku;
+      }
+    }
+    
+    // If we couldn't generate a unique SKU after 10 attempts, use timestamp as fallback
+    return `${prefix}-${Date.now().toString().substring(7)}`;
   };
   
   // Open dialog to create a new SKU
@@ -1429,13 +1515,26 @@ const SKUManager = () => {
               
               <div className="space-y-2">
                 <Label htmlFor="sku">{t.sku}</Label>
-                <Input
-                  id="sku"
-                  name="sku"
-                  value={form.sku}
-                  onChange={handleChange}
-                  required
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="sku"
+                    name="sku"
+                    value={form.sku}
+                    onChange={handleChange}
+                    required
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={async () => {
+                      const uniqueSku = await generateUniqueSku();
+                      setForm(prev => ({ ...prev, sku: uniqueSku }));
+                    }}
+                    title={t.generateSku}
+                  >
+                    {t.generate}
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -1927,6 +2026,10 @@ const id = {
   skuUpdatedDesc: 'Perubahan pada SKU telah disimpan',
   skuDeleted: 'SKU berhasil dihapus',
   skuDeletedDesc: 'SKU telah berhasil dihapus dari database',
+  duplicateSku: 'SKU Duplikat',
+  duplicateSkuDesc: 'SKU sudah ada dalam database. Silakan gunakan kode SKU yang berbeda.',
+  generateSku: 'Hasilkan kode SKU unik',
+  generate: 'Hasilkan',
 };
 
 const en = {
@@ -1982,6 +2085,10 @@ const en = {
   skuUpdatedDesc: 'Changes to the SKU have been saved',
   skuDeleted: 'SKU deleted successfully',
   skuDeletedDesc: 'The SKU has been removed from the database',
+  duplicateSku: 'Duplicate SKU',
+  duplicateSkuDesc: 'SKU already exists in the database. Please use a different SKU code.',
+  generateSku: 'Generate a unique SKU code',
+  generate: 'Generate',
 };
 
 export default SKUManager;

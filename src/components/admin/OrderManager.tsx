@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
+import { updateOrder } from '@/utils/supabase-helpers';
 import {
   Table,
   TableBody,
@@ -418,11 +419,10 @@ export default function OrderManager() {
                                           onClick={async () => {
                                             if (!statusDraft || statusDraft === selectedOrder.status) return;
                                             setStatusSaving(true);
-                                            const updateData: Database["public"]["Tables"]["orders"]["Update"] = { status: statusDraft };
-                                            const { error } = await supabase
-                                              .from('orders')
-                                              .update(updateData)
-                                              .eq('id', selectedOrder.id);
+                                            const { error } = await updateOrder(
+                                              selectedOrder.id,
+                                              { status: statusDraft }
+                                            );
                                             setStatusSaving(false);
                                             if (!error) {
                                               toast({ title: 'Order status updated', variant: 'default' });
@@ -454,11 +454,10 @@ export default function OrderManager() {
                                           onClick={async () => {
                                             if (!paymentDraft || paymentDraft === selectedOrder.payment_status) return;
                                             setPaymentSaving(true);
-                                            const updateData: Database["public"]["Tables"]["orders"]["Update"] = { payment_status: paymentDraft };
-                                            const { error } = await supabase
-                                              .from('orders')
-                                              .update(updateData)
-                                              .eq('id', selectedOrder.id);
+                                            const { error } = await updateOrder(
+                                              selectedOrder.id,
+                                              { payment_status: paymentDraft }
+                                            );
                                             setPaymentSaving(false);
                                             if (!error) {
                                               toast({ title: 'Payment status updated', variant: 'default' });

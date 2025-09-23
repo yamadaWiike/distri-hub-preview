@@ -58,8 +58,30 @@ export interface Database {
           payment_status: string;
           created_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["orders"]["Row"]>;
-        Update: Partial<Database["public"]["Tables"]["orders"]["Row"]>;
+        Insert: {
+          id?: string;
+          distributor_id: string;
+          total_amount: number;
+          status: string;
+          order_number: string;
+          shipping_address: string;
+          shipping_city: string;
+          shipping_notes?: string | null;
+          payment_status: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          distributor_id?: string;
+          total_amount?: number;
+          status?: string;
+          order_number?: string;
+          shipping_address?: string;
+          shipping_city?: string;
+          shipping_notes?: string | null;
+          payment_status?: string;
+          created_at?: string;
+        };
       };
     };
   };
