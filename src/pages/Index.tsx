@@ -7,10 +7,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { BarChart3, Box, Clock, CreditCard, MapPin, PackageCheck, ShieldCheck, TrendingUp, Truck, Workflow } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { translations } from "@/lib/translations";
+import { useAnalytics } from "@/hooks/use-analytics";
 
 const Index = () => {
   const { lang } = useLanguage();
   const t = translations[lang];
+  const { trackEvent } = useAnalytics();
   
   return (
     <div className="min-h-screen bg-background">
@@ -46,13 +48,13 @@ const Index = () => {
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link to="/daftar-produk">
+                <Link to="/daftar-produk" onClick={() => trackEvent('view_catalog_clicked')}>
                   <Button variant="hero" size="lg" className="w-full sm:w-auto">
                     <Box className="mr-1" size={20} />
                     {lang === 'id' ? "Katalog Produk" : "Product Catalog"}
                   </Button>
                 </Link>
-                <Link to="/daftar">
+                <Link to="/daftar" onClick={() => trackEvent('register_distributor_clicked')}>
                   <Button variant="soft" size="lg" className="w-full sm:w-auto">
                     <ShieldCheck className="mr-1" size={20} />
                     {lang === 'id' ? "Daftar Distributor" : "Register as Distributor"}
