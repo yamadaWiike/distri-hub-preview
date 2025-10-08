@@ -20,6 +20,11 @@ export type ProductFromDB = {
   product_categories?: { name: string };
   variant_count?: number;
   has_variants?: boolean; // Add this field
+  // UOM fields
+  base_uom?: string;
+  moq_uom?: string;
+  pricing_uom?: string;
+  enable_uom_conversions?: boolean;
 };
 
 export type RegionPricingFromDB = {
@@ -28,6 +33,8 @@ export type RegionPricingFromDB = {
   area: string;
   distributor_price: number;
   moq: number;
+  moq_uom?: string;
+  price_uom?: string;
   created_at?: string;
 };
 
@@ -267,6 +274,10 @@ interface ProductWithVariantCount {
   description: string;
   image?: string;
   variant_count: number;
+  base_uom?: string;
+  moq_uom?: string;
+  pricing_uom?: string;
+  enable_uom_conversions?: boolean;
 }
 
 interface RegionPricingDB {
@@ -276,6 +287,8 @@ interface RegionPricingDB {
   distributor_price: number;
   moq: number;
   created_at?: string;
+  price_uom?: string;
+  moq_uom?: string;
 }
 
 // Define interface for fallback product data
@@ -290,6 +303,10 @@ interface FallbackProduct {
   description: string;
   image_url?: string;
   has_variants: boolean;
+  base_uom?: string;
+  moq_uom?: string;
+  pricing_uom?: string;
+  enable_uom_conversions?: boolean;
   brands?: { name: string };
   product_categories?: { name: string };
 }
@@ -312,7 +329,11 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
         moq,
         description,
         image,
-        variant_count
+        variant_count,
+        base_uom,
+        moq_uom,
+        pricing_uom,
+        enable_uom_conversions
       `);
     
     // Variable to hold our final products list
@@ -336,6 +357,10 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
           description,
           image_url,
           has_variants,
+          base_uom,
+          moq_uom,
+          pricing_uom,
+          enable_uom_conversions,
           brands:brand_id(name),
           product_categories:category_id(name)
         `);
@@ -357,7 +382,11 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
         moq: p.base_moq,
         description: p.description,
         image: p.image_url,
-        variant_count: p.has_variants ? 1 : 0 // Assume has_variants flag means at least one variant
+        variant_count: p.has_variants ? 1 : 0, // Assume has_variants flag means at least one variant
+        base_uom: p.base_uom || 'pcs',
+        moq_uom: p.moq_uom || 'pcs',
+        pricing_uom: p.pricing_uom || 'pcs',
+        enable_uom_conversions: p.enable_uom_conversions || false
       }));
     } else {
       // Use the view data if available
@@ -372,7 +401,7 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
     // Then get region pricing for all products
     const { data: regionPricing, error: regionError } = await supabase
       .from('region_pricing')
-      .select('*');
+      .select('id, product_id, area, distributor_price, moq, moq_uom, price_uom, created_at');
     
     if (regionError || !regionPricing) {
       console.error('Error fetching region pricing:', regionError);
@@ -396,10 +425,18 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
         description: dbProduct.description,
         image: dbProduct.image,
         hasVariants: dbProduct.variant_count > 0,
+        // UOM fields
+        base_uom: dbProduct.base_uom || 'pcs',
+        moq_uom: dbProduct.moq_uom || 'pcs',
+        pricing_uom: dbProduct.pricing_uom || 'pcs',
+        enable_uom_conversions: dbProduct.enable_uom_conversions || false,
         regions: productRegions.map((region) => ({
           area: region.area,
           distributorPrice: region.distributor_price,
-          moq: region.moq
+          moq: region.moq,
+          // UOM fields for regional pricing
+          price_uom: region.price_uom || 'pcs',
+          moq_uom: region.moq_uom || 'pcs'
         }))
       };
     });
@@ -429,7 +466,7 @@ export async function getAllProducts(): Promise<Product[]> {
     // Fetch all region pricing
     const { data: regionsData, error: regionsError } = await supabase
       .from('region_pricing')
-      .select('*');
+      .select('id, product_id, area, distributor_price, moq, moq_uom, price_uom, created_at');
       
     if (regionsError || !regionsData) {
       console.error('Error fetching region pricing:', regionsError);
@@ -481,7 +518,7 @@ export async function getProductById(id: string): Promise<Product | null> {
     // Fetch the region pricing for this product
     const { data: regions, error: regionsError } = await supabase
       .from('region_pricing')
-      .select('*')
+      .select('id, product_id, area, distributor_price, moq, moq_uom, price_uom, created_at')
       .eq('product_id', typedProduct.id); // Always use product.id here
       
     if (regionsError || !regions) {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useLanguage } from '@/hooks/use-language';
 import { translations } from '@/lib/translations';
 import { Button } from '@/components/ui/button';
 import { ShoppingBasket } from 'lucide-react';

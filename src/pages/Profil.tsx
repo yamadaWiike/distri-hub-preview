@@ -20,8 +20,23 @@ import {
 } from "@/components/ui/dialog";
 import MapSelector from "@/components/ui/map-selector";
 import 'leaflet/dist/leaflet.css';
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
+
+// Extended type for distributor profile that includes all possible fields
+type ExtendedDistributorProfile = Database['public']['Tables']['distributor_profiles']['Row'] & {
+  email_pemilik?: string;
+  omzet?: string;
+  alamat_kantor?: string;
+  alamat_gudang?: string;
+  bentuk_usaha?: string;
+  foto_gudang?: string;
+  koordinat?: string;
+  nib?: string;
+  npwp?: string;
+  website_perusahaan?: string;
+  jumlah_karyawan?: number | string;
+};
 
 export default function Profil() {
   const { user } = useAuth();
@@ -88,18 +103,18 @@ export default function Profil() {
             kota: data.kota || "",
             nama_pemilik: data.nama_pemilik || "",
             kontak_pemilik: data.kontak_pemilik || "",
-            email_pemilik: data.email_pemilik || user.email || "", // Use from DB or fall back to user email
-            omzet: data.omzet || "",
-            alamat_kantor: data.alamat_kantor || "",
-            alamat_gudang: data.alamat_gudang || "",
-            bentuk_usaha: data.bentuk_usaha || "",
-            foto_gudang: data.foto_gudang || "",
-            koordinat: data.koordinat || "",
-            nib: data.nib || "",
+            email_pemilik: (data as ExtendedDistributorProfile).email_pemilik || data.email || user.email || "", // Use from DB or fall back to user email
+            omzet: (data as ExtendedDistributorProfile).omzet || "",
+            alamat_kantor: (data as ExtendedDistributorProfile).alamat_kantor || "",
+            alamat_gudang: (data as ExtendedDistributorProfile).alamat_gudang || "",
+            bentuk_usaha: (data as ExtendedDistributorProfile).bentuk_usaha || "",
+            foto_gudang: (data as ExtendedDistributorProfile).foto_gudang || "",
+            koordinat: (data as ExtendedDistributorProfile).koordinat || "",
+            nib: (data as ExtendedDistributorProfile).nib || "",
             // New fields added to the database
-            npwp: data.npwp || "",
-            website_perusahaan: data.website_perusahaan || "",
-            jumlah_karyawan: data.jumlah_karyawan ? String(data.jumlah_karyawan) : "",
+            npwp: (data as ExtendedDistributorProfile).npwp || "",
+            website_perusahaan: (data as ExtendedDistributorProfile).website_perusahaan || "",
+            jumlah_karyawan: (data as ExtendedDistributorProfile).jumlah_karyawan ? String((data as ExtendedDistributorProfile).jumlah_karyawan) : "",
           });
         } else {
           // If no profile data yet but we have user data, prefill what we can

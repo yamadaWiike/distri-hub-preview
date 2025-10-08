@@ -2,7 +2,7 @@ import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import { Building2, CheckCircle, Globe, LineChart, ShieldCheck, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 
 export default function Tentang() {

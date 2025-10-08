@@ -16,7 +16,7 @@ import {
   Activity,
   MapPin
 } from 'lucide-react';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useLanguage } from '@/hooks/use-language';
 
 // Types (simplified without status)
 type DistributorStats = {

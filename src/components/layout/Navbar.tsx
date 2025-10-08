@@ -1,6 +1,6 @@
 import { Link, NavLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/use-auth";
 import { useCart } from "@/hooks/use-cart";
 import { translations } from "@/lib/translations";

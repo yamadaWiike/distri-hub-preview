@@ -1,39 +1,53 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+/**
+ * Language Context Provider for Baskit Distributor Hub
+ * Provides language switching functionality between Indonesian and English
+ */
 
-type Lang = 'id' | 'en';
+// Third-party imports
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-type LanguageContextType = {
-  lang: Lang;
-  setLang: (l: Lang) => void;
-  toggle: () => void;
-};
+// Import context definition
+import { 
+  Lang, 
+  LanguageContext, 
+  STORAGE_KEY 
+} from "./LanguageContextDefinition";
 
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
-
-const STORAGE_KEY = 'baskit_lang';
-
+/**
+ * Language Provider Component
+ * Manages language state and provides language switching functionality
+ */
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  // Initialize with Indonesian as default language
   const [lang, setLangState] = useState<Lang>('id');
 
+  /**
+   * Load saved language preference from localStorage on mount
+   */
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY) as Lang | null;
     if (saved === 'id' || saved === 'en') setLangState(saved);
   }, []);
 
+  /**
+   * Set language and persist to localStorage
+   */
   const setLang = (l: Lang) => {
     setLangState(l);
     localStorage.setItem(STORAGE_KEY, l);
   };
 
-  const toggle = () => setLang(lang === 'id' ? 'en' : 'id');
+  /**
+   * Toggle between Indonesian and English
+   */
+  const toggle = useCallback(() => setLang(lang === 'id' ? 'en' : 'id'), [lang]);
 
-  const value = useMemo(() => ({ lang, setLang, toggle }), [lang]);
+  /**
+   * Memoized context value to prevent unnecessary re-renders
+   */
+  const value = useMemo(() => ({ lang, setLang, toggle }), [lang, toggle]);
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
 
-export function useLanguage() {
-  const ctx = useContext(LanguageContext);
-  if (!ctx) throw new Error('useLanguage must be used within LanguageProvider');
-  return ctx;
-}
+// useLanguage hook is now in src/hooks/use-language.ts

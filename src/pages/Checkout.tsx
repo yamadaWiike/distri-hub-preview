@@ -12,7 +12,7 @@ import { formatIDR } from "@/lib/utils";
 import { useCart } from "@/hooks/use-cart";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 
 // Address type selection

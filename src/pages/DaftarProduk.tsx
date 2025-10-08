@@ -11,7 +11,7 @@ import { Link } from "react-router-dom";
 import { Slider } from "@/components/ui/slider";
 import { useCart } from "@/hooks/use-cart";
 import { formatIDR } from "@/lib/utils";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/hooks/use-language";
 import { addPDFHeader, addPDFFooter } from "@/utils/pdf-utils";
 import { translations } from "@/lib/translations";
 import { useToast } from "@/components/ui/use-toast";
@@ -118,16 +118,31 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
             <div className="text-xs font-medium text-muted-foreground mb-2">
               {lang === 'id' ? "Harga Konsumen" : "Consumer Price"}
             </div>
-            <div className="text-sm font-bold text-foreground">{formatIDR(product.consumerPrice)}</div>
+            <div className="text-sm font-bold text-foreground flex flex-wrap items-baseline gap-1">
+              <span>{formatIDR(product.consumerPrice)}</span>
+              {product.pricing_uom && product.pricing_uom !== 'pcs' && (
+                <span className="text-xs text-muted-foreground">/{product.pricing_uom}</span>
+              )}
+            </div>
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="text-xs font-medium text-muted-foreground mb-2">
               {lang === 'id' ? "Harga Distributor" : "Distributor Price"}
             </div>
             {loggedIn ? (
-              <div className="text-sm font-bold text-foreground">{formatIDR(basePrice)}</div>
+              <div className="text-sm font-bold text-foreground flex flex-wrap items-baseline gap-1">
+                <span>{formatIDR(basePrice)}</span>
+                {(regional?.price_uom || product.pricing_uom) && (regional?.price_uom || product.pricing_uom) !== 'pcs' && (
+                  <span className="text-xs text-muted-foreground">/{regional?.price_uom || product.pricing_uom}</span>
+                )}
+              </div>
             ) : (
-              <div className="text-sm font-bold text-foreground blur-sm select-none">{formatIDR(basePrice)}</div>
+              <div className="text-sm font-bold text-foreground blur-sm select-none flex flex-wrap items-baseline gap-1">
+                <span>{formatIDR(basePrice)}</span>
+                {(regional?.price_uom || product.pricing_uom) && (regional?.price_uom || product.pricing_uom) !== 'pcs' && (
+                  <span className="text-xs text-muted-foreground">/{regional?.price_uom || product.pricing_uom}</span>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -135,7 +150,9 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
         <div className="grid grid-cols-2 gap-4">
           <div className="text-center">
             <div className="text-xs font-medium text-muted-foreground mb-1">MOQ</div>
-            <div className="text-sm font-semibold text-foreground">{usedMoq} pcs</div>
+            <div className="text-sm font-semibold text-foreground">
+              {usedMoq} {regional?.moq_uom || product.moq_uom || 'pcs'}
+            </div>
           </div>
           <div className="text-center">
             <div className="text-xs font-medium text-muted-foreground mb-1">Area Distribusi</div>
@@ -672,7 +689,9 @@ export default function DaftarProduk() {
     pdf.setFontSize(7);
     pdf.setTextColor(COLORS.darkGray[0], COLORS.darkGray[1], COLORS.darkGray[2]);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('Harga Distributor', x + 12, row1Y);
+    const distributorPriceUom = regional?.price_uom || product.pricing_uom || 'pcs';
+    const distributorLabel = distributorPriceUom !== 'pcs' ? `Harga Distributor (per ${distributorPriceUom})` : 'Harga Distributor';
+    pdf.text(distributorLabel, x + 12, row1Y);
     
     pdf.setFontSize(10);
     pdf.setTextColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2]);
@@ -686,7 +705,9 @@ export default function DaftarProduk() {
     pdf.setFontSize(7);
     pdf.setTextColor(COLORS.darkGray[0], COLORS.darkGray[1], COLORS.darkGray[2]);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('Harga Konsumen', x + (width/2) + 8, row1Y);
+    const consumerPriceUom = product.pricing_uom || 'pcs';
+    const consumerLabel = consumerPriceUom !== 'pcs' ? `Harga Konsumen (per ${consumerPriceUom})` : 'Harga Konsumen';
+    pdf.text(consumerLabel, x + (width/2) + 8, row1Y);
     
     pdf.setFontSize(10);
     pdf.setTextColor(COLORS.orange[0], COLORS.orange[1], COLORS.orange[2]);
@@ -732,7 +753,8 @@ export default function DaftarProduk() {
     pdf.setFontSize(9.5);
     pdf.setTextColor(COLORS.darkGray[0], COLORS.darkGray[1], COLORS.darkGray[2]);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(`${usedMoq}`, x + 12 + columnWidth + 3, row2Y + 10);
+    const moqUom = regional?.moq_uom || product.moq_uom || 'pcs';
+    pdf.text(`${usedMoq} ${moqUom}`, x + 12 + columnWidth + 3, row2Y + 10);
     
     // Third row - Area with improved styling
     const row3Y = row2Y + 25;

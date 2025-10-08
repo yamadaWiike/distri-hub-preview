@@ -46,6 +46,21 @@ interface VariantPricing {
   distributor_price: number;
   moq: number;
 }
+
+// UOM (Unit of Measure) interfaces
+interface UOMConversion {
+  from_uom: string;
+  to_uom: string;
+  conversion_factor: number;
+}
+
+interface UOMPricing {
+  uom: string;
+  area: string;
+  distributor_price: number;
+  moq: number;
+  moq_uom: string;
+}
 /**
  * SKU Manager Component
  * 
@@ -70,11 +85,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
-import { Trash2, Edit, Plus, X, Search, Loader2 } from 'lucide-react';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { Trash2, Edit, Plus, X, Search, Loader2, RefreshCw } from 'lucide-react';
+import { useLanguage } from '@/hooks/use-language';
 import { PostgrestError } from '@supabase/supabase-js';
 import { fetchAllBrands, getBrandNameFromCache, Brand, createNewBrand } from '@/data/brands';
 import { Database } from '@/integrations/supabase/types';
@@ -164,7 +181,12 @@ const SKUManager = () => {
     base_distributor_price: 0,
     base_moq: 1,
     is_active: true,
-    has_variants: false // Add variants flag
+    has_variants: false, // Add variants flag
+    // UOM fields
+    base_uom: 'pcs', // Base unit of measure
+    moq_uom: 'pcs', // MOQ unit of measure
+    pricing_uom: 'pcs', // Pricing unit of measure
+    enable_uom_conversions: false // Whether to enable UOM conversions
   });
   
   // Variant states
@@ -189,6 +211,23 @@ const SKUManager = () => {
   
   // Areas allowed for distribution (now as state to allow adding new ones)
   const [availableAreas, setAvailableAreas] = useState(["Jabodetabek", "Jawa Barat", "Jawa Tengah", "Jawa Timur"]);
+  
+  // UOM (Unit of Measure) states
+  const [availableUOMs, setAvailableUOMs] = useState([
+    "pcs", "box", "carton", "pack", "kg", "gram", "liter", "ml", "meter", "cm"
+  ]);
+  const [showNewUOMInput, setShowNewUOMInput] = useState(false);
+  const [newUOMName, setNewUOMName] = useState('');
+  const [uomConversions, setUomConversions] = useState<UOMConversion[]>([]);
+  const [uomPricing, setUomPricing] = useState<UOMPricing[]>([]);
+  const [showUOMSettings, setShowUOMSettings] = useState(false);
+  
+  // New conversion form state
+  const [newConversion, setNewConversion] = useState({
+    from_uom: '',
+    to_uom: '',
+    conversion_factor: 0
+  });
   
   // Fetch all SKUs
   useEffect(() => {
@@ -493,6 +532,210 @@ const SKUManager = () => {
     ));
   };
 
+  // UOM (Unit of Measure) Management Functions
+  
+  // Function to add a new UOM
+  const handleCreateUOM = async () => {
+    if (!newUOMName.trim()) return;
+    
+    try {
+      const newUOM = newUOMName.trim();
+      
+      // Add to available UOMs
+      setAvailableUOMs(prev => [...prev, newUOM]);
+      
+      // Reset inputs
+      setNewUOMName('');
+      setShowNewUOMInput(false);
+      
+      toast({
+        title: "Success",
+        description: `UOM "${newUOM}" created successfully`,
+      });
+    } catch (error) {
+      console.error('Error creating UOM:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create UOM",
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Function to add UOM conversion
+  const addUomConversion = (fromUom: string, toUom: string, conversionFactor: number) => {
+    if (fromUom === toUom) {
+      toast({
+        title: "Error",
+        description: "Cannot convert from the same UOM to itself",
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const newConversion: UOMConversion = {
+      from_uom: fromUom,
+      to_uom: toUom,
+      conversion_factor: conversionFactor
+    };
+
+    // Check if conversion already exists
+    const exists = uomConversions.find(conv => 
+      conv.from_uom === fromUom && conv.to_uom === toUom
+    );
+
+    if (exists) {
+      // Update existing conversion
+      setUomConversions(prev => prev.map(conv => 
+        conv.from_uom === fromUom && conv.to_uom === toUom
+          ? { ...conv, conversion_factor: conversionFactor }
+          : conv
+      ));
+    } else {
+      // Add new conversion
+      setUomConversions(prev => [...prev, newConversion]);
+    }
+
+    toast({
+      title: "Success",
+      description: `UOM conversion ${fromUom} → ${toUom} added`,
+    });
+  };
+
+  // Function to remove UOM conversion
+  const removeUomConversion = (fromUom: string, toUom: string) => {
+    setUomConversions(prev => prev.filter(conv => 
+      !(conv.from_uom === fromUom && conv.to_uom === toUom)
+    ));
+  };
+
+  // Function to calculate converted quantity
+  const convertQuantity = (quantity: number, fromUom: string, toUom: string): number => {
+    if (fromUom === toUom) return quantity;
+
+    const conversion = uomConversions.find(conv => 
+      conv.from_uom === fromUom && conv.to_uom === toUom
+    );
+
+    if (conversion) {
+      return quantity * conversion.conversion_factor;
+    }
+
+    // Check for reverse conversion
+    const reverseConversion = uomConversions.find(conv => 
+      conv.from_uom === toUom && conv.to_uom === fromUom
+    );
+
+    if (reverseConversion) {
+      return quantity / reverseConversion.conversion_factor;
+    }
+
+    return quantity; // No conversion found, return original
+  };
+
+  // Function to add UOM-based pricing
+  const addUomPricing = (uom: string, area: string, distributorPrice: number, moq: number, moqUom: string) => {
+    const newUomPricing: UOMPricing = {
+      uom,
+      area,
+      distributor_price: distributorPrice,
+      moq,
+      moq_uom: moqUom
+    };
+
+    // Check if pricing already exists for this UOM and area
+    const exists = uomPricing.find(pricing => 
+      pricing.uom === uom && pricing.area === area
+    );
+
+    if (exists) {
+      // Update existing pricing
+      setUomPricing(prev => prev.map(pricing => 
+        pricing.uom === uom && pricing.area === area
+          ? newUomPricing
+          : pricing
+      ));
+    } else {
+      // Add new pricing
+      setUomPricing(prev => [...prev, newUomPricing]);
+    }
+  };
+
+  // Function to remove UOM pricing
+  const removeUomPricing = (uom: string, area: string) => {
+    setUomPricing(prev => prev.filter(pricing => 
+      !(pricing.uom === uom && pricing.area === area)
+    ));
+  };
+
+  // Function to get UOMs relevant to the current SKU
+  const getRelevantUOMs = (): string[] => {
+    const relevantUOMs = new Set<string>();
+    
+    // Always include the configured UOMs for this SKU
+    relevantUOMs.add(form.base_uom);
+    relevantUOMs.add(form.moq_uom);
+    relevantUOMs.add(form.pricing_uom);
+    
+    // Include UOMs that have conversions from/to the base UOM
+    uomConversions.forEach(conversion => {
+      if (conversion.from_uom === form.base_uom) {
+        relevantUOMs.add(conversion.to_uom);
+      }
+      if (conversion.to_uom === form.base_uom) {
+        relevantUOMs.add(conversion.from_uom);
+      }
+    });
+    
+    return Array.from(relevantUOMs);
+  };
+
+  // Function to generate UOM pricing matrix for SKU-relevant UOMs only
+  const generateUomPricingMatrix = () => {
+    if (!form.enable_uom_conversions) return;
+
+    const relevantUOMs = getRelevantUOMs();
+    const newUomPricing: UOMPricing[] = [];
+    
+    // Only generate pricing for relevant UOMs
+    relevantUOMs.forEach(uom => {
+      availableAreas.forEach(area => {
+        // Skip if pricing already exists
+        const exists = uomPricing.find(pricing => 
+          pricing.uom === uom && pricing.area === area
+        );
+        
+        if (!exists) {
+          // Calculate converted price and MOQ based on base UOM
+          const convertedPrice = convertQuantity(form.base_distributor_price, form.base_uom, uom);
+          const convertedMoq = Math.ceil(convertQuantity(form.base_moq, form.moq_uom, uom));
+          
+          newUomPricing.push({
+            uom,
+            area,
+            distributor_price: convertedPrice,
+            moq: convertedMoq,
+            moq_uom: uom
+          });
+        }
+      });
+    });
+    
+    if (newUomPricing.length > 0) {
+      setUomPricing(prev => [...prev, ...newUomPricing]);
+      
+      toast({
+        title: "Success",
+        description: `Generated pricing for ${relevantUOMs.join(', ')} UOMs across ${availableAreas.length} areas`,
+      });
+    } else {
+      toast({
+        title: "Info",
+        description: "All relevant UOM pricing combinations already exist",
+      });
+    }
+  };
+
   const fetchSKUs = async (): Promise<void> => {
     setIsLoading(true);
     try {
@@ -643,6 +886,44 @@ const SKUManager = () => {
     }
   };
   
+  // Fetch UOM conversions for a specific SKU
+  const fetchUOMConversionsForSKU = async (skuId: string) => {
+    try {
+      const { data: conversionsData, error: conversionsError } = await supabase
+        .from('uom_conversions')
+        .select('from_uom, to_uom, conversion_factor')
+        .eq('product_id', skuId)
+        .eq('is_active', true);
+        
+      if (conversionsError) throw conversionsError;
+      
+      setUomConversions(conversionsData || []);
+    } catch (error) {
+      console.error('Error fetching UOM conversions:', error);
+      // Don't fail if UOM conversions can't be loaded
+      setUomConversions([]);
+    }
+  };
+  
+  // Fetch UOM pricing for a specific SKU
+  const fetchUOMPricingForSKU = async (skuId: string) => {
+    try {
+      const { data: uomPricingData, error: uomPricingError } = await supabase
+        .from('uom_pricing')
+        .select('uom, area, distributor_price, moq, moq_uom')
+        .eq('product_id', skuId)
+        .eq('is_active', true);
+        
+      if (uomPricingError) throw uomPricingError;
+      
+      setUomPricing(uomPricingData || []);
+    } catch (error) {
+      console.error('Error fetching UOM pricing:', error);
+      // Don't fail if UOM pricing can't be loaded
+      setUomPricing([]);
+    }
+  };
+  
   // Check if a SKU already exists in the database
   const checkIfSkuExists = async (skuCode: string, currentProductId?: string): Promise<boolean> => {
     try {
@@ -754,6 +1035,11 @@ const SKUManager = () => {
           is_active: form.is_active,
           has_variants: form.has_variants,
           base_distributor_price: Math.round(form.consumer_price * 0.8), // Update distributor price based on consumer price
+          // UOM fields
+          base_uom: form.base_uom,
+          moq_uom: form.moq_uom,
+          pricing_uom: form.pricing_uom,
+          enable_uom_conversions: form.enable_uom_conversions,
         };
         
         console.log('Update data being sent:', updateData);
@@ -787,7 +1073,12 @@ const SKUManager = () => {
           stock_quantity: 0,
           province_id: null,
           distribution_area_id: null,
-          regional_group_id: null
+          regional_group_id: null,
+          // UOM fields
+          base_uom: form.base_uom,
+          moq_uom: form.moq_uom,
+          pricing_uom: form.pricing_uom,
+          enable_uom_conversions: form.enable_uom_conversions,
           // Added nullable fields explicitly
         };
         
@@ -928,6 +1219,80 @@ const SKUManager = () => {
             .insert(regionsToInsert);
             
           if (regionError) throw regionError;
+        }
+      }
+      
+      // Save UOM conversions if UOM is enabled and conversions exist
+      if (form.enable_uom_conversions && uomConversions.length > 0) {
+        const skuId = editMode && currentSKU ? currentSKU.id : result.data?.[0]?.id;
+        
+        if (skuId) {
+          try {
+            // First delete existing UOM conversions for this product
+            await supabase
+              .from('uom_conversions')
+              .delete()
+              .eq('product_id', skuId);
+            
+            // Then insert the new UOM conversions
+            const conversionsToInsert = uomConversions.map(conversion => ({
+              product_id: skuId,
+              from_uom: conversion.from_uom,
+              to_uom: conversion.to_uom,
+              conversion_factor: conversion.conversion_factor,
+              is_active: true
+            }));
+            
+            const { error: conversionError } = await supabase
+              .from('uom_conversions')
+              // @ts-expect-error - Supabase types don't include UOM tables yet
+              .insert(conversionsToInsert);
+              
+            if (conversionError) throw conversionError;
+            
+            console.log(`Saved ${conversionsToInsert.length} UOM conversions for product ${skuId}`);
+          } catch (conversionError) {
+            console.error('Error saving UOM conversions:', conversionError);
+            // Don't fail the entire operation if UOM conversions fail
+          }
+        }
+      }
+      
+      // Save UOM-specific pricing if UOM is enabled and pricing exists
+      if (form.enable_uom_conversions && uomPricing.length > 0) {
+        const skuId = editMode && currentSKU ? currentSKU.id : result.data?.[0]?.id;
+        
+        if (skuId) {
+          try {
+            // First delete existing UOM pricing for this product
+            await supabase
+              .from('uom_pricing')
+              .delete()
+              .eq('product_id', skuId);
+            
+            // Then insert the new UOM pricing
+            const uomPricingToInsert = uomPricing.map(pricing => ({
+              product_id: skuId,
+              uom: pricing.uom,
+              area: pricing.area,
+              distributor_price: pricing.distributor_price,
+              moq: pricing.moq,
+              moq_uom: pricing.moq_uom,
+              is_active: true
+            }));
+            
+            const { error: uomPricingError } = await supabase
+              .from('uom_pricing')
+              // @ts-expect-error - Supabase types don't include UOM tables yet
+              .insert(uomPricingToInsert);
+              
+            if (uomPricingError) throw uomPricingError;
+            
+            console.log(`Saved ${uomPricingToInsert.length} UOM pricing entries for product ${skuId}`);
+          } catch (uomPricingError) {
+            console.error('Error saving UOM pricing:', uomPricingError);
+            // Don't fail the entire operation if UOM pricing fails
+          }
         }
       }
       
@@ -1147,11 +1512,17 @@ const SKUManager = () => {
       base_distributor_price: 0,
       base_moq: 1,
       is_active: true,
-      has_variants: false
+      has_variants: false,
+      base_uom: 'pcs',
+      moq_uom: 'pcs',
+      pricing_uom: 'pcs',
+      enable_uom_conversions: false
     });
     setProductVariants([]);
     setVariantPricing([]);
     setRegions([]);
+    setUomConversions([]);
+    setUomPricing([]);
     setShowRegions(false);
     setShowVariantPricing(false);
     setIsDialogOpen(true);
@@ -1180,7 +1551,15 @@ const SKUManager = () => {
       base_distributor_price: sku.base_distributor_price || Math.round(sku.consumer_price * 0.8),
       base_moq: sku.base_moq || 1,
       is_active: sku.is_active,
-      has_variants: Boolean(sku.has_variants) || false // Add variants flag
+      has_variants: Boolean(sku.has_variants) || false, // Add variants flag
+      // @ts-expect-error - UOM fields may not exist in existing SKUs
+      base_uom: sku.base_uom || 'pcs', // Use actual data or default to pcs
+      // @ts-expect-error - UOM fields may not exist in existing SKUs
+      moq_uom: sku.moq_uom || 'pcs',
+      // @ts-expect-error - UOM fields may not exist in existing SKUs
+      pricing_uom: sku.pricing_uom || 'pcs',
+      // @ts-expect-error - UOM fields may not exist in existing SKUs
+      enable_uom_conversions: sku.enable_uom_conversions || false
     });
     
     // Fetch regions for this SKU
@@ -1191,6 +1570,12 @@ const SKUManager = () => {
     
     // Fetch variant pricing for this SKU
     await fetchVariantPricingForSKU(sku.id);
+    
+    // Fetch UOM conversions for this SKU
+    await fetchUOMConversionsForSKU(sku.id);
+    
+    // Fetch UOM pricing for this SKU
+    await fetchUOMPricingForSKU(sku.id);
     
     setShowRegions(false);
     setIsDialogOpen(true);
@@ -1562,7 +1947,7 @@ const SKUManager = () => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="consumer_price">{t.consumerPrice}</Label>
+                <Label htmlFor="consumer_price">{t.consumerPrice} (per {form.base_uom})</Label>
                 <Input
                   id="consumer_price"
                   name="consumer_price"
@@ -1620,8 +2005,8 @@ const SKUManager = () => {
                       <TableHeader>
                         <TableRow>
                           <TableHead>{t.area}</TableHead>
-                          <TableHead>{t.distributorPrice}</TableHead>
-                          <TableHead>{t.moq}</TableHead>
+                          <TableHead>{t.distributorPrice} ({form.pricing_uom})</TableHead>
+                          <TableHead>{t.moq} ({form.moq_uom})</TableHead>
                           <TableHead></TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1727,7 +2112,7 @@ const SKUManager = () => {
                     </div>
                     
                     <div className="flex-1 space-y-2">
-                      <Label htmlFor="distributor_price">{t.distributorPrice}</Label>
+                      <Label htmlFor="distributor_price">{t.distributorPrice} ({form.pricing_uom})</Label>
                       <Input
                         id="distributor_price"
                         type="number"
@@ -1737,7 +2122,7 @@ const SKUManager = () => {
                     </div>
                     
                     <div className="flex-none space-y-2" style={{width: '100px'}}>
-                      <Label htmlFor="moq">{t.moq}</Label>
+                      <Label htmlFor="moq">{t.moq} ({form.moq_uom})</Label>
                       <Input
                         id="moq"
                         type="number"
@@ -1815,7 +2200,7 @@ const SKUManager = () => {
                   </div>
                   
                   <div className="flex-1 space-y-2">
-                    <Label htmlFor="additional_price">{t.additionalPrice || 'Additional Price'}</Label>
+                    <Label htmlFor="additional_price">{t.additionalPrice || 'Additional Price'} (per {form.pricing_uom})</Label>
                     <Input
                       id="additional_price"
                       type="number"
@@ -1870,8 +2255,8 @@ const SKUManager = () => {
                                 <TableHeader>
                                   <TableRow>
                                     <TableHead>Area</TableHead>
-                                    <TableHead>Distributor Price</TableHead>
-                                    <TableHead>MOQ</TableHead>
+                                    <TableHead>Distributor Price ({form.pricing_uom})</TableHead>
+                                    <TableHead>MOQ ({form.moq_uom})</TableHead>
                                     <TableHead className="w-20"></TableHead>
                                   </TableRow>
                                 </TableHeader>
@@ -1935,6 +2320,354 @@ const SKUManager = () => {
                 </div>
               </div>
             )}
+            
+            {/* Step 4: UOM (Unit of Measure) Management */}
+            <div className="pt-4 border-t space-y-4">
+              <div className="mb-4">
+                <h3 className="font-medium text-lg mb-2">Step 4: Unit of Measure (UOM) Settings</h3>
+                <p className="text-sm text-muted-foreground">Configure different units of measure, conversion factors, and UOM-specific pricing.</p>
+                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-xs text-blue-700">
+                    <strong>How it works:</strong> Set your base UOM (e.g., pieces), then define conversions (e.g., 1 box = 12 pcs). 
+                    You can then set different prices and MOQs for each unit. All pricing above will display the selected UOM units.
+                  </p>
+                </div>
+              </div>
+
+              {/* Enable UOM Conversions Toggle */}
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="enable_uom_conversions"
+                  checked={form.enable_uom_conversions}
+                  onCheckedChange={(checked) => setForm({...form, enable_uom_conversions: !!checked})}
+                />
+                <Label htmlFor="enable_uom_conversions">Enable UOM Conversions & Per-UOM Pricing</Label>
+              </div>
+
+              {/* Base UOM Settings */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="base_uom">Base UOM</Label>
+                  <Select
+                    value={form.base_uom}
+                    onValueChange={(value) => setForm({...form, base_uom: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select base UOM" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableUOMs.map((uom) => (
+                        <SelectItem key={uom} value={uom}>
+                          {uom}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="moq_uom">MOQ UOM</Label>
+                  <Select
+                    value={form.moq_uom}
+                    onValueChange={(value) => setForm({...form, moq_uom: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select MOQ UOM" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableUOMs.map((uom) => (
+                        <SelectItem key={uom} value={uom}>
+                          {uom}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="pricing_uom">Pricing UOM</Label>
+                  <Select
+                    value={form.pricing_uom}
+                    onValueChange={(value) => setForm({...form, pricing_uom: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select pricing UOM" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableUOMs.map((uom) => (
+                        <SelectItem key={uom} value={uom}>
+                          {uom}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Add New UOM */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label>Available UOMs:</Label>
+                  <Badge variant="outline">
+                    {availableUOMs.join(', ')}
+                  </Badge>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowNewUOMInput(!showNewUOMInput)}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add UOM
+                  </Button>
+                </div>
+
+                {showNewUOMInput && (
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1 space-y-2">
+                      <Label htmlFor="new_uom_name">New UOM Name</Label>
+                      <Input
+                        id="new_uom_name"
+                        value={newUOMName}
+                        onChange={(e) => setNewUOMName(e.target.value)}
+                        placeholder="e.g., box, carton, kg, liter"
+                      />
+                    </div>
+                    <Button type="button" onClick={handleCreateUOM}>
+                      Add
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setShowNewUOMInput(false);
+                        setNewUOMName('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* UOM Conversion Settings */}
+              {form.enable_uom_conversions && (
+                <div className="space-y-4">
+                  <div className="border rounded-md p-4">
+                    <h4 className="font-medium mb-3">UOM Conversion Factors</h4>
+                    
+                    {/* Existing conversions */}
+                    {uomConversions.length > 0 && (
+                      <div className="mb-4">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>From UOM</TableHead>
+                              <TableHead>To UOM</TableHead>
+                              <TableHead>Conversion Factor</TableHead>
+                              <TableHead></TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {uomConversions.map((conversion, index) => (
+                              <TableRow key={index}>
+                                <TableCell>{conversion.from_uom}</TableCell>
+                                <TableCell>{conversion.to_uom}</TableCell>
+                                <TableCell>{conversion.conversion_factor}</TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => removeUomConversion(conversion.from_uom, conversion.to_uom)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+
+                    {/* Add new conversion */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                      <div className="space-y-2">
+                        <Label>From UOM</Label>
+                        <Select
+                          value={newConversion.from_uom}
+                          onValueChange={(value) => setNewConversion({...newConversion, from_uom: value})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select UOM" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableUOMs.map((uom) => (
+                              <SelectItem key={uom} value={uom}>
+                                {uom}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>To UOM</Label>
+                        <Select
+                          value={newConversion.to_uom}
+                          onValueChange={(value) => setNewConversion({...newConversion, to_uom: value})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select UOM" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableUOMs.map((uom) => (
+                              <SelectItem key={uom} value={uom}>
+                                {uom}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Conversion Factor</Label>
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={newConversion.conversion_factor}
+                          onChange={(e) => setNewConversion({
+                            ...newConversion,
+                            conversion_factor: parseFloat(e.target.value) || 0
+                          })}
+                          placeholder="e.g., 12 (1 box = 12 pcs)"
+                        />
+                      </div>
+
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          if (newConversion.from_uom && newConversion.to_uom && newConversion.conversion_factor > 0) {
+                            addUomConversion(
+                              newConversion.from_uom,
+                              newConversion.to_uom,
+                              newConversion.conversion_factor
+                            );
+                            setNewConversion({ from_uom: '', to_uom: '', conversion_factor: 0 });
+                          }
+                        }}
+                      >
+                        Add Conversion
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* UOM-specific Pricing */}
+                  <div className="border rounded-md p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium">UOM-specific Pricing</h4>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={generateUomPricingMatrix}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-1" />
+                        Generate SKU UOM Pricing
+                      </Button>
+                    </div>
+
+                    {uomPricing.length > 0 ? (
+                      <div className="space-y-4">
+                        {/* Get unique UOMs from existing pricing and filter to only show those with pricing */}
+                        {Array.from(new Set(uomPricing.map(pricing => pricing.uom))).map((uom) => {
+                          const uomPricings = uomPricing.filter(pricing => pricing.uom === uom);
+                          if (uomPricings.length === 0) return null;
+
+                          return (
+                            <div key={uom} className="border rounded-md p-3">
+                              <h5 className="font-medium mb-2">Pricing for {uom}</h5>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Area</TableHead>
+                                    <TableHead>Distributor Price</TableHead>
+                                    <TableHead>MOQ</TableHead>
+                                    <TableHead>MOQ UOM</TableHead>
+                                    <TableHead></TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {uomPricings.map((pricing, index) => (
+                                    <TableRow key={index}>
+                                      <TableCell>{pricing.area}</TableCell>
+                                      <TableCell>
+                                        <Input
+                                          type="number"
+                                          value={pricing.distributor_price}
+                                          onChange={(e) => {
+                                            const newPrice = parseFloat(e.target.value) || 0;
+                                            addUomPricing(pricing.uom, pricing.area, newPrice, pricing.moq, pricing.moq_uom);
+                                          }}
+                                          className="w-32"
+                                        />
+                                      </TableCell>
+                                      <TableCell>
+                                        <Input
+                                          type="number"
+                                          value={pricing.moq}
+                                          onChange={(e) => {
+                                            const newMoq = parseInt(e.target.value) || 1;
+                                            addUomPricing(pricing.uom, pricing.area, pricing.distributor_price, newMoq, pricing.moq_uom);
+                                          }}
+                                          className="w-20"
+                                        />
+                                      </TableCell>
+                                      <TableCell>
+                                        <Select
+                                          value={pricing.moq_uom}
+                                          onValueChange={(value) => {
+                                            addUomPricing(pricing.uom, pricing.area, pricing.distributor_price, pricing.moq, value);
+                                          }}
+                                        >
+                                          <SelectTrigger className="w-20">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {availableUOMs.map((uom) => (
+                                              <SelectItem key={uom} value={uom}>
+                                                {uom}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => removeUomPricing(pricing.uom, pricing.area)}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground border rounded-md">
+                        <p>No UOM-specific pricing configured. Click "Generate SKU UOM Pricing" to auto-generate pricing for this SKU's relevant UOMs.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <DialogFooter>

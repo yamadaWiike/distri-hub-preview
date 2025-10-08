@@ -1,49 +1,45 @@
-import React, { createContext, useEffect, useMemo, useState, useContext } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
-import { Database } from "@/integrations/supabase/types";
+/**
+ * Authentication Context Provider for Baskit Distributor Hub
+ * Manages user authentication state, login, registration and session management
+ */
+
+// Third-party imports
+import React, { useEffect, useMemo, useState } from "react";
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 
-export type User = {
-  id?: string;
-  email: string;
-  namaBisnis?: string;
-  kota?: string;
-  role: 'user' | 'admin';
-};
+// Supabase client
+import { supabase } from "@/integrations/supabase/client";
 
-type DistributorProfile = Database['public']['Tables']['distributor_profiles']['Row'];
+// UI components
+import { toast } from "@/components/ui/use-toast";
 
-type AuthContextType = {
-  user: User | null;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (data: { 
-    email: string; 
-    password: string; 
-    namaBisnis: string; 
-    alamatLengkap: string; 
-    provinsiId: string; 
-    kota: string; 
-    namaPemilik: string; 
-    kontakPemilik: string; 
-  }) => Promise<void>;
-  logout: () => void;
-};
+// Import context and types from definition file
+import { 
+  AuthContext,
+  User,
+  RegistrationData,
+  DistributorProfile
+} from "./AuthContextDefinition";
 
-// Creating context in its own file to avoid fast refresh issues
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Import database types
+import { Database } from "@/integrations/supabase/types";
 
-export { AuthContext };
-
+/**
+ * Authentication Provider Component
+ * Manages authentication state and provides methods for login, register, and logout
+ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for existing session on mount
+  /**
+   * Check for existing user session on component mount
+   * Retrieves user session from Supabase and loads associated profile data
+   */
   useEffect(() => {
     const checkSession = async () => {
       try {
+        // Get current session from Supabase Auth
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session) {
@@ -92,8 +88,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkSession();
   }, []);
 
+  /**
+   * User login function
+   * Signs in with Supabase Auth and retrieves associated profile data
+   * 
+   * @param email - User email address
+   * @param password - User password
+   */
   const login = async (email: string, password: string) => {
     try {
+      // Authenticate with Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -102,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
       
       if (data.user) {
+        // Initialize user data with basic auth info
         let userData: User = {
           id: data.user.id,
           email: data.user.email || '',
@@ -109,6 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
         
         try {
+          // Fetch associated profile data
           const { data: profile, error: profileError } = await supabase
             .from('distributor_profiles')
             .select('*')
@@ -120,6 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('Error fetching profile during login:', profileError);
           }
           
+          // Enhance user data with profile info if available
           if (profile) {
             userData = {
               ...userData,
@@ -131,7 +138,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error('Profile fetch error during login:', err);
         }
         
+        // Update application state
         setUser(userData);
+        
         // Keep local storage for fallback/development
         localStorage.setItem('baskit_user', JSON.stringify(userData));
         return;
@@ -141,25 +150,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan";
       console.error('Login error:', errorMessage);
+      
+      // Show error toast
       toast({
         title: "Login Gagal",
         description: errorMessage || "Terjadi kesalahan saat login. Silakan coba lagi.",
         variant: "destructive"
       });
+      
       throw error;
     }
   };
 
-  const register = async (data: { 
-    email: string; 
-    password: string; 
-    namaBisnis: string; 
-    alamatLengkap: string; 
-    provinsiId: string; 
-    kota: string; 
-    namaPemilik: string; 
-    kontakPemilik: string; 
-  }) => {
+  /**
+   * User registration function
+   * Creates new account in Supabase Auth and associated distributor profile
+   * 
+   * @param data - Registration data object containing user and profile information
+   */
+  const register = async (data: RegistrationData) => {
     try {
       // Create user in Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -174,7 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (authError) throw authError;
       
-      // Create distributor profile
+      // Create distributor profile if user was created successfully
       if (authData.user) {
         // Insert profile data into distributor_profiles table
         // Due to TypeScript issues with the Supabase types, we'll use a more direct approach
@@ -210,6 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           profileError = { message: 'Failed to create profile' };
         }
         
+        // Handle profile creation result
         if (profileError) {
           console.error('Profile creation error:', profileError);
           console.error('Profile error details:', {
@@ -249,23 +259,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error: unknown) {
       console.error('Registration error:', error);
       const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan";
+      
+      // Show error toast
       toast({
         title: "Pendaftaran Gagal",
         description: errorMessage || "Terjadi kesalahan saat mendaftar. Silakan coba lagi.",
         variant: "destructive"
       });
+      
       throw error;
     }
   };
 
+  /**
+   * User logout function
+   * Clears user data from state and local storage
+   */
   const logout = () => {
+    // Remove from local storage
     localStorage.removeItem('baskit_user');
+    
+    // Clear user from state
     setUser(null);
+    
+    // Note: In a full implementation, this would also call supabase.auth.signOut()
   };
 
-  const value = useMemo(() => ({ user, isLoading, login, register, logout }), [user, isLoading]);
+  // Create memoized context value
+  const value = useMemo(
+    () => ({ user, isLoading, login, register, logout }), 
+    [user, isLoading]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// useAuth moved to src/hooks/use-auth.ts
+// Note: useAuth hook implementation moved to src/hooks/use-auth.ts

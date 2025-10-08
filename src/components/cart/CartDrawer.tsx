@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, X } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 import { Cart } from './Cart';
 import { CartEmpty } from './CartEmpty';

@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, X, Minus, Plus, Trash2 } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 import { Badge } from "@/components/ui/badge";
 import { formatIDR } from '@/lib/utils';

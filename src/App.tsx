@@ -1,11 +1,27 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+// Third-party library imports
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
+
+// Context providers
+import { AuthProvider } from "./contexts/AuthContext";
+import { CartProvider } from "./contexts/CartContext";
+import { LanguageProvider } from "./contexts/LanguageContext";
+
+// Hooks
+import { useAuth } from "./hooks/use-auth";
+
+// UI Components
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+
+// Analytics/Tracking components
+import GoogleAnalytics from "./components/seo/GoogleAnalytics";
+import Hotjar from "./components/seo/Hotjar";
+
+// Pages
 import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
 import DaftarProduk from "./pages/DaftarProduk";
 import ProdukDetail from "./pages/ProdukDetail";
 import Tentang from "./pages/Tentang";
@@ -15,35 +31,66 @@ import Daftar from "./pages/Daftar";
 import Profil from "./pages/Profil";
 import Admin from "./pages/Admin";
 import Checkout from "./pages/Checkout";
-import { AuthProvider } from "./contexts/AuthContext";
-import { useAuth } from "./hooks/use-auth";
-import { CartProvider } from "./contexts/CartContext";
-import { LanguageProvider } from "./contexts/LanguageContext";
-import GoogleAnalytics from "./components/seo/GoogleAnalytics";
-import Hotjar from "./components/seo/Hotjar";
+import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+/**
+ * Configure React Query client with default options
+ */
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      staleTime: 60000, // 1 minute
+    },
+  },
+});
 
-function Protected({ children }: { children: JSX.Element }) {
-  const { user, isLoading } = useAuth();
-  if (isLoading) return null;
-  return user ? children : <Navigate to="/masuk" replace />;
+/**
+ * Protected route wrapper component
+ * Redirects to login page if user is not authenticated
+ */
+interface ProtectedRouteProps {
+  children: JSX.Element;
 }
 
-const App = () => (
+const Protected: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const { user, isLoading } = useAuth();
+  
+  // Show nothing while checking auth status
+  if (isLoading) return null;
+  
+  // Either render the children or redirect to login
+  return user ? children : <Navigate to="/masuk" replace />;
+};
+
+/**
+ * Main application component
+ */
+const App: React.FC = () => (
   <QueryClientProvider client={queryClient}>
+    {/* Helmet for managing document head */}
     <HelmetProvider>
+      {/* UI component providers */}
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        
+        {/* Application context providers */}
         <LanguageProvider>
           <AuthProvider>
             <CartProvider>
-              <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+              
+              {/* Router configuration */}
+              <BrowserRouter future={{ 
+                v7_startTransition: true, 
+                v7_relativeSplatPath: true 
+              }}>
                 {/* Analytics tracking components */}
                 <GoogleAnalytics />
                 <Hotjar />
+                
                 <Routes>
+                  {/* Public pages */}
                   <Route path="/" element={<Index />} />
                   <Route path="/daftar-produk" element={<DaftarProduk />} />
                   <Route path="/produk/:id" element={<ProdukDetail />} />
@@ -51,10 +98,15 @@ const App = () => (
                   <Route path="/hubungi" element={<Hubungi />} />
                   <Route path="/masuk" element={<Masuk />} />
                   <Route path="/daftar" element={<Daftar />} />
+                  
+                  {/* Protected routes - require authentication */}
                   <Route path="/profil" element={<Protected><Profil /></Protected>} />
                   <Route path="/checkout" element={<Protected><Checkout /></Protected>} />
+                  
+                  {/* Admin routes */}
                   <Route path="/admin" element={<Admin />} />
-                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  
+                  {/* Fallback route for 404 errors */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </BrowserRouter>

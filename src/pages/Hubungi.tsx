@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { AtSign, Building, Loader2, Mail, MapPin, MessageSquare, Phone, Users } from "lucide-react";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 
 export default function Hubungi() {

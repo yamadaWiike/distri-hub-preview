@@ -7,7 +7,7 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/hooks/use-cart";
 import { formatIDR } from "@/lib/utils";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 import { useToast } from "@/components/ui/use-toast";
 import { fetchProductBySku } from "@/lib/db";
@@ -141,25 +141,25 @@ export default function ProdukDetail() {
           <div className="space-y-4">
             <div>
               <div className="text-xs text-muted-foreground">
-                {lang === 'id' ? "Harga Konsumen (per pcs)" : "Consumer Price (per pcs)"}
+                {lang === 'id' ? 
+                  `Harga Konsumen${product.pricing_uom && product.pricing_uom !== 'pcs' ? ` (per ${product.pricing_uom})` : ' (per pcs)'}` : 
+                  `Consumer Price${product.pricing_uom && product.pricing_uom !== 'pcs' ? ` (per ${product.pricing_uom})` : ' (per pcs)'}`
+                }
               </div>
               <div className="text-lg font-medium">{formatIDR(product.consumerPrice)}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">
-                {lang === 'id' ? "Harga Konsumen (per karton)" : "Consumer Price (per box)"}
-              </div>
-              <div className="text-lg font-medium">—</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">
-                {lang === 'id' ? "Harga Distributor" : "Distributor Price"}
+                {lang === 'id' ? 
+                  `Harga Distributor${(regional?.price_uom || product.pricing_uom) && (regional?.price_uom || product.pricing_uom) !== 'pcs' ? ` (per ${regional?.price_uom || product.pricing_uom})` : ' (per pcs)'}` : 
+                  `Distributor Price${(regional?.price_uom || product.pricing_uom) && (regional?.price_uom || product.pricing_uom) !== 'pcs' ? ` (per ${regional?.price_uom || product.pricing_uom})` : ' (per pcs)'}`
+                }
               </div>
               <div className={`text-lg font-medium ${user ? '' : 'blur-sm select-none'}`}>{formatIDR(usedPrice)}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">MOQ</div>
-              <div className="text-lg font-medium">{usedMoq} pcs</div>
+              <div className="text-lg font-medium">{usedMoq} {regional?.moq_uom || product.moq_uom || 'pcs'}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">
@@ -251,7 +251,7 @@ export default function ProdukDetail() {
               <div key={r.area} className="grid grid-cols-3 gap-3 p-3 text-sm">
                 <div className="font-medium">{r.area}</div>
                 <div className={`${user ? '' : 'blur-sm select-none'}`}>{formatIDR(r.distributorPrice)}</div>
-                <div>{r.moq} pcs</div>
+                <div>{r.moq} {r.moq_uom || product.moq_uom || 'pcs'}</div>
               </div>
             ))}
           </div>

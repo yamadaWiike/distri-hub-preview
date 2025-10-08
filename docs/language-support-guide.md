@@ -46,7 +46,7 @@ For each page that needs language support:
 
 1. Import the required hooks and translations:
 ```tsx
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 ```
 

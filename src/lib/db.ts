@@ -14,6 +14,10 @@ interface ProductRecord {
   image_url: string | null;
   stock_quantity: number | null;
   has_variants?: boolean;
+  base_uom?: string;
+  moq_uom?: string;
+  pricing_uom?: string;
+  enable_uom_conversions?: boolean;
   brands: { name: string } | null;
   product_categories: { name: string } | null;
 }
@@ -38,6 +42,8 @@ interface RegionPricingRecord {
   area: string;
   distributor_price: number;
   moq: number;
+  moq_uom?: string;
+  price_uom?: string;
 }
 
 // Function to fetch products from Supabase
@@ -57,6 +63,10 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
         description,
         image_url,
         stock_quantity,
+        base_uom,
+        moq_uom,
+        pricing_uom,
+        enable_uom_conversions,
         brands(name),
         product_categories(name)
       `);
@@ -69,7 +79,7 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
     // Fetch region pricing for all products
     const { data: regionPricing, error: regionError } = await supabase
       .from('region_pricing')
-      .select('product_id, area, distributor_price, moq');
+      .select('product_id, area, distributor_price, moq, moq_uom, price_uom');
     
     if (regionError || !regionPricing) {
       console.error('Error fetching region pricing:', regionError);
@@ -84,7 +94,9 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
         .map(rp => ({
           area: rp.area,
           distributorPrice: rp.distributor_price,
-          moq: rp.moq
+          moq: rp.moq,
+          moq_uom: rp.moq_uom,
+          price_uom: rp.price_uom
         }));
 
       return {
@@ -98,6 +110,11 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
         moq: product.base_moq,
         description: product.description,
         stock: product.stock_quantity || 0,
+        // UOM fields
+        base_uom: product.base_uom,
+        moq_uom: product.moq_uom,
+        pricing_uom: product.pricing_uom,
+        enable_uom_conversions: product.enable_uom_conversions,
         regions: productRegions,
         image: product.image_url || '/placeholder.svg'
       };
@@ -126,6 +143,10 @@ export async function fetchProductBySku(skuOrId: string): Promise<Product | null
         image_url,
         stock_quantity,
         has_variants,
+        base_uom,
+        moq_uom,
+        pricing_uom,
+        enable_uom_conversions,
         brands(name),
         product_categories(name)
       `)
@@ -155,6 +176,10 @@ export async function fetchProductBySku(skuOrId: string): Promise<Product | null
           image_url,
           stock_quantity,
           has_variants,
+          base_uom,
+          moq_uom,
+          pricing_uom,
+          enable_uom_conversions,
           brands(name),
           product_categories(name)
         `)
@@ -231,7 +256,7 @@ export async function fetchProductBySku(skuOrId: string): Promise<Product | null
     // Fetch region pricing for this product
     const { data: regionPricing, error: regionError } = await supabase
       .from('region_pricing')
-      .select('area, distributor_price, moq')
+      .select('area, distributor_price, moq, moq_uom, price_uom')
       .eq('product_id', productId);
     
     if (regionError) {
@@ -254,11 +279,18 @@ export async function fetchProductBySku(skuOrId: string): Promise<Product | null
       description: product.description,
       stock: product.stock_quantity || 0,
       hasVariants: product.has_variants,
+      // UOM fields
+      base_uom: product.base_uom,
+      moq_uom: product.moq_uom,
+      pricing_uom: product.pricing_uom,
+      enable_uom_conversions: product.enable_uom_conversions,
       variants: variants.length > 0 ? variants : undefined,
       regions: regions.map(rp => ({
         area: rp.area,
         distributorPrice: rp.distributor_price,
-        moq: rp.moq
+        moq: rp.moq,
+        moq_uom: rp.moq_uom,
+        price_uom: rp.price_uom
       })),
       image: product.image_url || '/placeholder.svg'
     };

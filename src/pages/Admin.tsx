@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/use-auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 

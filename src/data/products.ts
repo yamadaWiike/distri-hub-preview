@@ -2,6 +2,9 @@ export type RegionPricing = {
   area: string; // Kota/Kabupaten
   distributorPrice: number; // in IDR per unit
   moq: number;
+  // UOM fields for regional pricing
+  price_uom?: string;
+  moq_uom?: string;
 };
 
 export type VariantOption = {
@@ -41,6 +44,11 @@ export type Product = {
   area?: string;
   units?: number;
   sku?: string; // Product SKU (may be different from ID in some cases)
+  // UOM fields
+  base_uom?: string;
+  moq_uom?: string;
+  pricing_uom?: string;
+  enable_uom_conversions?: boolean;
 };
 
 export const PRODUCTS: Product[] = [

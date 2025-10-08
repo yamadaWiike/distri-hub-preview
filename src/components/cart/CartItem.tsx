@@ -4,7 +4,7 @@ import { useCart } from '@/hooks/use-cart';
 import { formatIDR } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { MinusIcon, PlusIcon, TrashIcon } from 'lucide-react';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useLanguage } from '@/hooks/use-language';
 import { translations } from '@/lib/translations';
 
 interface CartItemProps {

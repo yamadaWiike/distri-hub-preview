@@ -5,7 +5,7 @@ import heroImage from "@/assets/hero-baskit.jpg";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, Box, Clock, CreditCard, MapPin, PackageCheck, ShieldCheck, TrendingUp, Truck, Workflow } from "lucide-react";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { useHotjar } from "@/hooks/use-hotjar";
