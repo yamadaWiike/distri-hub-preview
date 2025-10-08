@@ -29,21 +29,22 @@ export default function ProdukDetail() {
   // First look for product in hardcoded data
   const hardcodedProduct = PRODUCTS.find((p) => p.id === id);
   
-  // Fetch product from database if not in hardcoded data
+  // Always fetch product from database to get UOM data
   useEffect(() => {
     async function loadProduct() {
-      if (hardcodedProduct) {
-        setProduct(hardcodedProduct);
-        setLoading(false);
-        return;
-      }
-      
       if (id) {
         try {
           const fetchedProduct = await fetchProductBySku(id);
-          setProduct(fetchedProduct);
+          if (fetchedProduct) {
+            setProduct(fetchedProduct);
+          } else {
+            // Fallback to hardcoded if database fetch fails
+            setProduct(hardcodedProduct);
+          }
         } catch (error) {
           console.error("Error fetching product:", error);
+          // Fallback to hardcoded if database fetch fails
+          setProduct(hardcodedProduct);
         } finally {
           setLoading(false);
         }
@@ -150,16 +151,18 @@ export default function ProdukDetail() {
             </div>
             <div>
               <div className="text-xs text-muted-foreground">
-                {lang === 'id' ? 
-                  `Harga Distributor${(regional?.price_uom || product.pricing_uom) && (regional?.price_uom || product.pricing_uom) !== 'pcs' ? ` (per ${regional?.price_uom || product.pricing_uom})` : ' (per pcs)'}` : 
-                  `Distributor Price${(regional?.price_uom || product.pricing_uom) && (regional?.price_uom || product.pricing_uom) !== 'pcs' ? ` (per ${regional?.price_uom || product.pricing_uom})` : ' (per pcs)'}`
-                }
+                {(() => {
+                  const priceUom = product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (regional?.price_uom || 'pcs');
+                  return lang === 'id' ? 
+                    `Harga Distributor${priceUom !== 'pcs' ? ` (per ${priceUom})` : ' (per pcs)'}` : 
+                    `Distributor Price${priceUom !== 'pcs' ? ` (per ${priceUom})` : ' (per pcs)'}`;
+                })()}
               </div>
               <div className={`text-lg font-medium ${user ? '' : 'blur-sm select-none'}`}>{formatIDR(usedPrice)}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">MOQ</div>
-              <div className="text-lg font-medium">{usedMoq} {regional?.moq_uom || product.moq_uom || 'pcs'}</div>
+              <div className="text-lg font-medium">{usedMoq} {product.moq_uom && product.moq_uom !== 'pcs' ? product.moq_uom : (regional?.moq_uom || 'pcs')}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">
@@ -247,13 +250,26 @@ export default function ProdukDetail() {
             {lang === 'id' ? "Harga & MOQ per Area Distribusi" : "Price & MOQ by Distribution Area"}
           </h2>
           <div className="divide-y border rounded-lg">
-            {product.regions.map((r) => (
-              <div key={r.area} className="grid grid-cols-3 gap-3 p-3 text-sm">
-                <div className="font-medium">{r.area}</div>
-                <div className={`${user ? '' : 'blur-sm select-none'}`}>{formatIDR(r.distributorPrice)}</div>
-                <div>{r.moq} {r.moq_uom || product.moq_uom || 'pcs'}</div>
-              </div>
-            ))}
+            {/* Table Headers */}
+            <div className="grid grid-cols-3 gap-3 p-3 text-xs font-semibold text-muted-foreground bg-muted/30">
+              <div>{lang === 'id' ? "Area" : "Area"}</div>
+              <div>{lang === 'id' ? "Harga Distributor" : "Distributor Price"}</div>
+              <div>{lang === 'id' ? "MOQ" : "MOQ"}</div>
+            </div>
+            {product.regions.map((r) => {
+              const moqUom = product.moq_uom && product.moq_uom !== 'pcs' ? product.moq_uom : (r.moq_uom || 'pcs');
+              const priceUom = product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (r.price_uom || 'pcs');
+              return (
+                <div key={r.area} className="grid grid-cols-3 gap-3 p-3 text-sm">
+                  <div className="font-medium">{r.area}</div>
+                  <div className={`${user ? '' : 'blur-sm select-none'}`}>
+                    {formatIDR(r.distributorPrice)}
+                    {priceUom !== 'pcs' && <span className="text-xs text-muted-foreground ml-1">/{priceUom}</span>}
+                  </div>
+                  <div>{r.moq} {moqUom}</div>
+                </div>
+              );
+            })}
           </div>
           {!user && <p className="text-sm text-muted-foreground mt-2">
             {lang === 'id' 

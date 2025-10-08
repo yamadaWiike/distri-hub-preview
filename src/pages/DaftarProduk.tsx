@@ -22,6 +22,16 @@ import { generateCatalogPDF } from "@/utils/catalog";
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 
 function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: ProductWithVariant; loggedIn: boolean; selectedFilterArea?: string }) {
+  // Debug UOM data in ProductCard
+  if (product.name.includes('Gula Kapas')) {
+    console.log(`ProductCard UOM debug for ${product.name}:`, {
+      moq_uom: product.moq_uom,
+      pricing_uom: product.pricing_uom,
+      base_uom: product.base_uom,
+      product: product
+    });
+  }
+  
   const { addItem } = useCart();
   const { toast } = useToast();
   const { lang } = useLanguage();
@@ -132,16 +142,18 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
             {loggedIn ? (
               <div className="text-sm font-bold text-foreground flex flex-wrap items-baseline gap-1">
                 <span>{formatIDR(basePrice)}</span>
-                {(regional?.price_uom || product.pricing_uom) && (regional?.price_uom || product.pricing_uom) !== 'pcs' && (
-                  <span className="text-xs text-muted-foreground">/{regional?.price_uom || product.pricing_uom}</span>
-                )}
+                {(() => {
+                  const priceUom = product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (regional?.price_uom || 'pcs');
+                  return priceUom !== 'pcs' ? <span className="text-xs text-muted-foreground">/{priceUom}</span> : null;
+                })()}
               </div>
             ) : (
               <div className="text-sm font-bold text-foreground blur-sm select-none flex flex-wrap items-baseline gap-1">
                 <span>{formatIDR(basePrice)}</span>
-                {(regional?.price_uom || product.pricing_uom) && (regional?.price_uom || product.pricing_uom) !== 'pcs' && (
-                  <span className="text-xs text-muted-foreground">/{regional?.price_uom || product.pricing_uom}</span>
-                )}
+                {(() => {
+                  const priceUom = product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (regional?.price_uom || 'pcs');
+                  return priceUom !== 'pcs' ? <span className="text-xs text-muted-foreground">/{priceUom}</span> : null;
+                })()}
               </div>
             )}
           </div>
@@ -151,7 +163,7 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
           <div className="text-center">
             <div className="text-xs font-medium text-muted-foreground mb-1">MOQ</div>
             <div className="text-sm font-semibold text-foreground">
-              {usedMoq} {regional?.moq_uom || product.moq_uom || 'pcs'}
+              {usedMoq} {product.moq_uom && product.moq_uom !== 'pcs' ? product.moq_uom : (regional?.moq_uom || 'pcs')}
             </div>
           </div>
           <div className="text-center">
@@ -689,7 +701,7 @@ export default function DaftarProduk() {
     pdf.setFontSize(7);
     pdf.setTextColor(COLORS.darkGray[0], COLORS.darkGray[1], COLORS.darkGray[2]);
     pdf.setFont('helvetica', 'normal');
-    const distributorPriceUom = regional?.price_uom || product.pricing_uom || 'pcs';
+    const distributorPriceUom = product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (regional?.price_uom || 'pcs');
     const distributorLabel = distributorPriceUom !== 'pcs' ? `Harga Distributor (per ${distributorPriceUom})` : 'Harga Distributor';
     pdf.text(distributorLabel, x + 12, row1Y);
     
@@ -753,7 +765,7 @@ export default function DaftarProduk() {
     pdf.setFontSize(9.5);
     pdf.setTextColor(COLORS.darkGray[0], COLORS.darkGray[1], COLORS.darkGray[2]);
     pdf.setFont('helvetica', 'bold');
-    const moqUom = regional?.moq_uom || product.moq_uom || 'pcs';
+    const moqUom = product.moq_uom && product.moq_uom !== 'pcs' ? product.moq_uom : (regional?.moq_uom || 'pcs');
     pdf.text(`${usedMoq} ${moqUom}`, x + 12 + columnWidth + 3, row2Y + 10);
     
     // Third row - Area with improved styling

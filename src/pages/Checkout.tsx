@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { Minus, Plus } from "lucide-react";
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { formatIDR } from "@/lib/utils";
 import { useCart } from "@/hooks/use-cart";
+import { CartItem } from "@/contexts/CartContextDefinition";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/hooks/use-language";
@@ -51,12 +53,49 @@ interface DbOrderItem {
 }
 
 export default function Checkout() {
-  const { items, totalAmount, clear } = useCart();
+  const { items, totalAmount, clear, updateQuantity, removeItem } = useCart();
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { lang } = useLanguage();
   const t = translations[lang];
+
+  // Quantity adjustment functions
+  const handleQuantityChange = (itemId: string, province: string, newQty: number, variantId?: string) => {
+    if (newQty < 1) {
+      return; // Prevent zero or negative quantities
+    }
+    updateQuantity(itemId, province, newQty, variantId);
+  };
+
+  const incrementQuantity = (item: CartItem) => {
+    const newQty = item.qty + 1;
+    handleQuantityChange(item.id, item.province, newQty, item.variant?.id);
+  };
+
+  const decrementQuantity = (item: CartItem) => {
+    if (item.qty > 1) {
+      const newQty = item.qty - 1;
+      handleQuantityChange(item.id, item.province, newQty, item.variant?.id);
+    }
+  };
+
+  const handleTextFieldQuantityChange = (item: CartItem, inputValue: string) => {
+    const newQty = parseInt(inputValue);
+    if (!isNaN(newQty) && newQty >= 1) {
+      handleQuantityChange(item.id, item.province, newQty, item.variant?.id);
+    }
+  };
+
+  const handleRemoveItem = (item: CartItem) => {
+    removeItem(item.id, item.province, item.variant?.id);
+    toast({
+      title: lang === 'id' ? "Item dihapus" : "Item removed",
+      description: lang === 'id' 
+        ? `${item.name} telah dihapus dari keranjang` 
+        : `${item.name} has been removed from cart`,
+    });
+  };
 
   // State for profile data
   const [profileData, setProfileData] = useState<{
@@ -416,7 +455,7 @@ You can view this order in the admin panel using Order Number: ${orderNumber}
               
               <div className="space-y-4">
                 {items.map((item) => (
-                  <div key={`${item.id}-${item.province}`} className="flex gap-3 pb-3 border-b">
+                  <div key={`${item.id}-${item.province}-${item.variant?.id || 'no-variant'}`} className="flex gap-3 pb-3 border-b">
                     {item.image && (
                       <div className="w-16 h-16 border rounded overflow-hidden flex-shrink-0">
                         <img 
@@ -427,10 +466,60 @@ You can view this order in the admin panel using Order Number: ${orderNumber}
                       </div>
                     )}
                     <div className="flex-1">
-                      <div className="font-medium">{item.name} - {item.size}</div>
+                      <div className="font-medium">
+                        {item.name} - {item.size}
+                        {item.variant && <span className="text-sm text-muted-foreground ml-1">({item.variant.name})</span>}
+                      </div>
                       <div className="text-sm text-muted-foreground">{item.province}</div>
+                      
+                      {/* Quantity Controls */}
+                      <div className="flex items-center gap-2 mt-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => decrementQuantity(item)}
+                          disabled={item.qty <= 1}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        
+                        <Input
+                          type="number"
+                          min="1"
+                          value={item.qty}
+                          onChange={(e) => handleTextFieldQuantityChange(item, e.target.value)}
+                          className="h-8 w-16 text-center"
+                        />
+                        
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => incrementQuantity(item)}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                        
+                        <span className="text-sm text-muted-foreground mx-2">x {formatIDR(item.unitPrice)}</span>
+                        
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveItem(item)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10 ml-auto"
+                        >
+                          {lang === 'id' ? 'Hapus' : 'Remove'}
+                        </Button>
+                      </div>
+                      
                       <div className="flex justify-between items-center mt-1">
-                        <span className="text-sm">{item.qty} x {formatIDR(item.unitPrice)}</span>
+                        <span className="text-sm font-medium">
+                          {lang === 'id' ? 'Subtotal:' : 'Subtotal:'}
+                        </span>
                         <span className="font-medium">{formatIDR(item.qty * item.unitPrice)}</span>
                       </div>
                     </div>

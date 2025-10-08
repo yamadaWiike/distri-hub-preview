@@ -82,6 +82,16 @@ export function mapDBProductToProduct(
   regionPricing: RegionPricingFromDB[],
   variants?: GenericVariant[] // Using generic interface to handle both old and new variant formats
 ): Product {
+  // Debug logging for UOM data
+  if (dbProduct.moq_uom && dbProduct.moq_uom !== 'pcs') {
+    console.log(`Product ${dbProduct.name} has UOM in mapDBProductToProduct:`, {
+      name: dbProduct.name,
+      moq_uom: dbProduct.moq_uom,
+      pricing_uom: dbProduct.pricing_uom,
+      base_uom: dbProduct.base_uom
+    });
+  }
+
   return {
     id: dbProduct.id, // Using actual UUID as ID for better compatibility
     sku: dbProduct.sku, // Add SKU separately
@@ -96,6 +106,11 @@ export function mapDBProductToProduct(
     stock: dbProduct.stock_quantity || 0,
     image: dbProduct.image_url,
     hasVariants: (dbProduct.variant_count || 0) > 0,
+    // UOM fields
+    base_uom: dbProduct.base_uom,
+    moq_uom: dbProduct.moq_uom,
+    pricing_uom: dbProduct.pricing_uom,
+    enable_uom_conversions: dbProduct.enable_uom_conversions,
     // Handle both new variant view format and old product_variants format
     variants: variants?.map(variant => ({
       id: variant.id,
@@ -109,7 +124,9 @@ export function mapDBProductToProduct(
     regions: regionPricing.map(region => ({
       area: region.area,
       distributorPrice: region.distributor_price,
-      moq: region.moq
+      moq: region.moq,
+      moq_uom: region.moq_uom,
+      price_uom: region.price_uom
     }))
   };
 }
@@ -413,6 +430,29 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
       const productRegions = (regionPricing as RegionPricingDB[])
         .filter((r) => r.product_id === dbProduct.id);
       
+      // Debug logging for products with UOM
+      if (dbProduct.moq_uom && dbProduct.moq_uom !== 'pcs') {
+        console.log(`fetchProductsWithVariants - Product ${dbProduct.name} has UOM:`, {
+          name: dbProduct.name,
+          moq_uom: dbProduct.moq_uom,
+          pricing_uom: dbProduct.pricing_uom,
+          base_uom: dbProduct.base_uom
+        });
+      }
+      
+      // Debug the database UOM values for Gula Kapas
+      if (dbProduct.name === 'Gula Kapas') {
+        console.log(`Database UOM values for ${dbProduct.name}:`, {
+          product_moq_uom: dbProduct.moq_uom,
+          product_pricing_uom: dbProduct.pricing_uom,
+          regions: productRegions.map(r => ({
+            area: r.area,
+            regional_moq_uom: r.moq_uom,
+            regional_price_uom: r.price_uom
+          }))
+        });
+      }
+      
       return {
         id: dbProduct.id,
         category: dbProduct.category,
@@ -430,14 +470,30 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
         moq_uom: dbProduct.moq_uom || 'pcs',
         pricing_uom: dbProduct.pricing_uom || 'pcs',
         enable_uom_conversions: dbProduct.enable_uom_conversions || false,
-        regions: productRegions.map((region) => ({
-          area: region.area,
-          distributorPrice: region.distributor_price,
-          moq: region.moq,
-          // UOM fields for regional pricing
-          price_uom: region.price_uom || 'pcs',
-          moq_uom: region.moq_uom || 'pcs'
-        }))
+        regions: productRegions.map((region) => {
+          const mappedRegion = {
+            area: region.area,
+            distributorPrice: region.distributor_price,
+            moq: region.moq,
+            // UOM fields for regional pricing - inherit from product if not set regionally
+            price_uom: region.price_uom || dbProduct.pricing_uom || 'pcs',
+            moq_uom: region.moq_uom || dbProduct.moq_uom || 'pcs'
+          };
+          
+          // Debug the mapping for Gula Kapas
+          if (dbProduct.name === 'Gula Kapas') {
+            console.log(`Mapped region ${region.area}:`, {
+              original_moq_uom: region.moq_uom,
+              original_price_uom: region.price_uom,
+              product_moq_uom: dbProduct.moq_uom,
+              product_pricing_uom: dbProduct.pricing_uom,
+              final_moq_uom: mappedRegion.moq_uom,
+              final_price_uom: mappedRegion.price_uom
+            });
+          }
+          
+          return mappedRegion;
+        })
       };
     });
   } catch (error) {
@@ -449,11 +505,25 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
 // Get all products with their region pricing
 export async function getAllProducts(): Promise<Product[]> {
   try {
-    // Fetch all products with brand and category names
+    // Fetch all products with brand and category names - explicitly select UOM fields
     const { data: productsData, error: productsError } = await supabase
       .from('products')
       .select(`
-        *,
+        id,
+        sku,
+        name,
+        size,
+        base_distributor_price,
+        consumer_price,
+        base_moq,
+        description,
+        image_url,
+        stock_quantity,
+        has_variants,
+        base_uom,
+        moq_uom,
+        pricing_uom,
+        enable_uom_conversions,
         brands(name),
         product_categories(name)
       `);
@@ -628,6 +698,11 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
           // Create a separate product entry for each variant
           for (const variant of variants) {
             console.log(`Creating variant product for: ${variant.variantName}`);
+            console.log(`Base product UOM for ${product.name}:`, {
+              moq_uom: product.moq_uom,
+              pricing_uom: product.pricing_uom,
+              base_uom: product.base_uom
+            });
             const variantProduct: ProductWithVariant = {
               ...product,
               // Create a unique ID for the variant product entry
@@ -644,12 +719,20 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
               // Update pricing to include variant additional price
               distributorPrice: product.distributorPrice + variant.additionalPrice,
               consumerPrice: product.consumerPrice + variant.additionalPrice,
-              // Update regional pricing to include variant additional price
+              // Update regional pricing to include variant additional price while preserving UOM
               regions: product.regions.map(region => ({
                 ...region,
-                distributorPrice: region.distributorPrice + variant.additionalPrice
+                distributorPrice: region.distributorPrice + variant.additionalPrice,
+                // Ensure UOM fields are preserved from parent product's regional pricing
+                moq_uom: region.moq_uom || product.moq_uom,
+                price_uom: region.price_uom || product.pricing_uom
               }))
             };
+            console.log(`Final variant product UOM for ${variantProduct.displayName}:`, {
+              moq_uom: variantProduct.moq_uom,
+              pricing_uom: variantProduct.pricing_uom,
+              base_uom: variantProduct.base_uom
+            });
             expandedProducts.push(variantProduct);
           }
         } else {

@@ -9,6 +9,7 @@ import {
   SheetClose
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ShoppingCart, X, Minus, Plus, Trash2 } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
 import { useLanguage } from "@/hooks/use-language";
@@ -29,6 +30,20 @@ export function ModernCartDrawer() {
     console.log('Navigating to checkout');
     setIsOpen(false);
     navigate('/checkout');
+  };
+
+  const handleQuantityChange = (itemId: string, province: string, newQty: number, variantId?: string) => {
+    if (newQty < 1) {
+      return; // Prevent zero or negative quantities
+    }
+    updateQuantity(itemId, province, newQty, variantId);
+  };
+
+  const handleTextFieldQuantityChange = (itemId: string, province: string, inputValue: string, variantId?: string) => {
+    const newQty = parseInt(inputValue);
+    if (!isNaN(newQty) && newQty >= 1) {
+      handleQuantityChange(itemId, province, newQty, variantId);
+    }
   };
 
   return (
@@ -53,18 +68,11 @@ export function ModernCartDrawer() {
       </SheetTrigger>
       <SheetContent className="w-full sm:max-w-md flex flex-col">
         <SheetHeader className="border-b pb-4">
-          <div className="flex items-center justify-between">
-            <SheetTitle className="flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5" />
-              {t.cart}
-              {totalItems > 0 && <span className="text-muted-foreground">({totalItems} {t.items})</span>}
-            </SheetTitle>
-            <SheetClose asChild>
-              <Button variant="ghost" size="icon" className="rounded-full">
-                <X className="h-4 w-4" />
-              </Button>
-            </SheetClose>
-          </div>
+          <SheetTitle className="flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5" />
+            {t.cart}
+            {totalItems > 0 && <span className="text-muted-foreground">({totalItems} {t.items})</span>}
+          </SheetTitle>
         </SheetHeader>
         
         {/* Cart Content */}
@@ -83,7 +91,7 @@ export function ModernCartDrawer() {
           ) : (
             <div className="space-y-4">
               {items.map((item) => (
-                <div key={`${item.id}-${item.province}`} className="flex gap-4 py-2 border-b">
+                <div key={`${item.id}-${item.province}-${item.variant?.id || 'no-variant'}`} className="flex gap-4 py-2 border-b">
                   {item.image && (
                     <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
@@ -91,30 +99,40 @@ export function ModernCartDrawer() {
                   )}
                   
                   <div className="flex-grow">
-                    <h3 className="font-semibold">{item.name}</h3>
+                    <h3 className="font-semibold">
+                      {item.name}
+                      {item.variant && <span className="text-sm text-muted-foreground ml-1">({item.variant.name})</span>}
+                    </h3>
                     <p className="text-gray-600 text-sm">
                       {item.size} • {formatIDR(item.unitPrice)}
                     </p>
+                    <p className="text-gray-500 text-xs">{item.province}</p>
                     
                     <div className="flex items-center justify-between mt-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <Button 
                           variant="outline" 
                           size="icon"
                           className="h-8 w-8"
-                          onClick={() => updateQuantity(item.id, item.province, item.qty - 1)}
+                          onClick={() => handleQuantityChange(item.id, item.province, item.qty - 1, item.variant?.id)}
                           disabled={item.qty <= 1}
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
                         
-                        <span className="w-8 text-center">{item.qty}</span>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={item.qty}
+                          onChange={(e) => handleTextFieldQuantityChange(item.id, item.province, e.target.value, item.variant?.id)}
+                          className="h-8 w-20 text-center"
+                        />
                         
                         <Button 
                           variant="outline" 
                           size="icon"
                           className="h-8 w-8"
-                          onClick={() => updateQuantity(item.id, item.province, item.qty + 1)}
+                          onClick={() => handleQuantityChange(item.id, item.province, item.qty + 1, item.variant?.id)}
                         >
                           <Plus className="h-3 w-3" />
                         </Button>
@@ -123,11 +141,16 @@ export function ModernCartDrawer() {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        onClick={() => removeItem(item.id, item.province)}
+                        onClick={() => removeItem(item.id, item.province, item.variant?.id)}
                         className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-100"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
+                    </div>
+                    
+                    <div className="flex justify-between items-center mt-1">
+                      <span className="text-sm text-muted-foreground">Subtotal:</span>
+                      <span className="font-medium text-sm">{formatIDR(item.qty * item.unitPrice)}</span>
                     </div>
                   </div>
                 </div>
