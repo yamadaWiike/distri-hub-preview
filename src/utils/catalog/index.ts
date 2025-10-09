@@ -19,6 +19,7 @@
 import { jsPDF } from "jspdf";
 import { format } from 'date-fns';
 import { Product } from "@/data/products";
+import { ProductWithVariant } from "@/services/product-service";
 
 /**
  * Format a number as Indonesian Rupiah currency.
@@ -28,16 +29,36 @@ import { Product } from "@/data/products";
 const formatRp = (n?: number) =>
   n === undefined ? "-" : `Rp${n.toLocaleString("id-ID")}`;
 
+/**
+ * Get the appropriate UOM for MOQ display
+ * @param product - Product object
+ * @param region - Optional region data
+ * @returns UOM string for MOQ
+ */
+const getMoqUom = (product: ProductWithVariant, region?: { moq_uom?: string }) => {
+  return product.moq_uom && product.moq_uom !== 'pcs' ? product.moq_uom : (region?.moq_uom || 'pcs');
+};
+
+/**
+ * Get the appropriate UOM for pricing display
+ * @param product - Product object  
+ * @param region - Optional region data
+ * @returns UOM string for pricing
+ */
+const getPricingUom = (product: ProductWithVariant, region?: { price_uom?: string }) => {
+  return product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (region?.price_uom || 'pcs');
+};
+
 const today = format(new Date(), 'dd/MM/yy');
 
 /**
  * Parameters for generating a catalog PDF.
- * @property products - Array of Product objects to include in the catalog.
+ * @property products - Array of ProductWithVariant objects to include in the catalog.
  * @property distributionArea - (Optional) The area where the catalog will be distributed.
  * @property fileName - (Optional) The desired name for the generated PDF file.
  */
 type GenerateCatalogPDF = {
-  products: Product[];
+  products: ProductWithVariant[];
   distributionArea?: string;
   fileName?: string;
 }
@@ -127,7 +148,7 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
    * @param x X coordinate (mm)
    * @param y Y coordinate (mm)
    */
-  function renderCard(p: Product, x: number, y: number) {
+  function renderCard(p: ProductWithVariant, x: number, y: number) {
     const cardW = cardWidth;     // card width (mm)
     const cardH = cardHeight;    // card height (mm)
     const pad = 2;               // inner padding
@@ -218,13 +239,17 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
       return nextY; // next block Y
     };
 
+    // Get UOM values for this product
+    const moqUom = getMoqUom(p);
+    const pricingUom = getPricingUom(p);
+    
     // Left column
-    leftY = renderBlock(leftX, leftY, "Harga Distributor", formatRp(p?.distributorPrice), "per karton");
-    leftY = renderBlock(leftX, leftY, "Margin Distributor", `${p?.margin ? p.margin + "%" : "-"}`, "Rp24.000/karton");
-    leftY = renderBlock(leftX, leftY, "MOQ", `${p?.moq ?? "-"}`, "karton");
+    leftY = renderBlock(leftX, leftY, "Harga Distributor", formatRp(p?.distributorPrice), pricingUom !== 'pcs' ? `per ${pricingUom}` : "per pcs");
+    leftY = renderBlock(leftX, leftY, "Margin Distributor", `${p?.margin ? p.margin + "%" : "-"}`, `Rp24.000/${pricingUom !== 'pcs' ? pricingUom : 'pcs'}`);
+    leftY = renderBlock(leftX, leftY, "MOQ", `${p?.moq ?? "-"}`, moqUom);
 
     // Right column
-    rightY = renderBlock(rightX, rightY, "Harga Konsumen", formatRp(p?.consumerPrice), "per karton");
+    rightY = renderBlock(rightX, rightY, "Harga Konsumen", formatRp(p?.consumerPrice), pricingUom !== 'pcs' ? `per ${pricingUom}` : "per pcs");
     rightY = renderBlock(rightX, rightY, "Isi Per Karton", `${p?.units ?? "-"}`, "pieces");
 
     // Format regions for display - show first area and count if more exist

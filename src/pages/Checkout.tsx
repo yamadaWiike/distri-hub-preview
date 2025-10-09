@@ -440,24 +440,24 @@ You can view this order in the admin panel using Order Number: ${orderNumber}
         description={lang === 'id' ? "Selesaikan pembelian Anda" : "Complete your purchase"} 
       />
       <Navbar />
-      <main className="container max-w-6xl mx-auto py-10 px-4">
-        <h1 className="text-3xl font-bold mb-8">
+      <main className="container max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-6 lg:mb-8">
           {t.checkoutTitle}
         </h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 xl:gap-8">
           {/* Order Summary */}
-          <div className="lg:col-span-1 order-2 lg:order-1">
-            <div className="border rounded-lg p-6 bg-white">
-              <h2 className="text-xl font-semibold mb-4">
+          <div className="lg:col-span-4 order-2 lg:order-1 w-full">
+            <div className="border rounded-lg p-3 sm:p-4 lg:p-6 bg-white shadow-sm sticky top-6 w-full max-w-full overflow-hidden">
+              <h2 className="text-lg sm:text-xl font-semibold mb-4">
                 {t.orderSummary}
               </h2>
               
-              <div className="space-y-4">
+              <div className="space-y-3 max-w-full">
                 {items.map((item) => (
-                  <div key={`${item.id}-${item.province}-${item.variant?.id || 'no-variant'}`} className="flex gap-3 pb-3 border-b">
+                  <div key={`${item.id}-${item.province}-${item.variant?.id || 'no-variant'}`} className="flex gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-gray-50 w-full overflow-hidden">
                     {item.image && (
-                      <div className="w-16 h-16 border rounded overflow-hidden flex-shrink-0">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 lg:w-16 lg:h-16 border rounded overflow-hidden flex-shrink-0">
                         <img 
                           src={item.image} 
                           alt={item.name} 
@@ -465,95 +465,98 @@ You can view this order in the admin panel using Order Number: ${orderNumber}
                         />
                       </div>
                     )}
-                    <div className="flex-1">
-                      <div className="font-medium">
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <div className="font-medium text-xs sm:text-sm lg:text-base truncate max-w-full">
                         {item.name} - {item.size}
-                        {item.variant && <span className="text-sm text-muted-foreground ml-1">({item.variant.name})</span>}
+                        {item.variant && <span className="text-xs text-muted-foreground ml-1 block sm:inline">({item.variant.name})</span>}
                       </div>
-                      <div className="text-sm text-muted-foreground">{item.province}</div>
+                      <div className="text-xs text-muted-foreground truncate">{item.province}</div>
                       
                       {/* Quantity Controls */}
-                      <div className="flex items-center gap-2 mt-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => decrementQuantity(item)}
-                          disabled={item.qty <= 1}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
+                      <div className="flex items-center gap-1 mt-2 flex-wrap">
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-6 w-6 sm:h-7 sm:w-7 p-0 flex-shrink-0"
+                            onClick={() => decrementQuantity(item)}
+                            disabled={item.qty <= 1}
+                          >
+                            <Minus className="h-2 w-2 sm:h-3 sm:w-3" />
+                          </Button>
+                          
+                          <Input
+                            type="number"
+                            min="1"
+                            value={item.qty}
+                            onChange={(e) => handleTextFieldQuantityChange(item, e.target.value)}
+                            className="h-6 w-16 sm:h-7 sm:w-20 text-center text-xs flex-shrink-0"
+                          />
+                          
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-6 w-6 sm:h-7 sm:w-7 p-0 flex-shrink-0"
+                            onClick={() => incrementQuantity(item)}
+                          >
+                            <Plus className="h-2 w-2 sm:h-3 sm:w-3" />
+                          </Button>
+                        </div>
                         
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.qty}
-                          onChange={(e) => handleTextFieldQuantityChange(item, e.target.value)}
-                          className="h-8 w-16 text-center"
-                        />
-                        
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => incrementQuantity(item)}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                        
-                        <span className="text-sm text-muted-foreground mx-2">x {formatIDR(item.unitPrice)}</span>
+                        <span className="text-xs text-muted-foreground truncate min-w-0">x {formatIDR(item.unitPrice)}</span>
                         
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveItem(item)}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10 ml-auto"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10 ml-auto text-xs h-6 px-2 flex-shrink-0"
                         >
                           {lang === 'id' ? 'Hapus' : 'Remove'}
                         </Button>
                       </div>
                       
-                      <div className="flex justify-between items-center mt-1">
-                        <span className="text-sm font-medium">
+                      <div className="flex justify-between items-center mt-2 min-w-0">
+                        <span className="text-xs font-medium truncate">
                           {lang === 'id' ? 'Subtotal:' : 'Subtotal:'}
                         </span>
-                        <span className="font-medium">{formatIDR(item.qty * item.unitPrice)}</span>
+                        <span className="font-medium text-xs sm:text-sm flex-shrink-0">{formatIDR(item.qty * item.unitPrice)}</span>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
               
-              <div className="mt-6 space-y-2">
+              <div className="mt-4 lg:mt-6 space-y-3 pt-4 border-t">
                 <div className="flex justify-between text-sm">
-                  <span>{t.subtotal}</span>
-                  <span className="font-medium">{formatIDR(totalAmount)}</span>
+                  <span className="truncate">{t.subtotal}</span>
+                  <span className="font-medium flex-shrink-0">{formatIDR(totalAmount)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span>{t.shipping}</span>
-                  <span className="font-medium">{t.shippingCalculatedLater}</span>
+                  <span className="truncate">{t.shipping}</span>
+                  <span className="font-medium text-muted-foreground text-xs lg:text-sm flex-shrink-0">{t.shippingCalculatedLater}</span>
                 </div>
-                <div className="flex justify-between font-semibold text-lg pt-2 border-t mt-2">
-                  <span>{t.total}</span>
-                  <span>{formatIDR(totalAmount)}</span>
+                <div className="flex justify-between font-semibold text-base lg:text-lg pt-3 border-t">
+                  <span className="truncate">{t.total}</span>
+                  <span className="flex-shrink-0">{formatIDR(totalAmount)}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Checkout Form */}
-          <div className="lg:col-span-2 order-1 lg:order-2">
-            <form onSubmit={handleSubmit} className="border rounded-lg p-6 bg-white">
-              <h2 className="text-xl font-semibold mb-4">
+          <div className="lg:col-span-8 order-1 lg:order-2 w-full min-w-0">
+            <form onSubmit={handleSubmit} className="border rounded-lg p-4 sm:p-6 bg-white shadow-sm w-full max-w-full overflow-hidden">
+              <h2 className="text-lg sm:text-xl font-semibold mb-6">
                 {t.deliveryDetails}
               </h2>
               
-              <div className="space-y-4">
-                <div className="space-y-3 mb-5 pb-3 border-b">
-                  <h3 className="font-semibold">
+              <div className="space-y-6">
+                {/* Address Type Selection */}
+                <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h3 className="font-semibold text-blue-900">
                     {lang === 'id' ? 'Pilih Alamat Pengiriman' : 'Select Shipping Address'} *
                   </h3>
                   
@@ -572,101 +575,129 @@ You can view this order in the admin panel using Order Number: ${orderNumber}
                         }
                       }
                     }}
+                    className="grid grid-cols-1 sm:grid-cols-2 gap-4"
                   >
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-3 p-3 border border-blue-200 rounded-lg bg-white hover:bg-blue-25 transition-colors">
                       <RadioGroupItem value="default" id="default_address" />
-                      <Label htmlFor="default_address">
+                      <Label htmlFor="default_address" className="cursor-pointer font-medium">
                         {lang === 'id' ? 'Alamat Utama' : 'Default Address'}
                       </Label>
                     </div>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-3 p-3 border border-blue-200 rounded-lg bg-white hover:bg-blue-25 transition-colors">
                       <RadioGroupItem value="warehouse" id="warehouse_address" />
-                      <Label htmlFor="warehouse_address">
+                      <Label htmlFor="warehouse_address" className="cursor-pointer font-medium">
                         {lang === 'id' ? 'Alamat Gudang' : 'Warehouse Address'}
                       </Label>
                     </div>
                   </RadioGroup>
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">
-                      {t.fullName} *
-                    </Label>
-                    <Input 
-                      id="fullName" 
-                      value={deliveryDetails.fullName}
-                      onChange={(e) => updateDeliveryDetails("fullName", e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">
-                      {t.phoneNumber} *
-                    </Label>
-                    <Input 
-                      id="phone" 
-                      type="tel"
-                      value={deliveryDetails.phone}
-                      onChange={(e) => updateDeliveryDetails("phone", e.target.value)}
-                      required
-                    />
+                {/* Contact Information */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-gray-900 border-b pb-2">
+                    {lang === 'id' ? 'Informasi Kontak' : 'Contact Information'}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="fullName" className="text-sm font-medium">
+                        {t.fullName} *
+                      </Label>
+                      <Input 
+                        id="fullName" 
+                        value={deliveryDetails.fullName}
+                        onChange={(e) => updateDeliveryDetails("fullName", e.target.value)}
+                        required
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="text-sm font-medium">
+                        {t.phoneNumber} *
+                      </Label>
+                      <Input 
+                        id="phone" 
+                        type="tel"
+                        value={deliveryDetails.phone}
+                        onChange={(e) => updateDeliveryDetails("phone", e.target.value)}
+                        required
+                        className="w-full"
+                      />
+                    </div>
                   </div>
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="address">
-                    {t.fullAddress} *
-                  </Label>
-                  <Textarea 
-                    id="address" 
-                    rows={3}
-                    value={deliveryDetails.address}
-                    onChange={(e) => updateDeliveryDetails("address", e.target.value)}
-                    required
-                  />
-                </div>
+                {/* Shipping Address */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-gray-900 border-b pb-2">
+                    {lang === 'id' ? 'Alamat Pengiriman' : 'Shipping Address'}
+                  </h3>
+                  <div className="space-y-2">
+                    <Label htmlFor="address" className="text-sm font-medium">
+                      {t.fullAddress} *
+                    </Label>
+                    <Textarea 
+                      id="address" 
+                      rows={3}
+                      value={deliveryDetails.address}
+                      onChange={(e) => updateDeliveryDetails("address", e.target.value)}
+                      required
+                      className="w-full resize-none"
+                      placeholder={lang === 'id' ? 'Masukkan alamat lengkap...' : 'Enter complete address...'}
+                    />
+                  </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="city">
-                      {t.city} *
-                    </Label>
-                    <Input 
-                      id="city" 
-                      value={deliveryDetails.city}
-                      onChange={(e) => updateDeliveryDetails("city", e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="postalCode">
-                      {t.postalCode}
-                    </Label>
-                    <Input 
-                      id="postalCode" 
-                      value={deliveryDetails.postalCode}
-                      onChange={(e) => updateDeliveryDetails("postalCode", e.target.value)}
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="city" className="text-sm font-medium">
+                        {t.city} *
+                      </Label>
+                      <Input 
+                        id="city" 
+                        value={deliveryDetails.city}
+                        onChange={(e) => updateDeliveryDetails("city", e.target.value)}
+                        required
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="postalCode" className="text-sm font-medium">
+                        {t.postalCode}
+                      </Label>
+                      <Input 
+                        id="postalCode" 
+                        value={deliveryDetails.postalCode}
+                        onChange={(e) => updateDeliveryDetails("postalCode", e.target.value)}
+                        className="w-full"
+                        placeholder="12345"
+                      />
+                    </div>
                   </div>
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="notes">
-                    {t.additionalNotes}
-                  </Label>
-                  <Textarea 
-                    id="notes" 
-                    rows={2}
-                    value={deliveryDetails.notes}
-                    onChange={(e) => updateDeliveryDetails("notes", e.target.value)}
-                  />
+                {/* Additional Notes */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-gray-900 border-b pb-2">
+                    {lang === 'id' ? 'Catatan Tambahan' : 'Additional Notes'}
+                  </h3>
+                  <div className="space-y-2">
+                    <Label htmlFor="notes" className="text-sm font-medium">
+                      {t.additionalNotes}
+                    </Label>
+                    <Textarea 
+                      id="notes" 
+                      rows={3}
+                      value={deliveryDetails.notes}
+                      onChange={(e) => updateDeliveryDetails("notes", e.target.value)}
+                      className="w-full resize-none"
+                      placeholder={lang === 'id' ? 'Catatan khusus untuk pengiriman...' : 'Special notes for delivery...'}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-8">
-                <Button type="submit" className="w-full">
-                  {lang === 'id' ? 'Pesan' : 'Order'}
+              <div className="mt-8 pt-6 border-t">
+                <Button type="submit" size="lg" className="w-full">
+                  {lang === 'id' ? 'Pesan Sekarang' : 'Place Order'}
                 </Button>
               </div>
             </form>

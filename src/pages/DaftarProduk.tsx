@@ -557,6 +557,57 @@ export default function DaftarProduk() {
     return filteredProducts.slice(startIndex, startIndex + productsPerPage);
   }, [currentPage, filteredProducts, productsPerPage]);
 
+  // Check if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    return !!(searchQuery.trim() || area || selectedBrand || 
+             priceRange[0] > 0 || priceRange[1] < 1000000);
+  }, [searchQuery, area, selectedBrand, priceRange]);
+
+  // Export catalog function that respects filters
+  const exportFilteredCatalog = async () => {
+    try {
+      let productsToExport: ProductWithVariant[];
+      
+      if (hasActiveFilters) {
+        // Use filtered products if filters are active
+        productsToExport = filteredProducts;
+        console.log(`Exporting filtered catalog with ${filteredProducts.length} products`);
+      } else {
+        // Fetch ALL products from database if no filters are active
+        console.log('No filters active, fetching all products from database...');
+        const allProducts = await fetchProductsExpandedByVariants();
+        productsToExport = allProducts;
+        console.log(`Exporting complete catalog with ${allProducts.length} products`);
+      }
+
+      // Generate the catalog with the appropriate product set
+      const fileName = hasActiveFilters 
+        ? `baskit-catalog-filtered-${new Date().toISOString().slice(0, 10)}`
+        : `baskit-catalog-complete-${new Date().toISOString().slice(0, 10)}`;
+        
+      await generateCatalogPDF({ 
+        products: productsToExport, 
+        distributionArea: area || 'Semua Area',
+        fileName: fileName
+      });
+
+      // Show success toast
+      toast({
+        title: lang === 'id' ? 'Katalog Berhasil Diunduh' : 'Catalog Successfully Downloaded',
+        description: lang === 'id' 
+          ? `Katalog ${hasActiveFilters ? 'terfilter' : 'lengkap'} dengan ${productsToExport.length} produk berhasil diunduh`
+          : `${hasActiveFilters ? 'Filtered' : 'Complete'} catalog with ${productsToExport.length} products successfully downloaded`,
+      });
+    } catch (error) {
+      console.error('Error exporting catalog:', error);
+      toast({
+        title: lang === 'id' ? 'Gagal mengunduh katalog' : 'Failed to download catalog',
+        description: lang === 'id' ? 'Terjadi kesalahan saat mengunduh katalog' : 'An error occurred while downloading the catalog',
+        variant: "destructive",
+      });
+    }
+  };
+
   // Baskit brand colors
   const COLORS = {
     tealGreen: [0, 104, 90], // #00685A - Primary color
@@ -1270,7 +1321,7 @@ export default function DaftarProduk() {
               <div className="flex flex-col md:flex-row gap-2">
                 <Button 
                   variant="outline" 
-                  onClick={()=> generateCatalogPDF({ products: currentProducts, distributionArea: area || 'Semua Area' })}
+                  onClick={exportFilteredCatalog}
                   className="w-full md:w-auto flex items-center justify-center"
                 >
                   <svg className="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
