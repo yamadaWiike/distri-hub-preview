@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from './types';
+import type { ExtendedDatabase } from './extended-types';
 
 // Using environment variables for security
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
@@ -13,7 +13,7 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const supabase = createClient<ExtendedDatabase>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,

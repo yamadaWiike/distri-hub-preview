@@ -17,6 +17,10 @@ import { translations } from "@/lib/translations";
 import { useToast } from "@/components/ui/use-toast";
 import { getAllProducts, getAllAreas, getAllBrands, fetchProductsWithVariants, fetchProductsExpandedByVariants, ProductWithVariant } from "@/services/product-service";
 import { generateCatalogPDF } from "@/utils/catalog";
+import { supabase } from "@/integrations/supabase/client";
+
+// Import the analytics helper
+import { trackCatalogExport } from "@/utils/analytics";
 
 // Cache duration constant
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
@@ -871,6 +875,26 @@ export default function DaftarProduk() {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
+      
+      // Track catalog export for analytics
+      try {
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        
+        if (userError) {
+          console.error('Error getting user for analytics:', userError);
+        } else if (userData?.user) {
+          // Use the helper function to track the export
+          await trackCatalogExport(
+            userData.user.id,
+            filteredProducts.length,
+            area || 'all',
+            selectedBrand || null,
+            priceRange
+          );
+        }
+      } catch (error) {
+        console.error('Error in catalog export analytics:', error);
+      }
       
       // Group products by category
       const groupedProducts: Record<string, ProductWithVariant[]> = {};
