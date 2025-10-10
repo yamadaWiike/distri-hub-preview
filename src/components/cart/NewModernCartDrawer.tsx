@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Sheet,
@@ -10,13 +10,95 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShoppingCart, X, Minus, Plus, Trash2 } from "lucide-react";
+import { ShoppingCart, X, Minus, Plus, Trash2, AlertCircle } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 import { Badge } from "@/components/ui/badge";
 import { formatIDR } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CartItem } from "@/contexts/CartContextDefinition";
+
+// Helper function to check if there are enough mixed variants in the cart to meet MOQ
+function checkMixedVariantsMOQ(
+  items: CartItem[], 
+  productId: string, 
+  province: string, 
+  skuLevelMoq: number
+): {
+  hasEnoughItems: boolean;
+  currentTotal: number;
+  neededToReachMOQ: number;
+  productName: string;
+} {
+  // Find all items in cart with the same base productId and province
+  const matchingItems = items.filter(
+    item => item.id === productId && item.province === province
+  );
+  
+  // Get the product name from any of the matching items
+  const productName = matchingItems.length > 0 ? matchingItems[0].name : 'Unknown Product';
+  
+  // Sum up quantities of all matching items (variants of same product)
+  const totalQuantity = matchingItems.reduce((sum, item) => sum + item.qty, 0);
+  
+  // Determine if we have enough items
+  const hasEnoughItems = totalQuantity >= skuLevelMoq;
+  const neededToReachMOQ = Math.max(0, skuLevelMoq - totalQuantity);
+  
+  return {
+    hasEnoughItems,
+    currentTotal: totalQuantity,
+    neededToReachMOQ,
+    productName
+  };
+}
+
+// Identify unique products with variants in the cart
+function identifyMixVariantProducts(items: CartItem[]): Map<string, { 
+  productId: string; 
+  province: string; 
+  variants: CartItem[];
+  skuLevelMoq: number;
+  allowMixVariants: boolean;
+}> {
+  // Group cart items by product ID and province
+  const productMap = new Map();
+  
+  // First pass: identify products with variants
+  items.forEach(item => {
+    if (item.variant) {
+      const key = `${item.id}|${item.province}`;
+      
+      if (!productMap.has(key)) {
+        productMap.set(key, {
+          productId: item.id,
+          province: item.province,
+          variants: [],
+          // These would normally come from product data, but for now let's assume
+          // every product with variants has a skuLevelMoq of the first variant's moq value
+          // This should be replaced with actual values from the product
+          skuLevelMoq: item.skuLevelMoq || item.moq,
+          allowMixVariants: item.allowMixVariants || false
+        });
+      }
+      
+      // Store reference to item for easier access later
+      productMap.get(key).variants.push(item);
+      
+      // Update skuLevelMoq and allowMixVariants if they exist on the item
+      if (item.skuLevelMoq) {
+        productMap.get(key).skuLevelMoq = item.skuLevelMoq;
+      }
+      if (item.allowMixVariants !== undefined) {
+        productMap.get(key).allowMixVariants = item.allowMixVariants;
+      }
+    }
+  });
+  
+  return productMap;
+}
 
 export function ModernCartDrawer() {
   const { items, totalItems, totalAmount, updateQuantity, removeItem } = useCart();
@@ -26,7 +108,53 @@ export function ModernCartDrawer() {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   
+  // Identify products that have mixed variants and check if they meet their MOQ
+  const mixVariantValidation = useMemo(() => {
+    const mixVariantProducts = identifyMixVariantProducts(items);
+    const validationResults: { 
+      productId: string; 
+      province: string; 
+      productName: string;
+      isValid: boolean; 
+      currentTotal: number; 
+      neededMore: number;
+      skuLevelMoq: number;
+    }[] = [];
+    
+    mixVariantProducts.forEach((product, key) => {
+      // Only check products that allow mixing variants
+      if (product.allowMixVariants && product.skuLevelMoq > 0) {
+        const validation = checkMixedVariantsMOQ(
+          items,
+          product.productId,
+          product.province,
+          product.skuLevelMoq
+        );
+        
+        validationResults.push({
+          productId: product.productId,
+          province: product.province,
+          productName: validation.productName,
+          isValid: validation.hasEnoughItems,
+          currentTotal: validation.currentTotal,
+          neededMore: validation.neededToReachMOQ,
+          skuLevelMoq: product.skuLevelMoq
+        });
+      }
+    });
+    
+    return {
+      allValid: validationResults.every(r => r.isValid),
+      results: validationResults
+    };
+  }, [items]);
+  
   const handleCheckout = () => {
+    // Only allow checkout if all mixed variant MOQs are met
+    if (!mixVariantValidation.allValid) {
+      return;
+    }
+    
     console.log('Navigating to checkout');
     setIsOpen(false);
     navigate('/checkout');
@@ -159,6 +287,27 @@ export function ModernCartDrawer() {
           )}
         </div>
         
+        {/* Mixed Variants MOQ Validation */}
+        {!mixVariantValidation.allValid && mixVariantValidation.results.length > 0 && (
+          <div className="mb-4">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>{lang === 'id' ? 'MOQ Varian Belum Terpenuhi' : 'Mixed Variant MOQ Not Met'}</AlertTitle>
+              <AlertDescription>
+                <div className="mt-2 space-y-2">
+                  {mixVariantValidation.results.filter(r => !r.isValid).map((result, idx) => (
+                    <div key={`${result.productId}-${result.province}-warning-${idx}`} className="text-sm">
+                      <strong>{result.productName}</strong>: {lang === 'id' 
+                        ? `Total varian ${result.currentTotal}/${result.skuLevelMoq} (kurang ${result.neededMore} lagi)`
+                        : `Total variants ${result.currentTotal}/${result.skuLevelMoq} (need ${result.neededMore} more)`}
+                    </div>
+                  ))}
+                </div>
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+        
         {/* Cart Footer */}
         {items.length > 0 && (
           <div className="border-t pt-4">
@@ -167,9 +316,23 @@ export function ModernCartDrawer() {
               <span className="font-medium">{formatIDR(totalAmount)}</span>
             </div>
             
-            <Button className="w-full" onClick={handleCheckout}>
-              {t.checkout}
+            <Button 
+              className="w-full" 
+              onClick={handleCheckout}
+              disabled={!mixVariantValidation.allValid}
+            >
+              {!mixVariantValidation.allValid 
+                ? (lang === 'id' ? 'MOQ Varian Belum Terpenuhi' : 'Complete Mixed Variant MOQ First') 
+                : t.checkout}
             </Button>
+            
+            {!mixVariantValidation.allValid && (
+              <p className="text-xs text-center mt-2 text-muted-foreground">
+                {lang === 'id' 
+                  ? 'Tambahkan lebih banyak varian untuk memenuhi jumlah minimum pemesanan'
+                  : 'Add more variants to meet minimum order quantities'}
+              </p>
+            )}
           </div>
         )}
       </SheetContent>

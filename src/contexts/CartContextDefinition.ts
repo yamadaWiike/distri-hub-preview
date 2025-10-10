@@ -41,6 +41,10 @@ export type CartItem = {
   consumerPrice: number;
   /** Optional variant information */
   variant?: CartItemVariant;
+  /** SKU-level MOQ for mixed variants */
+  skuLevelMoq?: number;
+  /** Whether different variants can be mixed to meet MOQ */
+  allowMixVariants?: boolean;
 };
 
 /**

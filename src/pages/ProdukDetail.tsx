@@ -143,8 +143,8 @@ export default function ProdukDetail() {
             <div>
               <div className="text-xs text-muted-foreground">
                 {lang === 'id' ? 
-                  `Harga Konsumen${product.pricing_uom && product.pricing_uom !== 'pcs' ? ` (per ${product.pricing_uom})` : ' (per pcs)'}` : 
-                  `Consumer Price${product.pricing_uom && product.pricing_uom !== 'pcs' ? ` (per ${product.pricing_uom})` : ' (per pcs)'}`
+                  `Harga Pelanggan${product.pricing_uom && product.pricing_uom !== 'pcs' ? ` (per ${product.pricing_uom})` : ` (per ${product.pricing_uom || 'pcs'})`}` : 
+                  `Customer Price${product.pricing_uom && product.pricing_uom !== 'pcs' ? ` (per ${product.pricing_uom})` : ` (per ${product.pricing_uom || 'pcs'})`}`
                 }
               </div>
               <div className="text-lg font-medium">{formatIDR(product.consumerPrice)}</div>
@@ -207,6 +207,11 @@ export default function ProdukDetail() {
                     variant="hero" 
                     className="w-full mt-5" 
                     onClick={() => {
+                      // Get the regional and product mix variant settings
+                      const regional = product.regions.find(r => r.area === selectedArea) || product.regions[0];
+                      const allowMixVariants = Boolean(regional?.allowMixVariants === true || product.allowMixVariants === true);
+                      const skuLevelMoq = Number(regional?.skuLevelMoq || product.singleSkuMoq || 0);
+                      
                       addItem({
                         id: product.id, 
                         name: product.name, 
@@ -216,7 +221,12 @@ export default function ProdukDetail() {
                         unitPrice: usedPrice, 
                         moq: usedMoq, 
                         qty: qty, // Use exactly what the user specified 
-                        consumerPrice: product.consumerPrice
+                        consumerPrice: product.consumerPrice,
+                        // Add mix variant properties
+                        allowMixVariants: allowMixVariants,
+                        skuLevelMoq: skuLevelMoq,
+                        // Note: ProdukDetail currently doesn't handle variant information
+                        // This will be added when variant selection UI is implemented
                       });
                       
                       // Show toast notification

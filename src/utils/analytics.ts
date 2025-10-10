@@ -37,6 +37,38 @@ export type OrderStatus = 'pending' | 'processing' | 'confirmed' | 'shipped' | '
  * @param priceRange - Price range used [min, max]
  * @returns Promise with the result of the operation
  */
+/**
+ * Track when a catalog export is denied due to authentication requirements
+ * 
+ * @returns Promise with the result of the operation
+ */
+export async function trackDeniedCatalogExport() {
+  try {
+    const exportData = {
+      event_type: 'catalog_export_denied',
+      timestamp: new Date().toISOString(),
+      reason: 'not_authenticated',
+      ip_address: null // IP is collected by Supabase automatically in RLS policies
+    };
+    
+    // This requires that the analytics_events table exists in the database
+    // Using type assertion to work around Supabase's typing limitations
+    const { error } = await supabase
+      .from('analytics_events')
+      .insert(exportData as any);
+    
+    if (error) {
+      console.error('Error tracking denied catalog export:', error);
+      return { error } as AnalyticsResponse;
+    }
+    
+    return { success: true } as AnalyticsResponse;
+  } catch (error) {
+    console.error('Exception tracking denied catalog export:', error);
+    return { error } as AnalyticsResponse;
+  }
+}
+
 export async function trackCatalogExport(
   userId: string,
   productCount: number,

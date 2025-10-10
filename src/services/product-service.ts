@@ -19,12 +19,15 @@ export type ProductFromDB = {
   brands?: { name: string };
   product_categories?: { name: string };
   variant_count?: number;
-  has_variants?: boolean; // Add this field
+  has_variants?: boolean;
   // UOM fields
   base_uom?: string;
   moq_uom?: string;
   pricing_uom?: string;
   enable_uom_conversions?: boolean;
+  // Mix variants fields
+  single_sku_moq?: number;
+  allow_mix_variants?: boolean;
 };
 
 export type RegionPricingFromDB = {
@@ -36,6 +39,9 @@ export type RegionPricingFromDB = {
   moq_uom?: string;
   price_uom?: string;
   created_at?: string;
+  // Mix variants fields
+  sku_level_moq?: number;
+  allow_mix_variants?: boolean;
 };
 
 // Define the new DB structure for variants - updated to match actual schema
@@ -105,12 +111,15 @@ export function mapDBProductToProduct(
     description: dbProduct.description,
     stock: dbProduct.stock_quantity || 0,
     image: dbProduct.image_url,
-    hasVariants: (dbProduct.variant_count || 0) > 0,
+    hasVariants: dbProduct.variant_count ? dbProduct.variant_count > 0 : (dbProduct.has_variants || false),
     // UOM fields
     base_uom: dbProduct.base_uom,
     moq_uom: dbProduct.moq_uom,
     pricing_uom: dbProduct.pricing_uom,
     enable_uom_conversions: dbProduct.enable_uom_conversions,
+    // Mix variants fields
+    singleSkuMoq: dbProduct.single_sku_moq || 0,
+    allowMixVariants: dbProduct.allow_mix_variants || false,
     // Handle both new variant view format and old product_variants format
     variants: variants?.map(variant => ({
       id: variant.id,
@@ -126,7 +135,10 @@ export function mapDBProductToProduct(
       distributorPrice: region.distributor_price,
       moq: region.moq,
       moq_uom: region.moq_uom,
-      price_uom: region.price_uom
+      price_uom: region.price_uom,
+      // Mix variants fields for regions
+      skuLevelMoq: region.sku_level_moq || 0,
+      allowMixVariants: region.allow_mix_variants || false
     }))
   };
 }
@@ -295,6 +307,9 @@ interface ProductWithVariantCount {
   moq_uom?: string;
   pricing_uom?: string;
   enable_uom_conversions?: boolean;
+  // Mix variants fields
+  single_sku_moq?: number;
+  allow_mix_variants?: boolean;
 }
 
 interface RegionPricingDB {
@@ -306,6 +321,9 @@ interface RegionPricingDB {
   created_at?: string;
   price_uom?: string;
   moq_uom?: string;
+  // Mix variants fields
+  sku_level_moq?: number;
+  allow_mix_variants?: boolean;
 }
 
 // Define interface for fallback product data
@@ -324,6 +342,9 @@ interface FallbackProduct {
   moq_uom?: string;
   pricing_uom?: string;
   enable_uom_conversions?: boolean;
+  // Mix variants fields
+  single_sku_moq?: number;
+  allow_mix_variants?: boolean;
   brands?: { name: string };
   product_categories?: { name: string };
 }
@@ -350,7 +371,9 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
         base_uom,
         moq_uom,
         pricing_uom,
-        enable_uom_conversions
+        enable_uom_conversions,
+        single_sku_moq,
+        allow_mix_variants
       `);
     
     // Variable to hold our final products list
@@ -403,7 +426,10 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
         base_uom: p.base_uom || 'pcs',
         moq_uom: p.moq_uom || 'pcs',
         pricing_uom: p.pricing_uom || 'pcs',
-        enable_uom_conversions: p.enable_uom_conversions || false
+        enable_uom_conversions: p.enable_uom_conversions || false,
+        // Mix variants fields
+        single_sku_moq: p.single_sku_moq || 0,
+        allow_mix_variants: p.allow_mix_variants || false
       }));
     } else {
       // Use the view data if available
@@ -418,7 +444,7 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
     // Then get region pricing for all products
     const { data: regionPricing, error: regionError } = await supabase
       .from('region_pricing')
-      .select('id, product_id, area, distributor_price, moq, moq_uom, price_uom, created_at');
+      .select('id, product_id, area, distributor_price, moq, moq_uom, price_uom, sku_level_moq, allow_mix_variants, created_at');
     
     if (regionError || !regionPricing) {
       console.error('Error fetching region pricing:', regionError);
@@ -470,6 +496,9 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
         moq_uom: dbProduct.moq_uom || 'pcs',
         pricing_uom: dbProduct.pricing_uom || 'pcs',
         enable_uom_conversions: dbProduct.enable_uom_conversions || false,
+        // Mix variants fields
+        singleSkuMoq: dbProduct.single_sku_moq || 0,
+        allowMixVariants: dbProduct.allow_mix_variants || false,
         regions: productRegions.map((region) => {
           const mappedRegion = {
             area: region.area,
@@ -477,7 +506,10 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
             moq: region.moq,
             // UOM fields for regional pricing - inherit from product if not set regionally
             price_uom: region.price_uom || dbProduct.pricing_uom || 'pcs',
-            moq_uom: region.moq_uom || dbProduct.moq_uom || 'pcs'
+            moq_uom: region.moq_uom || dbProduct.moq_uom || 'pcs',
+            // Mix variants fields
+            skuLevelMoq: region.sku_level_moq || 0,
+            allowMixVariants: region.allow_mix_variants || false
           };
           
           // Debug the mapping for Gula Kapas
@@ -524,6 +556,8 @@ export async function getAllProducts(): Promise<Product[]> {
         moq_uom,
         pricing_uom,
         enable_uom_conversions,
+        single_sku_moq,
+        allow_mix_variants,
         brands(name),
         product_categories(name)
       `);
@@ -536,7 +570,7 @@ export async function getAllProducts(): Promise<Product[]> {
     // Fetch all region pricing
     const { data: regionsData, error: regionsError } = await supabase
       .from('region_pricing')
-      .select('id, product_id, area, distributor_price, moq, moq_uom, price_uom, created_at');
+      .select('id, product_id, area, distributor_price, moq, moq_uom, price_uom, sku_level_moq, allow_mix_variants, created_at');
       
     if (regionsError || !regionsData) {
       console.error('Error fetching region pricing:', regionsError);
@@ -588,7 +622,7 @@ export async function getProductById(id: string): Promise<Product | null> {
     // Fetch the region pricing for this product
     const { data: regions, error: regionsError } = await supabase
       .from('region_pricing')
-      .select('id, product_id, area, distributor_price, moq, moq_uom, price_uom, created_at')
+      .select('id, product_id, area, distributor_price, moq, moq_uom, price_uom, sku_level_moq, allow_mix_variants, created_at')
       .eq('product_id', typedProduct.id); // Always use product.id here
       
     if (regionsError || !regions) {
@@ -675,6 +709,9 @@ export interface ProductWithVariant extends Omit<Product, 'variants' | 'hasVaria
   isVariant: boolean;
   baseProductId: string; // For variant products, this points to the base product
   displayName: string; // Combined product name + variant name for variants
+  // Make sure these fields are also included and properly typed
+  singleSkuMoq?: number;
+  allowMixVariants?: boolean;
 }
 
 // Fetch products expanded by variants - each variant becomes a separate product entry
@@ -719,13 +756,19 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
               // Update pricing to include variant additional price
               distributorPrice: product.distributorPrice + variant.additionalPrice,
               consumerPrice: product.consumerPrice + variant.additionalPrice,
+              // Mix variant fields - inherit from base product
+              singleSkuMoq: product.singleSkuMoq || 0,
+              allowMixVariants: product.allowMixVariants || false,
               // Update regional pricing to include variant additional price while preserving UOM
               regions: product.regions.map(region => ({
                 ...region,
                 distributorPrice: region.distributorPrice + variant.additionalPrice,
                 // Ensure UOM fields are preserved from parent product's regional pricing
                 moq_uom: region.moq_uom || product.moq_uom,
-                price_uom: region.price_uom || product.pricing_uom
+                price_uom: region.price_uom || product.pricing_uom,
+                // Mix variant fields for regions - inherit from base region
+                skuLevelMoq: region.skuLevelMoq || 0,
+                allowMixVariants: region.allowMixVariants || false
               }))
             };
             console.log(`Final variant product UOM for ${variantProduct.displayName}:`, {

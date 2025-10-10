@@ -90,11 +90,143 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
-import { Trash2, Edit, Plus, X, Search, Loader2, RefreshCw } from 'lucide-react';
+import { Trash2, Edit, Plus, X, Search, Loader2, RefreshCw, Info } from 'lucide-react';
 import { useLanguage } from '@/hooks/use-language';
 import { PostgrestError } from '@supabase/supabase-js';
 import { fetchAllBrands, getBrandNameFromCache, Brand, createNewBrand } from '@/data/brands';
 import { Database } from '@/integrations/supabase/types';
+import { 
+  Tooltip, 
+  TooltipContent, 
+  TooltipProvider, 
+  TooltipTrigger 
+} from '@/components/ui/tooltip';
+
+// Translation objects
+const id = {
+  skuManagement: 'Manajemen SKU',
+  addNewSku: 'Tambah SKU Baru',
+  editSku: 'Edit SKU',
+  searchSkus: 'Cari SKU berdasarkan nama, merek, atau kode SKU...',
+  clear: 'Hapus',
+  name: 'Nama',
+  brand: 'Merek',
+  category: 'Kategori',
+  size: 'Ukuran',
+  sku: 'SKU',
+  consumerPrice: 'Harga Pelanggan',
+  status: 'Status',
+  actions: 'Tindakan',
+  loading: 'Memuat SKU...',
+  noSkusFound: 'Tidak ada SKU ditemukan.',
+  active: 'Aktif',
+  inactive: 'Tidak Aktif',
+  description: 'Deskripsi',
+  imageUrl: 'URL Gambar',
+  isActive: 'SKU Aktif',
+  hasVariants: 'Memiliki Varian',
+  productVariants: 'Varian Produk',
+  variantName: 'Nama Varian',
+  additionalPrice: 'Harga Tambahan',
+  addVariant: 'Tambah Varian',
+  showRegionalPricing: 'Tampilkan Harga Regional',
+  hideRegionalPricing: 'Sembunyikan Harga Regional',
+  regionalPricing: 'Harga Regional',
+  area: 'Area',
+  distributorPrice: 'Harga Distributor',
+  moq: 'MOQ',
+  noRegionalPricing: 'Tidak ada pengaturan harga regional.',
+  selectArea: 'Pilih Area',
+  addRegion: 'Tambah Area',
+  cancel: 'Batal',
+  saveChanges: 'Simpan Perubahan',
+  createSku: 'Buat SKU',
+  confirmDelete: 'Konfirmasi Penghapusan',
+  deleteConfirmationText: 'Apakah Anda yakin ingin menghapus SKU',
+  thisActionCannot: ' Tindakan ini tidak dapat dibatalkan.',
+  delete: 'Hapus',
+  errorFetching: 'Gagal memuat SKU',
+  errorFetchingRegions: 'Gagal memuat data area',
+  errorFetchingVariants: 'Gagal memuat data varian',
+  errorSaving: 'Gagal menyimpan SKU',
+  errorDeleting: 'Gagal menghapus SKU',
+  skuCreated: 'SKU berhasil dibuat',
+  skuCreatedDesc: 'SKU baru telah berhasil ditambahkan ke database',
+  skuUpdated: 'SKU berhasil diperbarui',
+  skuUpdatedDesc: 'Perubahan pada SKU telah disimpan',
+  skuDeleted: 'SKU berhasil dihapus',
+  skuDeletedDesc: 'SKU telah berhasil dihapus dari database',
+  duplicateSku: 'SKU Duplikat',
+  duplicateSkuDesc: 'SKU sudah ada dalam database. Silakan gunakan kode SKU yang berbeda.',
+  generateSku: 'Hasilkan kode SKU unik',
+  generate: 'Hasilkan',
+  singleSkuMoq: 'MOQ Total SKU',
+  allowMixVariants: 'Izinkan Campuran Varian',
+  allowMixVariantsDesc: 'Pelanggan dapat mencampur berbagai varian untuk mencapai kuantitas pesanan minimum',
+};
+
+const en = {
+  skuManagement: 'SKU Management',
+  addNewSku: 'Add New SKU',
+  editSku: 'Edit SKU',
+  searchSkus: 'Search SKUs by name, brand, or SKU code...',
+  clear: 'Clear',
+  name: 'Name',
+  brand: 'Brand',
+  category: 'Category',
+  size: 'Size',
+  sku: 'SKU',
+  consumerPrice: 'Customer Price',
+  status: 'Status',
+  actions: 'Actions',
+  loading: 'Loading SKUs...',
+  noSkusFound: 'No SKUs found.',
+  active: 'Active',
+  inactive: 'Inactive',
+  description: 'Description',
+  imageUrl: 'Image URL',
+  isActive: 'SKU is Active',
+  hasVariants: 'Has Variants',
+  productVariants: 'Product Variants',
+  variantName: 'Variant Name',
+  additionalPrice: 'Additional Price',
+  addVariant: 'Add Variant',
+  showRegionalPricing: 'Show Regional Pricing',
+  hideRegionalPricing: 'Hide Regional Pricing',
+  regionalPricing: 'Regional Pricing',
+  area: 'Area',
+  distributorPrice: 'Distributor Price',
+  moq: 'MOQ',
+  noRegionalPricing: 'No regional pricing configured.',
+  selectArea: 'Select Area',
+  addRegion: 'Add Region',
+  cancel: 'Cancel',
+  saveChanges: 'Save Changes',
+  createSku: 'Create SKU',
+  confirmDelete: 'Confirm Deletion',
+  deleteConfirmationText: 'Are you sure you want to delete the SKU',
+  thisActionCannot: ' This action cannot be undone.',
+  delete: 'Delete',
+  errorFetching: 'Failed to fetch SKUs',
+  errorFetchingRegions: 'Failed to fetch region data',
+  errorFetchingVariants: 'Failed to fetch variant data',
+  errorSaving: 'Failed to save SKU',
+  errorDeleting: 'Failed to delete SKU',
+  skuCreated: 'SKU created successfully',
+  skuCreatedDesc: 'The new SKU has been added to the database',
+  skuUpdated: 'SKU updated successfully',
+  skuUpdatedDesc: 'Changes to the SKU have been saved',
+  skuDeleted: 'SKU deleted successfully',
+  skuDeletedDesc: 'The SKU has been removed from the database',
+  duplicateSku: 'Duplicate SKU',
+  duplicateSkuDesc: 'SKU already exists in the database. Please use a different SKU code.',
+  generateSku: 'Generate a unique SKU code',
+  generate: 'Generate',
+  singleSkuMoq: 'SKU Combined MOQ',
+  singleSkuMoqDesc: 'Allow mixing different variants to reach MOQ (combined quantity across all variants)',
+  allowMixVariants: 'Allow Mix Variants',
+  allowMixVariantsDesc: 'Customers can mix different variants to reach the minimum order quantity',
+};
 
 // Use the database types
 // Using the products table structure instead of skus
@@ -119,6 +251,9 @@ export type SKU = {
   created_at?: string;
   updated_at?: string;
   image?: string;
+  // Mixed variant fields
+  single_sku_moq?: number;
+  allow_mix_variants?: boolean;
   // Use a more specific union type instead of any
   [key: string]: string | number | boolean | undefined;
 };
@@ -180,6 +315,8 @@ const SKUManager = () => {
     consumer_price: 0,
     base_distributor_price: 0,
     base_moq: 1,
+    single_sku_moq: 0, // SKU-level MOQ (regardless of variant)
+    allow_mix_variants: false, // Allow mixing variants to reach MOQ
     is_active: true,
     has_variants: false, // Add variants flag
     // UOM fields
@@ -466,7 +603,7 @@ const SKUManager = () => {
           variant_name: variant.variant_name,
           area: newArea,
           distributor_price: form.base_distributor_price + variant.additional_price,
-          moq: form.base_moq
+          moq: form.base_moq // Default to base MOQ for individual variants
         }));
         setVariantPricing(prev => [...prev, ...newPricingEntries]);
       }
@@ -505,7 +642,7 @@ const SKUManager = () => {
             variant_name: variant.variant_name,
             area: area,
             distributor_price: form.base_distributor_price + variant.additional_price,
-            moq: form.base_moq
+            moq: form.base_moq // Default to base MOQ for individual variants
           });
         }
       });
@@ -518,6 +655,7 @@ const SKUManager = () => {
 
   // Function to update variant pricing
   const updateVariantPricing = (variant_name: string, area: string, field: 'distributor_price' | 'moq', value: number) => {
+    // Normal update for a single variant/area combo - we no longer force single_sku_moq for individual variants
     setVariantPricing(prev => prev.map(vp => 
       vp.variant_name === variant_name && vp.area === area
         ? { ...vp, [field]: value }
@@ -753,6 +891,29 @@ const SKUManager = () => {
           console.log('First product structure:', Object.keys(data[0]));
           console.log('Sample product fields:', JSON.stringify(data[0]));
           
+          // Specifically check for mix variant fields in the retrieved data
+          const hasMixVariantFields = data.some(product => {
+            // Cast to SKU type to ensure TypeScript recognizes the fields
+            const skuProduct = product as SKU;
+            return skuProduct.single_sku_moq !== undefined || 
+                   skuProduct.allow_mix_variants !== undefined;
+          });
+          
+          console.log('Mix variant fields present in retrieved data:', hasMixVariantFields);
+          
+          // Check a few records for mix variant fields
+          const sampleProducts = data.slice(0, 3);
+          sampleProducts.forEach((product, i) => {
+            // Cast to SKU type to ensure TypeScript recognizes the fields
+            const skuProduct = product as SKU;
+            console.log(`Product ${i} mix variant fields:`, {
+              id: skuProduct.id,
+              name: skuProduct.name,
+              single_sku_moq: skuProduct.single_sku_moq,
+              allow_mix_variants: skuProduct.allow_mix_variants
+            });
+          });
+          
           // Transform data to ensure we have proper brand names
           const transformedData = data.map(product => {
             // Cast the product to a Record<string, any> to access properties
@@ -980,6 +1141,10 @@ const SKUManager = () => {
       console.log('Save SKU called');
       console.log('Edit mode:', editMode);
       console.log('Current form data:', form);
+      console.log('Mix variant fields:', {
+        single_sku_moq: form.single_sku_moq,
+        allow_mix_variants: form.allow_mix_variants
+      });
 
       // Check if user is authenticated
       if (!user) {
@@ -1035,6 +1200,8 @@ const SKUManager = () => {
           is_active: form.is_active,
           has_variants: form.has_variants,
           base_distributor_price: Math.round(form.consumer_price * 0.8), // Update distributor price based on consumer price
+          single_sku_moq: form.single_sku_moq, // SKU-level MOQ
+          allow_mix_variants: form.allow_mix_variants, // Allow mixing variants to reach MOQ
           // UOM fields
           base_uom: form.base_uom,
           moq_uom: form.moq_uom,
@@ -1043,6 +1210,9 @@ const SKUManager = () => {
         };
         
         console.log('Update data being sent:', updateData);
+        
+        // Log the exact update data being sent to Supabase
+        console.log('Update data being sent to database:', JSON.stringify(updateData, null, 2));
         
         // Update existing SKU in the products table
         result = await supabase
@@ -1055,6 +1225,14 @@ const SKUManager = () => {
         console.log('Update result:', result);
         console.log('Update result data:', result.data);
         console.log('Number of rows updated:', result.data?.length || 0);
+        
+        // Check if the mix variant fields were included in the response
+        if (result.data && result.data.length > 0) {
+          console.log('Updated product mix variant fields in response:', {
+            single_sku_moq: result.data[0].single_sku_moq,
+            allow_mix_variants: result.data[0].allow_mix_variants
+          });
+        }
       } else {
         // For new SKUs, include all required fields
         const insertData = {
@@ -1070,6 +1248,8 @@ const SKUManager = () => {
           has_variants: form.has_variants,
           base_distributor_price: Math.round(form.consumer_price * 0.8),
           base_moq: 1,
+          single_sku_moq: form.single_sku_moq, // SKU-level MOQ
+          allow_mix_variants: form.allow_mix_variants, // Allow mixing variants to reach MOQ
           stock_quantity: 0,
           province_id: null,
           distribution_area_id: null,
@@ -1171,13 +1351,20 @@ const SKUManager = () => {
           const regionPricingToInsert = Object.entries(areaGroups).map(([area, prices]) => {
             // Use the minimum price as base price for the area
             const basePrice = Math.min(...prices.map(p => p.distributor_price));
+            
+            // Store the minimum MOQ for this area
+            // For SKUs with mixed variants, this will be used as a guide
+            // but the actual MOQ check will combine quantities across variants
             const baseMoq = prices[0]?.moq || form.base_moq;
             
             return {
               product_id: skuId,
               area: area,
               distributor_price: basePrice,
-              moq: baseMoq
+              moq: baseMoq,
+              moq_uom: form.moq_uom, // Store the MOQ UOM with the region pricing
+              sku_level_moq: form.single_sku_moq, // Store the SKU-level MOQ
+              allow_mix_variants: form.allow_mix_variants // Store whether variants can be mixed
             };
           });
           
@@ -1511,6 +1698,8 @@ const SKUManager = () => {
       consumer_price: 0,
       base_distributor_price: 0,
       base_moq: 1,
+      single_sku_moq: 0, // SKU-level MOQ (combined across variants)
+      allow_mix_variants: false, // Allow mixing variants to reach MOQ
       is_active: true,
       has_variants: false,
       base_uom: 'pcs',
@@ -1559,7 +1748,10 @@ const SKUManager = () => {
       // @ts-expect-error - UOM fields may not exist in existing SKUs
       pricing_uom: sku.pricing_uom || 'pcs',
       // @ts-expect-error - UOM fields may not exist in existing SKUs
-      enable_uom_conversions: sku.enable_uom_conversions || false
+      enable_uom_conversions: sku.enable_uom_conversions || false,
+      // Mix variant fields
+      single_sku_moq: sku.single_sku_moq || 0,
+      allow_mix_variants: sku.allow_mix_variants || false
     });
     
     // Fetch regions for this SKU
@@ -1596,13 +1788,33 @@ const SKUManager = () => {
   // Handle form changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    const updatedForm = { ...form, [name]: value };
+    setForm(updatedForm);
+    
+    // Debug log form changes
+    if (name === 'single_sku_moq' || name === 'allow_mix_variants') {
+      console.log(`Form field ${name} changed:`, {
+        oldValue: form[name as keyof typeof form],
+        newValue: value,
+        currentForm: updatedForm
+      });
+    }
   };
   
   // Handle checkbox changes
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, checked } = e.target;
-    setForm(prev => ({ ...prev, [name]: checked }));
+    const updatedForm = { ...form, [name]: checked };
+    setForm(updatedForm);
+    
+    // Debug log checkbox changes
+    if (name === 'allow_mix_variants' || name === 'has_variants') {
+      console.log(`Checkbox ${name} changed:`, {
+        oldValue: form[name as keyof typeof form],
+        newValue: checked,
+        currentForm: updatedForm
+      });
+    }
   };
   
   // Handle number input changes
@@ -1947,7 +2159,7 @@ const SKUManager = () => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="consumer_price">{t.consumerPrice} (per {form.base_uom})</Label>
+                <Label htmlFor="consumer_price">{t.consumerPrice} (per {form.pricing_uom})</Label>
                 <Input
                   id="consumer_price"
                   name="consumer_price"
@@ -1981,6 +2193,83 @@ const SKUManager = () => {
                 className="h-4 w-4 rounded border-gray-300"
               />
               <Label htmlFor="has_variants">{t.hasVariants || 'Has Variants'}</Label>
+            </div>
+            
+            {/* MOQ and Mix Variants Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+              <div className="space-y-4">
+                {/* SKU-level MOQ Field */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="single_sku_moq">{t.singleSkuMoq || 'SKU Combined MOQ'}</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Set the minimum order quantity for this SKU</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="single_sku_moq"
+                      name="single_sku_moq"
+                      type="number"
+                      value={form.single_sku_moq}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 0;
+                        // Update the form
+                        setForm(prev => ({ ...prev, single_sku_moq: value }));
+                      }}
+                      placeholder="0 = No minimum"
+                    />
+                    <div className="w-20">
+                      <Select
+                        value={form.moq_uom}
+                        onValueChange={(value) => {
+                          // Update form with new UOM
+                          setForm(prev => ({ ...prev, moq_uom: value }));
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="UOM" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableUOMs.map((uom) => (
+                            <SelectItem key={uom} value={uom}>{uom}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {form.single_sku_moq > 0 ? `Minimum ${form.single_sku_moq} ${form.moq_uom} order required` : 'No minimum order quantity'}
+                  </div>
+                </div>
+
+                {/* Allow Mix Variants Checkbox */}
+                <div className="flex items-center space-x-2 py-2">
+                  <input
+                    type="checkbox"
+                    id="allow_mix_variants"
+                    name="allow_mix_variants"
+                    checked={form.allow_mix_variants}
+                    onChange={handleCheckboxChange}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="allow_mix_variants">{t.allowMixVariants || 'Allow Mix Variants'}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {form.allow_mix_variants 
+                        ? 'Different variants can be combined to reach minimum order quantity' 
+                        : 'Each variant must meet its own minimum order quantity'}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
             
             {/* Step 1: Distribution Areas */}
@@ -2256,7 +2545,12 @@ const SKUManager = () => {
                                   <TableRow>
                                     <TableHead>Area</TableHead>
                                     <TableHead>Distributor Price ({form.pricing_uom})</TableHead>
-                                    <TableHead>MOQ ({form.moq_uom})</TableHead>
+                                    <TableHead>
+                                      MOQ ({form.moq_uom})
+                                      {form.allow_mix_variants && form.single_sku_moq > 0 && (
+                                        <span className="ml-2 text-xs text-muted-foreground">(Combined across variants)</span>
+                                      )}
+                                    </TableHead>
                                     <TableHead className="w-20"></TableHead>
                                   </TableRow>
                                 </TableHeader>
@@ -2285,17 +2579,32 @@ const SKUManager = () => {
                                           />
                                         </TableCell>
                                         <TableCell>
-                                          <Input
-                                            type="number"
-                                            value={vp.moq}
-                                            onChange={(e) => updateVariantPricing(
-                                              vp.variant_name, 
-                                              vp.area, 
-                                              'moq', 
-                                              parseInt(e.target.value) || 1
+                                          <div className="flex items-center gap-2">
+                                            <Input
+                                              type="number"
+                                              value={vp.moq}
+                                              onChange={(e) => updateVariantPricing(
+                                                vp.variant_name, 
+                                                vp.area, 
+                                                'moq', 
+                                                parseInt(e.target.value) || 1
+                                              )}
+                                              className="w-20"
+                                            />
+                                            <span className="text-xs text-muted-foreground">{form.moq_uom}</span>
+                                            {form.allow_mix_variants && form.single_sku_moq > 0 && (
+                                              <TooltipProvider>
+                                                <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                    <Info className="h-4 w-4 text-muted-foreground" />
+                                                  </TooltipTrigger>
+                                                  <TooltipContent>
+                                                    <p>Variants can be mixed to reach combined MOQ of {form.single_sku_moq} {form.moq_uom}</p>
+                                                  </TooltipContent>
+                                                </Tooltip>
+                                              </TooltipProvider>
                                             )}
-                                            className="w-20"
-                                          />
+                                          </div>
                                         </TableCell>
                                         <TableCell>
                                           <Button
@@ -2703,125 +3012,6 @@ const SKUManager = () => {
       </Dialog>
     </div>
   );
-};
-
-// Translations
-const id = {
-  skuManagement: 'Manajemen SKU',
-  addNewSku: 'Tambah SKU Baru',
-  editSku: 'Edit SKU',
-  searchSkus: 'Cari SKU berdasarkan nama, brand, atau kode SKU...',
-  clear: 'Bersihkan',
-  name: 'Nama',
-  brand: 'Brand',
-  category: 'Kategori',
-  size: 'Ukuran',
-  sku: 'SKU',
-  consumerPrice: 'Harga Konsumen',
-  status: 'Status',
-  actions: 'Aksi',
-  loading: 'Memuat SKU...',
-  noSkusFound: 'Tidak ada SKU yang ditemukan.',
-  active: 'Aktif',
-  inactive: 'Non-aktif',
-  description: 'Deskripsi',
-  imageUrl: 'URL Gambar',
-  isActive: 'SKU Aktif',
-  hasVariants: 'Memiliki Varian',
-  productVariants: 'Varian Produk',
-  variantName: 'Nama Varian',
-  additionalPrice: 'Harga Tambahan',
-  addVariant: 'Tambah Varian',
-  showRegionalPricing: 'Tampilkan Harga Regional',
-  hideRegionalPricing: 'Sembunyikan Harga Regional',
-  regionalPricing: 'Harga Regional',
-  area: 'Area',
-  distributorPrice: 'Harga Distributor',
-  moq: 'MOQ',
-  noRegionalPricing: 'Tidak ada pengaturan harga regional.',
-  selectArea: 'Pilih Area',
-  addRegion: 'Tambah Area',
-  cancel: 'Batal',
-  saveChanges: 'Simpan Perubahan',
-  createSku: 'Buat SKU',
-  confirmDelete: 'Konfirmasi Penghapusan',
-  deleteConfirmationText: 'Apakah Anda yakin ingin menghapus SKU',
-  thisActionCannot: ' Tindakan ini tidak dapat dibatalkan.',
-  delete: 'Hapus',
-  errorFetching: 'Gagal memuat SKU',
-  errorFetchingRegions: 'Gagal memuat data area',
-  errorFetchingVariants: 'Gagal memuat data varian',
-  errorSaving: 'Gagal menyimpan SKU',
-  errorDeleting: 'Gagal menghapus SKU',
-  skuCreated: 'SKU berhasil dibuat',
-  skuCreatedDesc: 'SKU baru telah berhasil ditambahkan ke database',
-  skuUpdated: 'SKU berhasil diperbarui',
-  skuUpdatedDesc: 'Perubahan pada SKU telah disimpan',
-  skuDeleted: 'SKU berhasil dihapus',
-  skuDeletedDesc: 'SKU telah berhasil dihapus dari database',
-  duplicateSku: 'SKU Duplikat',
-  duplicateSkuDesc: 'SKU sudah ada dalam database. Silakan gunakan kode SKU yang berbeda.',
-  generateSku: 'Hasilkan kode SKU unik',
-  generate: 'Hasilkan',
-};
-
-const en = {
-  skuManagement: 'SKU Management',
-  addNewSku: 'Add New SKU',
-  editSku: 'Edit SKU',
-  searchSkus: 'Search SKUs by name, brand, or SKU code...',
-  clear: 'Clear',
-  name: 'Name',
-  brand: 'Brand',
-  category: 'Category',
-  size: 'Size',
-  sku: 'SKU',
-  consumerPrice: 'Consumer Price',
-  status: 'Status',
-  actions: 'Actions',
-  loading: 'Loading SKUs...',
-  noSkusFound: 'No SKUs found.',
-  active: 'Active',
-  inactive: 'Inactive',
-  description: 'Description',
-  imageUrl: 'Image URL',
-  isActive: 'SKU is Active',
-  hasVariants: 'Has Variants',
-  productVariants: 'Product Variants',
-  variantName: 'Variant Name',
-  additionalPrice: 'Additional Price',
-  addVariant: 'Add Variant',
-  showRegionalPricing: 'Show Regional Pricing',
-  hideRegionalPricing: 'Hide Regional Pricing',
-  regionalPricing: 'Regional Pricing',
-  area: 'Area',
-  distributorPrice: 'Distributor Price',
-  moq: 'MOQ',
-  noRegionalPricing: 'No regional pricing configured.',
-  selectArea: 'Select Area',
-  addRegion: 'Add Region',
-  cancel: 'Cancel',
-  saveChanges: 'Save Changes',
-  createSku: 'Create SKU',
-  confirmDelete: 'Confirm Deletion',
-  deleteConfirmationText: 'Are you sure you want to delete the SKU',
-  thisActionCannot: ' This action cannot be undone.',
-  delete: 'Delete',
-  errorFetching: 'Failed to fetch SKUs',
-  errorFetchingRegions: 'Failed to fetch region data',
-  errorFetchingVariants: 'Failed to fetch variant data',
-  errorSaving: 'Failed to save SKU',
-  errorDeleting: 'Failed to delete SKU',
-  skuCreated: 'SKU created successfully',
-  skuCreatedDesc: 'The new SKU has been added to the database',
-  skuUpdated: 'SKU updated successfully',
-  skuUpdatedDesc: 'Changes to the SKU have been saved',
-  skuDeleted: 'SKU deleted successfully',
-  skuDeletedDesc: 'The SKU has been removed from the database',
-  duplicateSku: 'Duplicate SKU',
-  duplicateSkuDesc: 'SKU already exists in the database. Please use a different SKU code.',
-  generateSku: 'Generate a unique SKU code',
-  generate: 'Generate',
 };
 
 export default SKUManager;
