@@ -32,35 +32,23 @@ import { trackCatalogExport, trackDeniedCatalogExport } from "@/utils/analytics"
 // Cache duration constant
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 
-// Helper function to check if there are enough mixed variants in the cart to meet MOQ
-function checkMixedVariantsMOQ(
-  items: CartItem[], 
-  productId: string, 
-  province: string, 
-  skuLevelMoq: number
-): {
-  hasEnoughItems: boolean;
-  currentTotal: number;
-  neededToReachMOQ: number;
-} {
-  // Find all items in cart with the same base productId and province
-  const matchingItems = items.filter(
-    item => item.id === productId && item.province === province
+// Helper function to check mixed variants MOQ
+const checkMixedVariantsMOQ = (items: CartItem[], baseProductId: string, area: string, skuLevelMoq: number) => {
+  // Find all items in cart that match this base product and area
+  const relatedItems = items.filter(item => 
+    item.id === baseProductId && item.province === area
   );
   
-  // Sum up quantities of all matching items (variants of same product)
-  const totalQuantity = matchingItems.reduce((sum, item) => sum + item.qty, 0);
-  
-  // Determine if we have enough items
-  const hasEnoughItems = totalQuantity >= skuLevelMoq;
-  const neededToReachMOQ = Math.max(0, skuLevelMoq - totalQuantity);
+  const currentTotal = relatedItems.reduce((sum, item) => sum + item.qty, 0);
+  const hasEnoughItems = currentTotal >= skuLevelMoq;
+  const neededToReachMOQ = Math.max(0, skuLevelMoq - currentTotal);
   
   return {
     hasEnoughItems,
-    currentTotal: totalQuantity,
+    currentTotal,
     neededToReachMOQ
   };
-}
+};
 
 function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: ProductWithVariant; loggedIn: boolean; selectedFilterArea?: string }) {
   
@@ -92,6 +80,34 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
   
   // If we have SKU-level MOQ and allow mixing variants, use it; otherwise use standard MOQ
   const displayMoq = (allowMixVariants && skuLevelMoq > 0) ? skuLevelMoq : usedMoq;
+  
+  // UOM conversion properties (not displayed on frontend)
+  const moqUom = product.moq_uom && product.moq_uom !== 'pcs' ? product.moq_uom : (regional?.moq_uom || 'pcs');
+  const pricingUom = product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (regional?.price_uom || 'pcs');
+  const baseUom = product.base_uom || 'pcs';
+  
+  // UOM conversion factors (for backend processing/calculations)
+  const moqConversionFactor = product.moq_conversion_factor || regional?.moq_conversion_factor || 1;
+  const pricingConversionFactor = product.pricing_conversion_factor || regional?.pricing_conversion_factor || 1;
+  const baseConversionFactor = product.base_conversion_factor || 1;
+  
+  // Conversion ratios for UOM calculations
+  const uomConversions = {
+    moq: {
+      uom: moqUom,
+      factor: moqConversionFactor,
+      convertedQuantity: usedMoq * moqConversionFactor
+    },
+    pricing: {
+      uom: pricingUom,
+      factor: pricingConversionFactor,
+      convertedPrice: basePrice / pricingConversionFactor
+    },
+    base: {
+      uom: baseUom,
+      factor: baseConversionFactor
+    }
+  };
   
   // Helper function to check how many more items are needed to reach MOQ
   const getMixedVariantsStatus = () => {
@@ -394,6 +410,13 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
                       name: product.variantInfo.variantName,
                       additionalPrice: product.variantInfo.additionalPrice
                     } : undefined,
+                    // UOM conversion data (not displayed but available for calculations)
+                    uomConversions: uomConversions,
+                    selectedUoms: {
+                      moq: moqUom,
+                      pricing: pricingUom,
+                      base: baseUom
+                    }
                   });
                   
                   // Show toast notification

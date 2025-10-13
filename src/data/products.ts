@@ -8,6 +8,9 @@ export type RegionPricing = {
   // Mix variants fields
   skuLevelMoq?: number; // MOQ at the SKU level (across all variants)
   allowMixVariants?: boolean; // Whether variants can be mixed for this region
+  // UOM conversion factors for regional pricing
+  moq_conversion_factor?: number;
+  pricing_conversion_factor?: number;
 };
 
 export type VariantOption = {
@@ -55,6 +58,10 @@ export type Product = {
   // Mix variants fields
   singleSkuMoq?: number; // Minimum order quantity for the entire SKU
   allowMixVariants?: boolean; // Whether different variants can be mixed to reach MOQ
+  // UOM conversion factors
+  base_conversion_factor?: number;
+  moq_conversion_factor?: number;
+  pricing_conversion_factor?: number;
 };
 
 export const PRODUCTS: Product[] = [

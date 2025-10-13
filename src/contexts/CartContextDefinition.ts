@@ -17,6 +17,32 @@ export type CartItemVariant = {
 };
 
 /**
+ * UOM conversion information for cart items
+ */
+export type UomConversion = {
+  /** Unit of measurement */
+  uom: string;
+  /** Conversion factor */
+  factor: number;
+  /** Converted quantity (for MOQ) */
+  convertedQuantity?: number;
+  /** Converted price (for pricing) */
+  convertedPrice?: number;
+};
+
+/**
+ * Selected UOMs for the cart item
+ */
+export type SelectedUoms = {
+  /** MOQ unit of measurement */
+  moq: string;
+  /** Pricing unit of measurement */
+  pricing: string;
+  /** Base unit of measurement */
+  base: string;
+};
+
+/**
  * Cart item representation
  * Defines the structure of items stored in the cart
  */
@@ -41,9 +67,17 @@ export type CartItem = {
   consumerPrice: number;
   /** Optional variant information */
   variant?: CartItemVariant;
-  /** SKU-level MOQ for mixed variants */
+  /** UOM conversion data (not displayed but available for calculations) */
+  uomConversions?: {
+    moq: UomConversion;
+    pricing: UomConversion;
+    base: UomConversion;
+  };
+  /** Selected UOMs for this cart item */
+  selectedUoms?: SelectedUoms;
+  /** SKU-level MOQ (for mixed variants) */
   skuLevelMoq?: number;
-  /** Whether different variants can be mixed to meet MOQ */
+  /** Whether variants can be mixed for MOQ */
   allowMixVariants?: boolean;
 };
 

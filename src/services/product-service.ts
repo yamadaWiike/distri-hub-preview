@@ -28,6 +28,10 @@ export type ProductFromDB = {
   // Mix variants fields
   single_sku_moq?: number;
   allow_mix_variants?: boolean;
+  // UOM conversion factors
+  base_conversion_factor?: number;
+  moq_conversion_factor?: number;
+  pricing_conversion_factor?: number;
 };
 
 export type RegionPricingFromDB = {
@@ -38,6 +42,9 @@ export type RegionPricingFromDB = {
   moq: number;
   moq_uom?: string;
   price_uom?: string;
+  // UOM conversion factors
+  moq_conversion_factor?: number;
+  pricing_conversion_factor?: number;
   created_at?: string;
   // Mix variants fields
   sku_level_moq?: number;
@@ -120,6 +127,10 @@ export function mapDBProductToProduct(
     // Mix variants fields
     singleSkuMoq: dbProduct.single_sku_moq || 0,
     allowMixVariants: dbProduct.allow_mix_variants || false,
+    // UOM conversion factors
+    base_conversion_factor: dbProduct.base_conversion_factor,
+    moq_conversion_factor: dbProduct.moq_conversion_factor,
+    pricing_conversion_factor: dbProduct.pricing_conversion_factor,
     // Handle both new variant view format and old product_variants format
     variants: variants?.map(variant => ({
       id: variant.id,
@@ -138,7 +149,10 @@ export function mapDBProductToProduct(
       price_uom: region.price_uom,
       // Mix variants fields for regions
       skuLevelMoq: region.sku_level_moq || 0,
-      allowMixVariants: region.allow_mix_variants || false
+      allowMixVariants: region.allow_mix_variants || false,
+      // UOM conversion factors
+      moq_conversion_factor: region.moq_conversion_factor,
+      pricing_conversion_factor: region.pricing_conversion_factor
     }))
   };
 }
