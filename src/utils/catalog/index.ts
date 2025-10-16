@@ -18,7 +18,7 @@
 
 import { jsPDF } from "jspdf";
 import { format } from 'date-fns';
-import { Product } from "@/data/products";
+import { calculateMargin, capitalizeFirst, getRegionByArea } from "./Funtions";
 import { ProductWithVariant } from "@/services/product-service";
 
 /**
@@ -183,13 +183,13 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     let textY = y + pad + imageH + 5;
 
     // ── Brand (text-gray-500 text-xs) ────────────────
-    doc.setFontSize(8);
+    doc.setFontSize(7);
     doc.setTextColor(107);                      // gray-500
     doc.text(p?.brand ?? "-", x + pad, textY);
 
     // ── Product Name (font-semibold text-sm) ─────────
     textY += 4;
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setTextColor(33);                       // gray-800
     const productTitle = `${p?.name ?? "-"} ${p?.size ?? ""}`;
     const wrappedTitle = doc.splitTextToSize(productTitle, cardW - pad * 2);
@@ -226,7 +226,7 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
       doc.setTextColor(107);
       doc.text(label, startX, startY);
       doc.setTextColor(33);
-      doc.setFontSize(9);
+      doc.setFontSize(7);
       const wrappedValue = doc.splitTextToSize(value, colW);
       doc.text(wrappedValue, startX, startY + 3.8);
       let nextY = startY + 1.8 + wrappedValue.length * 5;
@@ -242,15 +242,18 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     // Get UOM values for this product
     const moqUom = getMoqUom(p);
     const pricingUom = getPricingUom(p);
-    
+    const uom = pricingUom !== "pcs" ? pricingUom : "pcs";
+    const margin = calculateMargin(p, distributionArea);
+    const region = getRegionByArea(p, distributionArea)
+
     // Left column
-    leftY = renderBlock(leftX, leftY, "Harga Distributor", formatRp(p?.distributorPrice), pricingUom !== 'pcs' ? `per ${pricingUom}` : "per pcs");
-    leftY = renderBlock(leftX, leftY, "Margin Distributor", `${p?.margin ? p.margin + "%" : "-"}`, `Rp24.000/${pricingUom !== 'pcs' ? pricingUom : 'pcs'}`);
+    leftY = renderBlock(leftX, leftY, "Harga Distributor", formatRp(region.distributorPrice), `per ${uom}`);
+    leftY = renderBlock(leftX, leftY, "Margin Distributor", `${formatRp(margin.value)}`, `${margin.percentage.toFixed(1)}% margin`);
     leftY = renderBlock(leftX, leftY, "MOQ", `${p?.moq ?? "-"}`, moqUom);
 
     // Right column
-    rightY = renderBlock(rightX, rightY, "Harga Konsumen", formatRp(p?.consumerPrice), pricingUom !== 'pcs' ? `per ${pricingUom}` : "per pcs");
-    rightY = renderBlock(rightX, rightY, "Isi Per Karton", `${p?.units ?? "-"}`, "pieces");
+    rightY = renderBlock(rightX, rightY, "Harga Konsumen", formatRp(p?.consumerPrice), `per ${uom}`);
+    rightY = renderBlock(rightX, rightY, `Isi Per ${capitalizeFirst((uom || '').toLowerCase())}`, `${p?.units ?? "-"}`, "pieces");
 
     // Format regions for display - show first area and count if more exist
     let areaDisplay = p?.regions?.length
