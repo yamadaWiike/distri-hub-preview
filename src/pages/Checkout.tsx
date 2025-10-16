@@ -331,7 +331,7 @@ export default function Checkout() {
 
       // Prepare email data for Web3Forms
       const emailData = {
-        access_key: "aaf6ab03-78a5-4e84-94bc-0acd0a51273c",
+        access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY,
         subject: `[Baskit] New Order #${orderNumber} from ${deliveryDetails.fullName}`,
         from_name: "Baskit Order System",
         message: `
