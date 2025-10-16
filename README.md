@@ -191,10 +191,62 @@ This project includes several scripts to help set up and maintain the database:
 ### Production Deployment
 - Deploy via [Lovable](https://lovable.dev/projects/8f232d77-cc27-4788-bc81-f012c9ee4d08)
 - Compatible with any Vite/React hosting platform (Vercel, Netlify, etc.)
-- Includes `vercel.json` for Vercel deployment configuration
+- Includes optimized `vercel.json` for Vercel deployment configuration
+
+### Vercel Deployment Setup
+1. **Connect your repository** to Vercel
+2. **Configure build settings:**
+   - Build Command: `npm run build:vercel`
+   - Output Directory: `dist`
+   - Install Command: `npm install`
+   - Node.js Version: 18.x (specified in `.nvmrc`)
+
+3. **Set Environment Variables:**
+   ```bash
+   VITE_SUPABASE_URL=your-supabase-project-url
+   VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+   VITE_SUPABASE_PROJECT_ID=your-supabase-project-id
+   VITE_WEB3FORMS_ACCESS_KEY=your-web3forms-api-key
+   ```
 
 ### Custom Domain Setup
 Follow the [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide) guide untuk menghubungkan domain Anda.
+
+### Deployment Troubleshooting
+
+#### Common Vercel Deployment Issues:
+
+1. **Build Failures:**
+   ```bash
+   # Test build locally first
+   npm run build:vercel
+   npm run typecheck
+   ```
+
+2. **Environment Variable Issues:**
+   - Ensure all `VITE_` prefixed variables are set in Vercel dashboard
+   - Check that variables match exactly with `.env.example`
+   - Verify Supabase URL format: `https://your-project.supabase.co`
+
+3. **Node.js Version Conflicts:**
+   - Vercel uses Node.js 18.x (specified in `.nvmrc`)
+   - Local development should use compatible version
+   - Check with: `node --version`
+
+4. **Large Bundle Size Warnings:**
+   - Current setup includes optimized chunking
+   - Main bundle ~1MB is acceptable for this application
+   - Consider dynamic imports for further optimization if needed
+
+5. **Routing Issues (404 on refresh):**
+   - `vercel.json` includes SPA fallback configuration
+   - All routes redirect to `/index.html` for client-side routing
+
+#### Performance Optimizations:
+- ✅ Code splitting with manual chunks
+- ✅ Optimized dependencies bundling
+- ✅ Proper asset caching headers
+- ✅ Compressed static assets
 
 ### Environment Variables for Production
 Ensure all environment variables are properly configured in your hosting platform:
