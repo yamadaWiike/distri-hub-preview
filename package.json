@@ -11,6 +11,7 @@
     "dev": "vite",
     "build": "vite build && cp vercel.json dist/",
     "build:vercel": "vite build",
+    "build:cloudflare": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",

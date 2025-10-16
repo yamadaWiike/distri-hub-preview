@@ -188,10 +188,20 @@ This project includes several scripts to help set up and maintain the database:
 
 ## Deployment
 
-### Production Deployment
-- Deploy via [Lovable](https://lovable.dev/projects/8f232d77-cc27-4788-bc81-f012c9ee4d08)
-- Compatible with any Vite/React hosting platform (Vercel, Netlify, etc.)
-- Includes optimized `vercel.json` for Vercel deployment configuration
+### Production Deployment Options
+
+The Baskit Distributor Hub can be deployed on multiple platforms:
+
+1. **[Lovable](https://lovable.dev/projects/8f232d77-cc27-4788-bc81-f012c9ee4d08)** - Original development platform
+2. **Vercel** - Optimized configuration included (`vercel.json`)
+3. **Cloudflare Pages** - Fast global CDN with edge optimization (`wrangler.toml`)
+4. **Netlify** - Compatible with standard Vite build process
+5. **Any static hosting** - Works with any platform supporting static sites
+
+### Platform-Specific Configurations:
+- ✅ **Vercel**: `vercel.json` with build optimizations
+- ✅ **Cloudflare Pages**: `wrangler.toml` and security headers
+- ✅ **General**: Standard Vite build output
 
 ### Vercel Deployment Setup
 1. **Connect your repository** to Vercel
@@ -247,6 +257,68 @@ Follow the [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/cus
 - ✅ Optimized dependencies bundling
 - ✅ Proper asset caching headers
 - ✅ Compressed static assets
+
+### Cloudflare Pages Deployment
+
+#### Setup Instructions:
+1. **Connect Repository to Cloudflare Pages:**
+   - Go to [Cloudflare Pages Dashboard](https://dash.cloudflare.com/pages)
+   - Click "Create a project" → "Connect to Git"
+   - Select your repository
+
+2. **Configure Build Settings:**
+   ```bash
+   Build command: npm run build:cloudflare
+   Build output directory: dist
+   Root directory: (leave empty)
+   ```
+
+3. **Set Environment Variables:**
+   Navigate to Settings → Environment variables and add:
+   ```bash
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+   VITE_SUPABASE_PROJECT_ID=your-supabase-project-id
+   VITE_WEB3FORMS_ACCESS_KEY=your-web3forms-api-key
+   ```
+
+4. **Deploy:**
+   - Click "Save and Deploy"
+   - Cloudflare will automatically build and deploy your site
+
+#### Cloudflare Pages Features:
+- **Automatic HTTPS:** SSL certificates included
+- **Global CDN:** Fast loading worldwide
+- **Branch Previews:** Automatic preview deployments
+- **Security Headers:** Built-in security configurations
+- **Edge Functions:** Optional serverless functions support
+
+#### Configuration Files:
+- `wrangler.toml`: Main Cloudflare configuration
+- `_headers.json`: Security and caching headers
+- `_build.config`: Build configuration reference
+
+#### Troubleshooting Cloudflare Deployment:
+
+1. **Build Failures:**
+   ```bash
+   # Test build locally
+   npm run build:cloudflare
+   ```
+
+2. **Environment Variables:**
+   - Set variables in Cloudflare Pages dashboard
+   - Ensure `VITE_` prefix for client-side variables
+   - Check variable names match `.env.example`
+
+3. **Routing Issues:**
+   - `wrangler.toml` includes SPA redirect configuration
+   - All routes fallback to `/index.html`
+
+4. **Custom Domain:**
+   - Add custom domain in Cloudflare Pages dashboard
+   - Configure DNS records as instructed
+   - SSL certificates are automatically provisioned
 
 ### Environment Variables for Production
 Ensure all environment variables are properly configured in your hosting platform:

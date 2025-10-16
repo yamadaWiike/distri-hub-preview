@@ -1,0 +1,28 @@
+name = "baskit-distributor-hub"
+compatibility_date = "2024-10-16"
+pages_build_output_dir = "dist"
+
+[build]
+command = "npm run build:cloudflare"
+
+[build.environment_variables]
+NODE_VERSION = "18"
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
+
+[env.production.vars]
+# Production environment variables will be set in Cloudflare dashboard
+# VITE_SUPABASE_URL = ""
+# VITE_SUPABASE_ANON_KEY = ""
+# VITE_SUPABASE_PROJECT_ID = ""
+# VITE_WEB3FORMS_ACCESS_KEY = ""
+
+[env.preview.vars]
+# Preview environment variables
+# VITE_SUPABASE_URL = ""
+# VITE_SUPABASE_ANON_KEY = ""
+# VITE_SUPABASE_PROJECT_ID = ""
+# VITE_WEB3FORMS_ACCESS_KEY = ""
