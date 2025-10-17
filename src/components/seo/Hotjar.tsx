@@ -31,10 +31,21 @@ const Hotjar: React.FC = () => {
       hjsv: HOTJAR_SNIPPET_VERSION
     };
 
-    // Create and add the script
+    // Create and add the script with error handling
     const script = document.createElement('script');
     script.async = true;
+    script.defer = true;
     script.src = `https://static.hotjar.com/c/hotjar-${HOTJAR_ID}.js?sv=${HOTJAR_SNIPPET_VERSION}`;
+    
+    // Add error handling
+    script.onerror = () => {
+      console.warn('Failed to load Hotjar script. Analytics may be blocked by an extension or network policy.');
+      // Remove the failed script
+      if (document.head.contains(script)) {
+        document.head.removeChild(script);
+      }
+    };
+    
     document.head.appendChild(script);
 
     // Cleanup function
