@@ -297,7 +297,8 @@ export async function getAllVariantOptions() {
 interface ProductWithVariantCount {
   id: string;
   category: string;
-  brand: string;
+  brand?: string;
+  brand_id?: string;
   name: string;
   size: string;
   distributor_price: number;
@@ -365,7 +366,7 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
         id,
         sku,
         category_id,
-        brand,
+        brand_id,
         name,
         size,
         distributor_price,
@@ -465,7 +466,7 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
       return {
         id: dbProduct.id,
         category: dbProduct.category,
-        brand: dbProduct.brand,
+        brand: dbProduct.brand_id || 'Unknown', // Use brand_id instead of brand
         name: dbProduct.name,
         size: dbProduct.size,
         distributorPrice: dbProduct.distributor_price,
