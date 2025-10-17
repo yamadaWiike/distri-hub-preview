@@ -191,7 +191,7 @@ export async function fetchProductBySku(skuOrId: string): Promise<Product | null
         productId = product.id;
       } else {
         // Neither SKU nor ID matched
-        console.log(`Product not found with identifier "${skuOrId}"`);
+        // Product not found with identifier
         return null;
       }
     } else if (productSkuError && productSkuError.code !== 'PGRST116') {

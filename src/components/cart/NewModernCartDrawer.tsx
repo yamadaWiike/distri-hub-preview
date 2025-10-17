@@ -155,7 +155,7 @@ export function ModernCartDrawer() {
       return;
     }
     
-    console.log('Navigating to checkout');
+
     setIsOpen(false);
     navigate('/checkout');
   };

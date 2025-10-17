@@ -9,9 +9,9 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build && cp vercel.json dist/",
+    "build": "vite build && powershell -Command \"Copy-Item vercel.json dist/ -Force\"",
     "build:vercel": "vite build",
-    "build:cloudflare": "vite build && cp public/_redirects dist/",
+    "build:cloudflare": "vite build && powershell -Command \"Copy-Item public/_redirects dist/ -Force\"",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",

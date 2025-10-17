@@ -71,8 +71,6 @@ export async function fetchAllBrands(): Promise<Brand[]> {
       .limit(1);
       
     if (tableCheckError) {
-      console.warn('Brands table might not exist:', tableCheckError.message);
-      
       // If table doesn't exist or we can't access it, return mock brands
       return getMockBrands();
     }
@@ -88,7 +86,6 @@ export async function fetchAllBrands(): Promise<Brand[]> {
     }
     
     if (!data || data.length === 0) {
-      console.log('No brands found in database, using mock data');
       return getMockBrands();
     }
     

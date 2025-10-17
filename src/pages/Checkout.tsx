@@ -120,17 +120,13 @@ export default function Checkout() {
 
   // Check for user authentication, cart items, and fetch profile data
   useEffect(() => {
-    console.log("Checkout page mounted, checking auth and cart");
     
     if (!user) {
-      console.log("User not authenticated, redirecting to login");
       navigate("/masuk", { replace: true });
       return;
     }
     
-    console.log(`Cart has ${items.length} items`);
     if (items.length === 0) {
-      console.log("Cart is empty, redirecting to products");
       navigate("/daftar-produk", { replace: true });
       return;
     }
@@ -180,7 +176,7 @@ export default function Checkout() {
     };
     
     fetchProfileData();
-    console.log("Checkout page ready");
+
   }, [user, items, navigate]);
 
   // Update delivery details
@@ -212,7 +208,7 @@ export default function Checkout() {
       items: items,
       totalAmount
     };
-    console.log('Submitting order:', orderData);
+
 
     try {
       // Import supabase client
@@ -312,12 +308,6 @@ export default function Checkout() {
         await supabase.from('orders').delete().eq('id', typedOrderData.id);
         throw new Error('Failed to create order items: ' + itemsError.message);
       }
-
-      console.log('Order successfully saved to database:', {
-        orderId: typedOrderData.id,
-        orderNumber: orderNumber,
-        itemsCount: orderItems.length
-      });
 
       // Prepare order details for email
       const orderItemsText = items.map(item => 

@@ -104,7 +104,7 @@ const UserManager = () => {
           .order('created_at', { ascending: true });
           
           if (!profileError && profiles && profiles.length > 0) {
-          console.log('Fetched user profiles data:', profiles);
+
           
           // Create users array with profile data
           // Get role from auth.users app_metadata instead of hardcoded email check
@@ -122,9 +122,7 @@ const UserManager = () => {
       }
       
       // Fall back to mock data if Supabase fetch fails
-      console.log('Using mock user data');
       import('@/data/mockData').then(({ mockUserProfiles }) => {
-        console.log('Loaded mock user profiles:', mockUserProfiles);
         
         // Create mock users with profiles
         const mockUsersWithProfiles = mockUserProfiles.map(profile => ({
@@ -350,7 +348,7 @@ const UserManager = () => {
             }
             throw error;
           }
-          console.log('Successfully updated user in Supabase');
+
         }
       } catch (supabaseError) {
         console.warn('Supabase update failed, updating locally only:', supabaseError);

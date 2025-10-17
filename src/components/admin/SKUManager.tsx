@@ -382,7 +382,7 @@ const SKUManager = () => {
   // Load categories from database
   const loadCategories = async (): Promise<void> => {
     try {
-      console.log('Loading categories...');
+
       const { data, error } = await supabase
         .from('product_categories')
         .select('id, name')
@@ -399,18 +399,18 @@ const SKUManager = () => {
         
         // If table doesn't exist, create some fallback categories
         if (error.message?.includes('does not exist') || error.message?.includes('not found')) {
-          console.log('Categories table does not exist, using fallback categories');
+          // Categories table does not exist, using fallback categories
         }
         
         throw error;
       }
       
-      console.log('Loaded categories:', data);
+
       setCategories(data || []);
     } catch (error) {
       console.error('Error loading categories:', error);
       // Set some default categories if the table doesn't exist yet
-      console.log('Setting fallback categories due to error');
+      // Setting fallback categories due to error
       setCategories([
         { id: 'snack', name: 'Snack' },
         { id: 'beverage', name: 'Beverage' },
@@ -426,11 +426,8 @@ const SKUManager = () => {
   // Load brands from database
   const loadBrands = async (): Promise<void> => {
     try {
-      console.log('Loading brands...');
       const brandData = await fetchAllBrands();
-      console.log('Loaded brands:', brandData);
       setBrands(brandData);
-      console.log('Brand cache should now be populated');
     } catch (error) {
       console.error('Error loading brands:', error);
       toast({
@@ -511,7 +508,7 @@ const SKUManager = () => {
     }
 
     try {
-      console.log('Attempting to create category:', newCategoryName.trim());
+
       
       const { data, error } = await supabase
         .from('product_categories')
@@ -886,11 +883,6 @@ const SKUManager = () => {
           .order('name', { ascending: true });
           
         if (!error && data && data.length > 0) {
-          console.log('Fetched product data:', data);
-          // Log structure of the first product to debug
-          console.log('First product structure:', Object.keys(data[0]));
-          console.log('Sample product fields:', JSON.stringify(data[0]));
-          
           // Specifically check for mix variant fields in the retrieved data
           const hasMixVariantFields = data.some(product => {
             // Cast to SKU type to ensure TypeScript recognizes the fields
@@ -899,20 +891,7 @@ const SKUManager = () => {
                    skuProduct.allow_mix_variants !== undefined;
           });
           
-          console.log('Mix variant fields present in retrieved data:', hasMixVariantFields);
-          
           // Check a few records for mix variant fields
-          const sampleProducts = data.slice(0, 3);
-          sampleProducts.forEach((product, i) => {
-            // Cast to SKU type to ensure TypeScript recognizes the fields
-            const skuProduct = product as SKU;
-            console.log(`Product ${i} mix variant fields:`, {
-              id: skuProduct.id,
-              name: skuProduct.name,
-              single_sku_moq: skuProduct.single_sku_moq,
-              allow_mix_variants: skuProduct.allow_mix_variants
-            });
-          });
           
           // Transform data to ensure we have proper brand names
           const transformedData = data.map(product => {
@@ -921,9 +900,7 @@ const SKUManager = () => {
             
             // Get actual brand name using the lookup function
             const brandId = (p.brand_id as string) || '';
-            console.log(`Product ${p.name}: brand_id = "${brandId}"`);
             const brandName = getBrandNameFromCache(brandId);
-            console.log(`Resolved brand name: "${brandName}"`);
             
             return {
               ...p,
@@ -941,9 +918,8 @@ const SKUManager = () => {
       }
       
       // Fall back to mock data if Supabase fetch fails
-      console.log('Using mock SKU data');
+      // Use mock SKU data
       const { mockSKUs } = await import('@/data/mockData');
-      console.log('Loaded mock SKU data:', mockSKUs);
       setSkus(mockSKUs);
     } catch (error) {
       console.error('Error fetching SKUs:', error);
@@ -1138,13 +1114,10 @@ const SKUManager = () => {
         return;
       }
 
-      console.log('Save SKU called');
-      console.log('Edit mode:', editMode);
-      console.log('Current form data:', form);
-      console.log('Mix variant fields:', {
-        single_sku_moq: form.single_sku_moq,
-        allow_mix_variants: form.allow_mix_variants
-      });
+      
+      
+      
+      
 
       // Check if user is authenticated
       if (!user) {
@@ -1156,8 +1129,8 @@ const SKUManager = () => {
         return;
       }
 
-      console.log('User authentication state:', user);
-      console.log('User role:', user.role);
+      
+      
       
       // Warn about role requirements for admin operations
       if (user.role !== 'admin') {
@@ -1177,15 +1150,15 @@ const SKUManager = () => {
         return;
       }
       
-      console.log('Supabase session user:', sessionData.session.user);
-      console.log('Session user role:', sessionData.session.user.role);
+      
+      
 
       let result;
       
       if (editMode && currentSKU) {
-        console.log('Update mode detected');
-        console.log('Current SKU:', currentSKU);
-        console.log('Current SKU ID:', currentSKU.id);
+        
+        
+        
         
         // For updates, only update the fields that can be safely changed
         const updateData = {
@@ -1209,10 +1182,10 @@ const SKUManager = () => {
           enable_uom_conversions: form.enable_uom_conversions,
         };
         
-        console.log('Update data being sent:', updateData);
+        
         
         // Log the exact update data being sent to Supabase
-        console.log('Update data being sent to database:', JSON.stringify(updateData, null, 2));
+        
         
         // Update existing SKU in the products table
         result = await supabase
@@ -1222,17 +1195,11 @@ const SKUManager = () => {
           .eq('id', currentSKU.id)
           .select();
           
-        console.log('Update result:', result);
-        console.log('Update result data:', result.data);
-        console.log('Number of rows updated:', result.data?.length || 0);
         
-        // Check if the mix variant fields were included in the response
-        if (result.data && result.data.length > 0) {
-          console.log('Updated product mix variant fields in response:', {
-            single_sku_moq: result.data[0].single_sku_moq,
-            allow_mix_variants: result.data[0].allow_mix_variants
-          });
-        }
+        
+        
+        
+        // Response received successfully
       } else {
         // For new SKUs, include all required fields
         const insertData = {
@@ -1262,12 +1229,12 @@ const SKUManager = () => {
           // Added nullable fields explicitly
         };
         
-        console.log('Insert data being sent:', insertData);
+        
         
         // Check current session
         const { data: sessionData } = await supabase.auth.getSession();
-        console.log('Current session:', sessionData.session?.user?.id);
-        console.log('Session role:', sessionData.session?.user?.role);
+        
+        
         
         // Insert new SKU into the products table
         result = await supabase
@@ -1295,7 +1262,7 @@ const SKUManager = () => {
         return;
       }
       
-      console.log('Save operation successful:', result.data);
+      
       
       // Get the SKU ID for saving variants
       const skuId = editMode && currentSKU ? currentSKU.id : result.data?.[0]?.id;
@@ -1437,7 +1404,7 @@ const SKUManager = () => {
               
             if (conversionError) throw conversionError;
             
-            console.log(`Saved ${conversionsToInsert.length} UOM conversions for product ${skuId}`);
+            
           } catch (conversionError) {
             console.error('Error saving UOM conversions:', conversionError);
             // Don't fail the entire operation if UOM conversions fail
@@ -1475,7 +1442,7 @@ const SKUManager = () => {
               
             if (uomPricingError) throw uomPricingError;
             
-            console.log(`Saved ${uomPricingToInsert.length} UOM pricing entries for product ${skuId}`);
+            
           } catch (uomPricingError) {
             console.error('Error saving UOM pricing:', uomPricingError);
             // Don't fail the entire operation if UOM pricing fails
@@ -1719,12 +1686,12 @@ const SKUManager = () => {
   
   // Open dialog to edit an existing SKU
   const openEditDialog = async (sku: SKU) => {
-    console.log('Opening edit dialog with SKU:', sku);
-    console.log('SKU object keys:', Object.keys(sku));
+    
+    
     
     // Get the brand_id - this is what we need for the dropdown
     const brandId = sku.brand_id || '';
-    console.log('Brand ID value:', brandId);
+    
     
     setEditMode(true);
     setCurrentSKU(sku);
@@ -1790,15 +1757,6 @@ const SKUManager = () => {
     const { name, value } = e.target;
     const updatedForm = { ...form, [name]: value };
     setForm(updatedForm);
-    
-    // Debug log form changes
-    if (name === 'single_sku_moq' || name === 'allow_mix_variants') {
-      console.log(`Form field ${name} changed:`, {
-        oldValue: form[name as keyof typeof form],
-        newValue: value,
-        currentForm: updatedForm
-      });
-    }
   };
   
   // Handle checkbox changes
@@ -1806,15 +1764,6 @@ const SKUManager = () => {
     const { name, checked } = e.target;
     const updatedForm = { ...form, [name]: checked };
     setForm(updatedForm);
-    
-    // Debug log checkbox changes
-    if (name === 'allow_mix_variants' || name === 'has_variants') {
-      console.log(`Checkbox ${name} changed:`, {
-        oldValue: form[name as keyof typeof form],
-        newValue: checked,
-        currentForm: updatedForm
-      });
-    }
   };
   
   // Handle number input changes
@@ -3015,3 +2964,4 @@ const SKUManager = () => {
 };
 
 export default SKUManager;
+

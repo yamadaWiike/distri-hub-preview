@@ -12,7 +12,6 @@ export function useHotjar() {
    */
   const identifyUser = useCallback((userId: string, userProperties?: Record<string, string>) => {
     if (!window.hj) {
-      console.warn('Hotjar not loaded yet');
       return;
     }
 
@@ -26,7 +25,6 @@ export function useHotjar() {
    */
   const triggerEvent = useCallback((eventName: string) => {
     if (!window.hj) {
-      console.warn('Hotjar not loaded yet');
       return;
     }
 
@@ -38,7 +36,6 @@ export function useHotjar() {
    */
   const triggerRecording = useCallback(() => {
     if (!window.hj) {
-      console.warn('Hotjar not loaded yet');
       return;
     }
 

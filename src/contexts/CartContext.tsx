@@ -67,7 +67,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     });
     
     // Log the current cart for debugging
-    console.log(`Added item to cart: ${item.name} ${item.variant ? `(${item.variant.name})` : ''}`);
+
   }, []);
 
   /**

@@ -355,8 +355,7 @@ export default function OrderManager() {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            console.log('Setting selected order:', order);
-                            console.log('Order items:', order.order_items);
+
                             setSelectedOrder(order);
                           }}
                         >

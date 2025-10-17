@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Product, RegionPricing, ProductVariant } from '@/data/products';
+import { withAuth, requireAuth, validateAuth } from '@/utils/auth-guards';
 
 // Define database types to match our schema
 export type ProductFromDB = {
@@ -164,6 +165,9 @@ type ProductVariantWithOption = ProductVariantFromDB & {
 
 // Fetch product variants for a specific product
 export async function fetchProductVariants(productId: string) {
+  // Ensure user is authenticated and approved
+  await requireAuth();
+  
   try {
     
     // Query the product_variants table directly - this matches your actual schema
@@ -350,6 +354,9 @@ interface FallbackProduct {
 
 // Fetch all products with variant information
 export async function fetchProductsWithVariants(): Promise<Product[]> {
+  // Ensure user is authenticated and approved
+  await requireAuth();
+  
   try {
     // First try to get products from the products_with_variants view
     const { data: viewProducts, error: productsError } = await supabase
@@ -357,7 +364,7 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
       .select(`
         id,
         sku,
-        category,
+        category_id,
         brand,
         name,
         size,
@@ -455,29 +462,6 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
       const productRegions = (regionPricing as RegionPricingDB[])
         .filter((r) => r.product_id === dbProduct.id);
       
-      // Debug logging for products with UOM
-      if (dbProduct.moq_uom && dbProduct.moq_uom !== 'pcs') {
-        console.log(`fetchProductsWithVariants - Product ${dbProduct.name} has UOM:`, {
-          name: dbProduct.name,
-          moq_uom: dbProduct.moq_uom,
-          pricing_uom: dbProduct.pricing_uom,
-          base_uom: dbProduct.base_uom
-        });
-      }
-      
-      // Debug the database UOM values for Gula Kapas
-      if (dbProduct.name === 'Gula Kapas') {
-        console.log(`Database UOM values for ${dbProduct.name}:`, {
-          product_moq_uom: dbProduct.moq_uom,
-          product_pricing_uom: dbProduct.pricing_uom,
-          regions: productRegions.map(r => ({
-            area: r.area,
-            regional_moq_uom: r.moq_uom,
-            regional_price_uom: r.price_uom
-          }))
-        });
-      }
-      
       return {
         id: dbProduct.id,
         category: dbProduct.category,
@@ -511,30 +495,20 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
             allowMixVariants: region.allow_mix_variants || false
           };
           
-          // Debug the mapping for Gula Kapas
-          if (dbProduct.name === 'Gula Kapas') {
-            console.log(`Mapped region ${region.area}:`, {
-              original_moq_uom: region.moq_uom,
-              original_price_uom: region.price_uom,
-              product_moq_uom: dbProduct.moq_uom,
-              product_pricing_uom: dbProduct.pricing_uom,
-              final_moq_uom: mappedRegion.moq_uom,
-              final_price_uom: mappedRegion.price_uom
-            });
-          }
-          
           return mappedRegion;
         })
       };
     });
   } catch (error) {
-    console.error('Exception fetching products with variants:', error);
     return [];
   }
 }
 
 // Get all products with their region pricing
 export async function getAllProducts(): Promise<Product[]> {
+  // Ensure user is authenticated and approved
+  await requireAuth();
+  
   try {
     // Fetch all products with brand and category names - explicitly select UOM fields
     const { data: productsData, error: productsError } = await supabase
@@ -592,6 +566,9 @@ export async function getAllProducts(): Promise<Product[]> {
 
 // Get a single product by ID
 export async function getProductById(id: string): Promise<Product | null> {
+  // Ensure user is authenticated and approved
+  await requireAuth();
+  
   try {
     // Check if the id looks like a UUID or a SKU
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -656,6 +633,9 @@ export async function getProductById(id: string): Promise<Product | null> {
 
 // Get areas where products are available (distinct list)
 export async function getAllAreas(): Promise<string[]> {
+  // Ensure user is authenticated and approved
+  await requireAuth();
+  
   try {
     const { data, error } = await supabase
       .from('region_pricing')
@@ -677,6 +657,9 @@ export async function getAllAreas(): Promise<string[]> {
 
 // Get all available brands (distinct list)
 export async function getAllBrands(): Promise<string[]> {
+  // Ensure user is authenticated and approved
+  await requireAuth();
+  
   try {
     // Query the brands table directly - not the products table
     const { data, error } = await supabase
@@ -715,30 +698,23 @@ export interface ProductWithVariant extends Omit<Product, 'variants' | 'hasVaria
 
 // Fetch products expanded by variants - each variant becomes a separate product entry
 export async function fetchProductsExpandedByVariants(): Promise<ProductWithVariant[]> {
+  // Ensure user is authenticated and approved
+  await requireAuth();
+  
   try {
-    console.log('Starting fetchProductsExpandedByVariants...');
     // First get all base products
     const baseProducts = await fetchProductsWithVariants();
-    console.log('Base products fetched:', baseProducts.length);
     const expandedProducts: ProductWithVariant[] = [];
     
     for (const product of baseProducts) {
-      console.log(`Processing product: ${product.name}, hasVariants: ${product.hasVariants}`);
       if (product.hasVariants) {
         // Fetch variants for this product
         const variants = await fetchProductVariants(product.id);
-        console.log(`Variants found for ${product.name}:`, variants.length);
         
         // For testing - only add real variants, no test data
         if (variants.length > 0) {
           // Create a separate product entry for each variant
           for (const variant of variants) {
-            console.log(`Creating variant product for: ${variant.variantName}`);
-            console.log(`Base product UOM for ${product.name}:`, {
-              moq_uom: product.moq_uom,
-              pricing_uom: product.pricing_uom,
-              base_uom: product.base_uom
-            });
             const variantProduct: ProductWithVariant = {
               ...product,
               // Create a unique ID for the variant product entry
@@ -770,11 +746,6 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
                 allowMixVariants: region.allowMixVariants || false
               }))
             };
-            console.log(`Final variant product UOM for ${variantProduct.displayName}:`, {
-              moq_uom: variantProduct.moq_uom,
-              pricing_uom: variantProduct.pricing_uom,
-              base_uom: variantProduct.base_uom
-            });
             expandedProducts.push(variantProduct);
           }
         } else {
@@ -799,11 +770,8 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
       }
     }
     
-    console.log('Final expanded products:', expandedProducts.length);
-    console.log('Variant products:', expandedProducts.filter(p => p.isVariant).length);
     return expandedProducts;
   } catch (error) {
-    console.error('Error fetching products expanded by variants:', error);
     return [];
   }
 }
