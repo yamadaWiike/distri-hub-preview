@@ -126,19 +126,16 @@ export default function OrderManager() {
             isUserAdmin = true;
           }
         } catch (e) {
-          console.warn('Could not parse JWT claims:', e);
+          // Could not parse JWT claims
         }
       }
       
-      // Fallback: check email against admin list (same as supabase client)
-      if (!isUserAdmin) {
-        const adminEmails = ['rudy@baskit.app', 'admin.commercial@baskit.app', 'admin@example.com'];
-        isUserAdmin = adminEmails.includes(user.email || '');
+      // Check user app_metadata for admin role (server-side managed)
+      if (!isUserAdmin && user.app_metadata?.role === 'admin') {
+        isUserAdmin = true;
       }
       
       if (!isUserAdmin) {
-        console.warn('User does not have admin access');
-        console.warn('User email:', user.email, 'User role:', user.role);
         // Continue anyway - let database policies handle access control if needed
       }
 
@@ -170,13 +167,11 @@ export default function OrderManager() {
         .order('created_at', { ascending: false });
 
       if (ordersError) {
-        console.error('Orders fetch error:', ordersError);
         throw new Error(`Failed to fetch orders: ${ordersError.message}`);
       }
 
       // Transform data to match our interface
       const ordersWithDetails: Order[] = await Promise.all(ordersData.map(async (order: OrderFromDB) => {
-        console.log(`Fetching order items for order ${order.id}`);
         
         // Fetch order items for each order
         const { data: orderItemsData, error: itemsError } = await supabase
@@ -185,15 +180,12 @@ export default function OrderManager() {
           .eq('order_id', order.id);
 
         if (itemsError) {
-          console.error('Order items fetch error:', itemsError);
+          throw new Error(`Failed to fetch order items: ${itemsError.message}`);
         }
-
-        console.log(`Found ${orderItemsData?.length || 0} items for order ${order.id}:`, orderItemsData);
 
         // For each order item, fetch product details
         const enhancedOrderItems: OrderItem[] = orderItemsData ? await Promise.all(
           orderItemsData.map(async (item: OrderItemFromDB) => {
-            console.log(`Fetching product details for product_id: ${item.product_id}`);
             
             const { data: productData, error: productError } = await supabase
               .from('products')
@@ -202,7 +194,7 @@ export default function OrderManager() {
               .single() as { data: ProductFromDB | null; error: Error | null };
 
             if (productError) {
-              console.error('Product fetch error:', productError);
+              // Handle product fetch error silently
             }
 
             const enhancedItem = {
@@ -211,7 +203,6 @@ export default function OrderManager() {
               product_sku: productData?.sku || 'N/A'
             };
             
-            console.log(`Enhanced item:`, enhancedItem);
             return enhancedItem;
           })
         ) : [];
@@ -238,10 +229,8 @@ export default function OrderManager() {
         };
       }));
 
-      console.log('Final orders with details:', ordersWithDetails);
       setOrders(ordersWithDetails);
     } catch (error: unknown) {
-      console.error('Error fetching orders:', error);
       toast({
         title: "Error Fetching Orders",
         description: error instanceof Error ? error.message : "Failed to fetch orders.",

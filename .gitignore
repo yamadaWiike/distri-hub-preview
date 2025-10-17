@@ -19,6 +19,7 @@ dist-ssr
 .env.production
 .env.development.local
 .env.production.local
+.env.example
 
 # Editor directories and files
 .vscode/*
@@ -30,3 +31,41 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Security test files (keep local only)
+test_all_tables_security.ps1
+scripts/security-test-instructions.ps1
+supabase/migrations/security_verification_test.sql
+SECURITY_AUDIT_REPORT.md
+SECURITY_IMPLEMENTATION_GUIDE.md
+docs/COMPREHENSIVE_SECURITY_ASSESSMENT.md
+docs/DISTRIBUTOR_PROFILES_RLS_SECURITY_FIX.md
+docs/PRODUCTS_RLS_SECURITY_FIX.md
+
+# Security-related migration files (keep local only)
+supabase/migrations/*security*
+supabase/migrations/*emergency*
+supabase/migrations/*lockdown*
+supabase/migrations/*restoration*
+supabase/migrations/nuclear_policy_cleanup.sql
+supabase/migrations/secure_production_restore.sql
+supabase/migrations/temporary_development_restore.sql
+supabase/migrations/20251017000002_fix_distributor_profiles_rls.sql
+
+# Security audit and test scripts (keep local only)
+*security_audit*.ps1
+*security*.ps1
+detailed_sql_security_audit.ps1
+apply_secure_migration.ps1
+restore_app_securely.ps1
+test_api_security.ps1
+scripts/test-*.ps1
+scripts/deploy-*-rls-*.ps1
+scripts/deploy-*-rls-*.sh
+scripts/manual-deploy-*.ps1
+scripts/manual-deploy-*.sh
+scripts/manual-deploy-*.cmd
+scripts/validate-*.sql
+
+# Local security directory
+security-local/

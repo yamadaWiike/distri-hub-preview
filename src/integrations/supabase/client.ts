@@ -39,9 +39,12 @@ export const isAdmin = async (): Promise<boolean> => {
       }
     }
     
-    // Alternatively check email against admin list
-    const adminEmails = ['rudy@baskit.app', 'admin.commercial@baskit.app', 'admin@example.com'];
-    return adminEmails.includes(user.email || '');
+    // Check user app_metadata for admin role (server-side managed)
+    if (user.app_metadata?.role === 'admin') {
+      return true;
+    }
+    
+    return false;
   } catch (error) {
     console.error('Error checking admin status:', error);
     return false;

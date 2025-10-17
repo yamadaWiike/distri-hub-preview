@@ -57,12 +57,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
             
             // Set user data with or without profile
+            const userStatus = profile?.status as 'pending' | 'active' | 'inactive' | 'rejected' || 'pending';
             setUser({
               id: session.user.id,
               email: session.user.email || '',
               namaBisnis: profile?.nama_bisnis,
               kota: profile?.kota,
-              role: session.user.app_metadata?.role || 'user'
+              role: session.user.app_metadata?.role || 'user',
+              status: userStatus,
+              isApproved: userStatus === 'active'
             });
           } catch (err) {
             console.error('Profile fetch error:', err);
@@ -70,7 +73,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser({
               id: session.user.id,
               email: session.user.email || '',
-              role: session.user.app_metadata?.role || 'user'
+              role: session.user.app_metadata?.role || 'user',
+              status: 'pending',
+              isApproved: false
             });
           }
         } else {
@@ -110,7 +115,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         let userData: User = {
           id: data.user.id,
           email: data.user.email || '',
-          role: data.user.app_metadata?.role || 'user'
+          role: data.user.app_metadata?.role || 'user',
+          status: 'pending',
+          isApproved: false
         };
         
         try {
@@ -128,10 +135,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           // Enhance user data with profile info if available
           if (profile) {
+            const profileStatus = profile.status as 'pending' | 'active' | 'inactive' | 'rejected' || 'pending';
             userData = {
               ...userData,
               namaBisnis: profile.nama_bisnis,
               kota: profile.kota,
+              status: profileStatus,
+              isApproved: profileStatus === 'active'
             };
           }
         } catch (err) {
@@ -204,30 +214,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
         
         try {
-          console.log('Creating distributor profile with data:', profileData);
-          
           // Create profile - bypass TypeScript issues with explicit any
           const { data: insertResult, error } = await supabase
             .from('distributor_profiles')
             .insert(profileData as never)
             .select();
             
-          console.log('Profile creation result:', { insertResult, error });
           profileError = error;
         } catch (err) {
-          console.error('Profile creation error:', err);
           profileError = { message: 'Failed to create profile' };
         }
         
         // Handle profile creation result
         if (profileError) {
-          console.error('Profile creation error:', profileError);
-          console.error('Profile error details:', {
-            message: profileError.message,
-            details: profileError.details,
-            hint: profileError.hint,
-            code: profileError.code
-          });
           
           // If profile creation fails, still continue since the auth account was created
           toast({
@@ -249,7 +248,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: data.email,
           namaBisnis: data.namaBisnis,
           kota: data.kota,
-          role: 'user'
+          role: 'user',
+          status: 'pending',
+          isApproved: false // New registrations need approval
         };
         
         setUser(userData);

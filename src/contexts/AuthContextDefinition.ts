@@ -15,6 +15,8 @@ export type User = {
   namaBisnis?: string;
   kota?: string;
   role: 'user' | 'admin';
+  status?: 'pending' | 'active' | 'inactive' | 'rejected';
+  isApproved?: boolean; // Computed field for easy access
 };
 
 /**

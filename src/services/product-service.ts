@@ -95,15 +95,6 @@ export function mapDBProductToProduct(
   regionPricing: RegionPricingFromDB[],
   variants?: GenericVariant[] // Using generic interface to handle both old and new variant formats
 ): Product {
-  // Debug logging for UOM data
-  if (dbProduct.moq_uom && dbProduct.moq_uom !== 'pcs') {
-    console.log(`Product ${dbProduct.name} has UOM in mapDBProductToProduct:`, {
-      name: dbProduct.name,
-      moq_uom: dbProduct.moq_uom,
-      pricing_uom: dbProduct.pricing_uom,
-      base_uom: dbProduct.base_uom
-    });
-  }
 
   return {
     id: dbProduct.id, // Using actual UUID as ID for better compatibility
@@ -174,7 +165,6 @@ type ProductVariantWithOption = ProductVariantFromDB & {
 // Fetch product variants for a specific product
 export async function fetchProductVariants(productId: string) {
   try {
-    console.log(`Fetching variants for product: ${productId}`);
     
     // Query the product_variants table directly - this matches your actual schema
     const { data, error } = await supabase
@@ -184,16 +174,12 @@ export async function fetchProductVariants(productId: string) {
       .eq('is_active', true);
     
     if (error) {
-      console.error('Error fetching product variants:', error);
       return [];
     }
     
     if (!data || data.length === 0) {
-      console.log(`No variants found for product ${productId}`);
       return [];
     }
-    
-    console.log(`Found ${data.length} real variants for product ${productId}:`, data);
     
     // Convert to the format needed by the frontend using the actual variant_name field
     return data.map((variant: ProductVariantFromDB) => ({
@@ -204,7 +190,6 @@ export async function fetchProductVariants(productId: string) {
       isActive: variant.is_active
     }));
   } catch (error) {
-    console.error('Exception fetching product variants:', error);
     return [];
   }
 }

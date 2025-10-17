@@ -107,11 +107,11 @@ const UserManager = () => {
           console.log('Fetched user profiles data:', profiles);
           
           // Create users array with profile data
-          // Use email_pemilik as the email if available
+          // Get role from auth.users app_metadata instead of hardcoded email check
           const usersWithProfiles = (profiles as UserProfile[]).map(profile => ({
             id: profile.user_id,
             email: profile.email_pemilik || `user_${profile.user_id.substring(0, 5)}@example.com`,
-            role: (profile.email_pemilik === 'rudy@baskit.app' || profile.email_pemilik === 'admin.commercial@baskit.app') ? 'admin' : 'user', // Check for admin emails
+            role: 'user', // Default to user, actual role comes from auth.users metadata
             profile: profile,
           }));          setUsers(usersWithProfiles);
           setIsLoading(false);
@@ -130,7 +130,7 @@ const UserManager = () => {
         const mockUsersWithProfiles = mockUserProfiles.map(profile => ({
           id: profile.user_id,
           email: profile.email_pemilik,
-          role: (profile.email_pemilik === 'rudy@baskit.app' || profile.email_pemilik === 'admin.commercial@baskit.app') ? 'admin' : 'user',
+          role: 'user', // Default to user, actual roles managed server-side
           profile: profile,
         }));
         
@@ -761,7 +761,7 @@ SET raw_app_meta_data = jsonb_set(
   '{role}', 
   '"admin"'
 )
-WHERE email = 'rudy@baskit.app';`}
+WHERE email = 'your-admin-email@example.com';`}
         </pre>
       </div>
     </div>

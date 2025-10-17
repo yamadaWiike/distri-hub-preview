@@ -4,12 +4,14 @@ import { Product, ProductVariant } from "@/data/products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
+import { useDistributorApproval } from "@/hooks/use-distributor-approval";
 import { 
   Tooltip, 
   TooltipContent, 
   TooltipProvider, 
   TooltipTrigger 
 } from "@/components/ui/tooltip";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -25,6 +27,7 @@ import { getAllProducts, getAllAreas, getAllBrands, fetchProductsWithVariants, f
 import { generateCatalogPDF } from "@/utils/catalog";
 import { supabase } from "@/integrations/supabase/client";
 import { CartItem } from "@/contexts/CartContextDefinition";
+import { Clock, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 
 // Import the analytics helpers
 import { trackCatalogExport, trackDeniedCatalogExport } from "@/utils/analytics";
@@ -57,6 +60,9 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
   const { toast } = useToast();
   const { lang } = useLanguage();
   const t = translations[lang];
+  
+  // Get distributor approval status
+  const distributorAccess = useDistributorApproval();
 
   // If a filter area is selected and product has that area, use it as default
   const initialSelectedArea = (() => {
@@ -228,7 +234,7 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
             </div>
             {loggedIn ? (
               <div className="text-sm font-bold text-foreground flex flex-wrap items-baseline gap-1">
-                <span>{formatIDR(basePrice)}</span>
+                <span>{distributorAccess.canViewPrices ? formatIDR(basePrice) : '••••••'}</span>
                 {(() => {
                   const priceUom = product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (regional?.price_uom || 'pcs');
                   return priceUom !== 'pcs' ? <span className="text-xs text-muted-foreground">/{priceUom}</span> : null;
@@ -269,170 +275,201 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
       {/* Use mt-auto to push this section to the bottom of the card */}
       <div className="mt-auto pt-2">
         {loggedIn ? (
-          <div className="space-y-3">
-            <div className="grid gap-2 grid-cols-2">
-              <div>
-                <label className="text-xs text-muted-foreground">Area Distribusi</label>
-                <select
-                  value={selectedArea}
-                  onChange={(e) => {
-                    const newArea = e.target.value;
-                    setSelectedArea(newArea);
+          distributorAccess.isActive ? (
+            <div className="space-y-3">
+              <div className="grid gap-2 grid-cols-2">
+                <div>
+                  <label className="text-xs text-muted-foreground">Area Distribusi</label>
+                  <select
+                    value={selectedArea}
+                    onChange={(e) => {
+                      const newArea = e.target.value;
+                      setSelectedArea(newArea);
+                      
+                      // Find the new MOQ and mix variants settings for the selected area
+                      const newRegional = product.regions.find(r => r.area === newArea) || product.regions[0];
+                      const newMoq = newRegional?.moq ?? product.moq;
+                      const newAllowMixVariants = Boolean(newRegional?.allowMixVariants === true || product.allowMixVariants === true);
+                      
+                      // If mixed variants are allowed, min qty can be 1, otherwise use MOQ
+                      const minQty = (newAllowMixVariants && product.isVariant) ? 1 : newMoq;
+                      
+                      // Update quantity to at least match the minimum quantity
+                      setQty((currentQty) => {
+                        return Math.max(currentQty, minQty);
+                      });
+                    }}
+                    className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-xs"
+                  >
+                    {product.regions.map((r) => (
+                      <option key={r.area} value={r.area}>{r.area}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs text-muted-foreground">Kuantitas</label>
+                  <input
+                    type="number"
+                    // IMPORTANT: Force min="1" directly when mixed variants are allowed
+                    min="1" 
+                    step="1"
+                    value={qty}
+                    onChange={(e) => {
+                      // Parse the new value as integer
+                      let newValue = parseInt(e.target.value || '0');
+                      
+                      // Always ensure at least 1
+                      if (newValue <= 0) {
+                        newValue = 1;
+                      }
+                      
+                      // Critical check: When mix variants is allowed, accept ANY positive value
+                      if (allowMixVariants && product.isVariant) {
+                        // For mixed variants, allow ANY quantity (no enforcement)
+                        setQty(newValue);
+                      } else {
+                        // For regular products, enforce individual MOQ
+                        setQty(newValue < usedMoq ? usedMoq : newValue);
+                      }
+                    }}
+                    className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-xs"
+                  />
+                </div>
+              </div>
+              <div className="bg-muted/30 rounded-md p-2">
+                <div className="text-xs text-muted-foreground mb-1">Estimasi Margin</div>
+                <div className="text-sm font-medium">
+                  {/* Always calculate and display margin if prices are available */}
+                  {basePrice > 0 && product.consumerPrice > 0 ? (
+                    <div className="space-y-0.5">
+                      <div className="font-semibold">{formatIDR(unitProfit * qty)}</div>
+                      <div className={`text-xs ${unitMargin >= 25 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {unitMargin.toFixed(1)}% margin
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-muted-foreground py-1">Tidak tersedia</div>
+                  )}
+                </div>
+              </div>
+              {/* Fixed height button container */}
+              <div className="h-10">
+                <Button
+                  variant="hero"
+                  size="sm"
+                  className="w-full h-full"
+                  onClick={() => {
+                    // For mixed variants, check if we're meeting MOQ across all variants
+                    let finalQty = qty;
+                    let moqMessage = '';
                     
-                    // Find the new MOQ and mix variants settings for the selected area
-                    const newRegional = product.regions.find(r => r.area === newArea) || product.regions[0];
-                    const newMoq = newRegional?.moq ?? product.moq;
-                    const newAllowMixVariants = Boolean(newRegional?.allowMixVariants === true || product.allowMixVariants === true);
+                    if (allowMixVariants && skuLevelMoq > 0 && product.isVariant) {
+                      // For mixed variants products, always allow any quantity (minimum 1)
+                      // Calculate the mixed variant status
+                      const { hasEnoughItems, currentTotal } = checkMixedVariantsMOQ(
+                        items,
+                        product.baseProductId,
+                        regional?.area || '',
+                        skuLevelMoq
+                      );
+                      
+                      // For mixed variants, always allow adding any quantity
+                      // Just provide different messages based on whether MOQ is met
+                      const newTotal = currentTotal + qty;
+                      
+                      if (hasEnoughItems || newTotal >= skuLevelMoq) {
+                        // We're good - the current cart + this addition will meet or exceed SKU-level MOQ
+                        moqMessage = lang === 'id'
+                          ? ` (Total varian: ${newTotal}/${skuLevelMoq})`
+                          : ` (Total variants: ${newTotal}/${skuLevelMoq})`;
+                      } else {
+                        // We're adding a quantity that won't meet the MOQ yet - show how many more needed
+                        const stillNeeded = skuLevelMoq - newTotal;
+                        moqMessage = lang === 'id'
+                          ? ` (${newTotal}/${skuLevelMoq}, perlu ${stillNeeded} lagi)`
+                          : ` (${newTotal}/${skuLevelMoq}, need ${stillNeeded} more)`;
+                      }
+                      
+                      // Use exactly the quantity the user specified - no auto adjustments
+                      finalQty = qty;
+                    } else if (qty < usedMoq) {
+                      // For regular products, enforce individual MOQ
+                      finalQty = usedMoq;
+                    }
                     
-                    // If mixed variants are allowed, min qty can be 1, otherwise use MOQ
-                    const minQty = (newAllowMixVariants && product.isVariant) ? 1 : newMoq;
-                    
-                    // Update quantity to at least match the minimum quantity
-                    setQty((currentQty) => {
-                      return Math.max(currentQty, minQty);
+                    // Add to cart with exact quantity specified and variant if selected
+                    addItem({
+                      id: product.baseProductId, // Use base product ID for cart consistency
+                      name: product.name, // Use original product name
+                      size: product.size,
+                      image: product.image,
+                      province: regional?.area || '',
+                      unitPrice: basePrice,
+                      moq: usedMoq,
+                      qty: finalQty, // Use calculated quantity based on MOQ rules
+                      consumerPrice: product.consumerPrice,
+                      // Include mixed variants information for MOQ validation
+                      skuLevelMoq: allowMixVariants ? skuLevelMoq : undefined,
+                      allowMixVariants: allowMixVariants,
+                      variant: product.isVariant && product.variantInfo ? {
+                        id: product.variantInfo.id,
+                        name: product.variantInfo.variantName,
+                        additionalPrice: product.variantInfo.additionalPrice
+                      } : undefined,
+                      // UOM conversion data (not displayed but available for calculations)
+                      uomConversions: uomConversions,
+                      selectedUoms: {
+                        moq: moqUom,
+                        pricing: pricingUom,
+                        base: baseUom
+                      }
+                    });
+
+                    // Show toast notification
+                    toast({
+                      title: `${product.displayName} ${product.size}`,
+                      description: lang === 'id' 
+                        ? `${finalQty} item ditambahkan ke keranjang${moqMessage}` 
+                        : `${finalQty} items added to cart${moqMessage}`,
+                      duration: 3000,
                     });
                   }}
-                  className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-xs"
                 >
-                  {product.regions.map((r) => (
-                    <option key={r.area} value={r.area}>{r.area}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs text-muted-foreground">Kuantitas</label>
-                <input
-                  type="number"
-                  // IMPORTANT: Force min="1" directly when mixed variants are allowed
-                  min="1" 
-                  step="1"
-                  value={qty}
-                  onChange={(e) => {
-                    // Parse the new value as integer
-                    let newValue = parseInt(e.target.value || '0');
-                    
-                    // Always ensure at least 1
-                    if (newValue <= 0) {
-                      newValue = 1;
-                    }
-                    
-                    // Critical check: When mix variants is allowed, accept ANY positive value
-                    if (allowMixVariants && product.isVariant) {
-                      // For mixed variants, allow ANY quantity (no enforcement)
-                      setQty(newValue);
-                    } else {
-                      // For regular products, enforce individual MOQ
-                      setQty(newValue < usedMoq ? usedMoq : newValue);
-                    }
-                  }}
-                  className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-xs"
-                />
+                  {lang === 'id' ? "Tambah ke Keranjang" : "Add to Cart"}
+                </Button>
               </div>
             </div>
-            <div className="bg-muted/30 rounded-md p-2">
-              <div className="text-xs text-muted-foreground mb-1">Estimasi Margin</div>
-              <div className="text-sm font-medium">
-                {/* Always calculate and display margin if prices are available */}
-                {basePrice > 0 && product.consumerPrice > 0 ? (
-                  <div className="space-y-0.5">
-                    <div className="font-semibold">{formatIDR(unitProfit * qty)}</div>
-                    <div className={`text-xs ${unitMargin >= 25 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                      {unitMargin.toFixed(1)}% margin
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-muted-foreground py-1">Tidak tersedia</div>
-                )}
-              </div>
-            </div>
-            {/* Fixed height button container */}
-            <div className="h-10">
-              <Button
-                variant="hero"
-                size="sm"
-                className="w-full h-full"
-                onClick={() => {
-                  // For mixed variants, check if we're meeting MOQ across all variants
-                  let finalQty = qty;
-                  let moqMessage = '';
-                  
-                  if (allowMixVariants && skuLevelMoq > 0 && product.isVariant) {
-                    // For mixed variants products, always allow any quantity (minimum 1)
-                    // Calculate the mixed variant status
-                    const { hasEnoughItems, currentTotal } = checkMixedVariantsMOQ(
-                      items,
-                      product.baseProductId,
-                      regional?.area || '',
-                      skuLevelMoq
-                    );
-                    
-                    // For mixed variants, always allow adding any quantity
-                    // Just provide different messages based on whether MOQ is met
-                    const newTotal = currentTotal + qty;
-                    
-                    if (hasEnoughItems || newTotal >= skuLevelMoq) {
-                      // We're good - the current cart + this addition will meet or exceed SKU-level MOQ
-                      moqMessage = lang === 'id'
-                        ? ` (Total varian: ${newTotal}/${skuLevelMoq})`
-                        : ` (Total variants: ${newTotal}/${skuLevelMoq})`;
-                    } else {
-                      // We're adding a quantity that won't meet the MOQ yet - show how many more needed
-                      const stillNeeded = skuLevelMoq - newTotal;
-                      moqMessage = lang === 'id'
-                        ? ` (${newTotal}/${skuLevelMoq}, perlu ${stillNeeded} lagi)`
-                        : ` (${newTotal}/${skuLevelMoq}, need ${stillNeeded} more)`;
-                    }
-                    
-                    // Use exactly the quantity the user specified - no auto adjustments
-                    finalQty = qty;
-                  } else if (qty < usedMoq) {
-                    // For regular products, enforce individual MOQ
-                    finalQty = usedMoq;
+          ) : (
+            // Account pending approval or rejected
+            <div className="space-y-3">
+              <Alert className={`border-${distributorAccess.statusColor === 'yellow' ? 'orange' : distributorAccess.statusColor}-200 bg-${distributorAccess.statusColor === 'yellow' ? 'orange' : distributorAccess.statusColor}-50`}>
+                <div className="flex items-center gap-2">
+                  {distributorAccess.isPending && <Clock className="h-4 w-4 text-orange-500" />}
+                  {distributorAccess.isRejected && <XCircle className="h-4 w-4 text-red-500" />}
+                  {distributorAccess.isInactive && <AlertTriangle className="h-4 w-4 text-gray-500" />}
+                  <AlertDescription className="text-sm">
+                    {lang === 'id' ? (
+                      distributorAccess.isPending ? 'Akun menunggu persetujuan admin' :
+                      distributorAccess.isRejected ? 'Akun telah ditolak' :
+                      distributorAccess.isInactive ? 'Akun tidak aktif' :
+                      'Status akun tidak diketahui'
+                    ) : (
+                      distributorAccess.statusMessage
+                    )}
+                  </AlertDescription>
+                </div>
+              </Alert>
+              <div className="h-10">
+                <Button variant="outline" size="sm" className="w-full h-full" disabled>
+                  {lang === 'id' ? 
+                    (distributorAccess.isPending ? "Menunggu Persetujuan" : "Tidak Dapat Memesan") :
+                    (distributorAccess.isPending ? "Pending Approval" : "Cannot Order")
                   }
-                  
-                  // Add to cart with exact quantity specified and variant if selected
-                  addItem({
-                    id: product.baseProductId, // Use base product ID for cart consistency
-                    name: product.name, // Use original product name
-                    size: product.size,
-                    image: product.image,
-                    province: regional?.area || '',
-                    unitPrice: basePrice,
-                    moq: usedMoq,
-                    qty: finalQty, // Use calculated quantity based on MOQ rules
-                    consumerPrice: product.consumerPrice,
-                    // Include mixed variants information for MOQ validation
-                    skuLevelMoq: allowMixVariants ? skuLevelMoq : undefined,
-                    allowMixVariants: allowMixVariants,
-                    variant: product.isVariant && product.variantInfo ? {
-                      id: product.variantInfo.id,
-                      name: product.variantInfo.variantName,
-                      additionalPrice: product.variantInfo.additionalPrice
-                    } : undefined,
-                    // UOM conversion data (not displayed but available for calculations)
-                    uomConversions: uomConversions,
-                    selectedUoms: {
-                      moq: moqUom,
-                      pricing: pricingUom,
-                      base: baseUom
-                    }
-                  });
-
-                  // Show toast notification
-                  toast({
-                    title: `${product.displayName} ${product.size}`,
-                    description: lang === 'id' 
-                      ? `${finalQty} item ditambahkan ke keranjang${moqMessage}` 
-                      : `${finalQty} items added to cart${moqMessage}`,
-                    duration: 3000,
-                  });
-                }}
-              >
-                {lang === 'id' ? "Tambah ke Keranjang" : "Add to Cart"}
-              </Button>
+                </Button>
+              </div>
             </div>
-          </div>
+          )
         ) : (
           <div className="flex flex-col gap-3">
             <div className="text-sm text-muted-foreground">
@@ -461,6 +498,9 @@ export default function DaftarProduk() {
   const { lang } = useLanguage();
   const t = translations[lang];
   const { toast } = useToast();
+  
+  // Get distributor approval status
+  const distributorAccess = useDistributorApproval();
 
   // State for products and areas - updated to use ProductWithVariant
   const [products, setProducts] = useState<ProductWithVariant[]>([]);
@@ -495,7 +535,6 @@ export default function DaftarProduk() {
       const now = Date.now();
       const cache = dataCacheRef.current;
       if (cache.products && (now - cache.timestamp) < CACHE_DURATION) {
-        console.log('Using cached product data');
         setProducts(cache.products);
         setLoading(false);
         return;
@@ -505,12 +544,7 @@ export default function DaftarProduk() {
 
       try {
         // Fetch products expanded by variants
-        console.log('About to call fetchProductsExpandedByVariants...');
         const productsData = await fetchProductsExpandedByVariants();
-        console.log('Fetched products data:', productsData);
-        console.log('Number of products with variants expanded:', productsData.length);
-        console.log('Variants found:', productsData.filter(p => p.isVariant).length);
-        console.log('Sample variant product:', productsData.find(p => p.isVariant));
 
         // Update cache
         dataCacheRef.current = {
@@ -751,19 +785,28 @@ export default function DaftarProduk() {
       return;
     }
     
+    // Check distributor approval status
+    if (!distributorAccess.canDownloadCatalog) {
+      toast({
+        title: lang === 'id' ? 'Akses Ditolak' : 'Access Denied',
+        description: lang === 'id' 
+          ? 'Akun Anda belum disetujui. Silakan tunggu persetujuan admin untuk mengunduh katalog.' 
+          : 'Your account is not yet approved. Please wait for admin approval to download catalogs.',
+        variant: "destructive"
+      });
+      return;
+    }
+    
     try {
       let productsToExport: ProductWithVariant[];
       
       if (hasActiveFilters) {
         // Use filtered products if filters are active
         productsToExport = filteredProducts;
-        console.log(`Exporting filtered catalog with ${filteredProducts.length} products`);
       } else {
         // Fetch ALL products from database if no filters are active
-        console.log('No filters active, fetching all products from database...');
         const allProducts = await fetchProductsExpandedByVariants();
         productsToExport = allProducts;
-        console.log(`Exporting complete catalog with ${allProducts.length} products`);
       }
 
       // Generate the catalog with the appropriate product set
@@ -1387,6 +1430,32 @@ export default function DaftarProduk() {
           <h1 className="text-2xl font-bold">{t.productList}</h1>
         </div>
 
+        {/* Account Status Alert for logged-in users */}
+        {user && !distributorAccess.isActive && (
+          <Alert className={`border-${distributorAccess.statusColor === 'yellow' ? 'orange' : distributorAccess.statusColor}-200 bg-${distributorAccess.statusColor === 'yellow' ? 'orange' : distributorAccess.statusColor}-50`}>
+            <div className="flex items-center gap-2">
+              {distributorAccess.isPending && <Clock className="h-4 w-4 text-orange-500" />}
+              {distributorAccess.isRejected && <XCircle className="h-4 w-4 text-red-500" />}
+              {distributorAccess.isInactive && <AlertTriangle className="h-4 w-4 text-gray-500" />}
+              <div className="flex-1">
+                <AlertDescription className="text-sm font-medium">
+                  {lang === 'id' ? (
+                    distributorAccess.isPending ? 'Akun Anda sedang menunggu persetujuan admin. Anda dapat melihat produk namun tidak dapat mengakses harga atau melakukan pemesanan sampai akun disetujui.' :
+                    distributorAccess.isRejected ? 'Akun Anda telah ditolak. Silakan hubungi admin untuk informasi lebih lanjut.' :
+                    distributorAccess.isInactive ? 'Akun Anda tidak aktif. Silakan hubungi admin untuk mengaktifkan kembali akun Anda.' :
+                    'Status akun tidak diketahui. Silakan hubungi admin.'
+                  ) : (
+                    distributorAccess.isPending ? 'Your account is pending admin approval. You can view products but cannot access prices or place orders until approved.' :
+                    distributorAccess.isRejected ? 'Your account has been rejected. Please contact admin for more information.' :
+                    distributorAccess.isInactive ? 'Your account is inactive. Please contact admin to reactivate your account.' :
+                    'Account status unknown. Please contact admin.'
+                  )}
+                </AlertDescription>
+              </div>
+            </div>
+          </Alert>
+        )}
+
         {/* Filter Bar - Redesigned for cleaner UX */}
         <div className="bg-background border rounded-lg p-4 shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
@@ -1531,7 +1600,8 @@ export default function DaftarProduk() {
                       <Button 
                         variant="outline" 
                         onClick={exportFilteredCatalog}
-                        className={`w-full md:w-auto flex items-center justify-center ${!user ? 'relative' : ''}`}
+                        disabled={!distributorAccess.canDownloadCatalog}
+                        className={`w-full md:w-auto flex items-center justify-center ${(!user || !distributorAccess.canDownloadCatalog) ? 'relative' : ''}`}
                       >
                         {!user && (
                           <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
@@ -1540,17 +1610,28 @@ export default function DaftarProduk() {
                             </svg>
                           </div>
                         )}
+                        {user && !distributorAccess.canDownloadCatalog && (
+                          <div className="absolute -top-1 -right-1 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center">
+                            <Clock className="w-3 h-3 text-white" />
+                          </div>
+                        )}
                         <svg className="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                         {lang === 'id' ? "Unduh Katalog" : "Download Catalog"}
                       </Button>
                     </TooltipTrigger>
-                    {!user && (
-                      <TooltipContent>
-                        <p>{lang === 'id' ? 'Harap masuk untuk mengunduh katalog' : 'Please sign in to download catalog'}</p>
-                      </TooltipContent>
-                    )}
+                    <TooltipContent>
+                      <p>
+                        {!user ? (
+                          lang === 'id' ? 'Harap masuk untuk mengunduh katalog' : 'Please sign in to download catalog'
+                        ) : !distributorAccess.canDownloadCatalog ? (
+                          lang === 'id' ? 'Menunggu persetujuan admin untuk mengunduh katalog' : 'Waiting for admin approval to download catalog'
+                        ) : (
+                          lang === 'id' ? 'Unduh katalog produk' : 'Download product catalog'
+                        )}
+                      </p>
+                    </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
                 
@@ -1564,8 +1645,16 @@ export default function DaftarProduk() {
         {!user && (
           <p className="text-muted-foreground text-sm">
             {lang === 'id'
-              ? "Harga distributor akan terlihat setelah Anda masuk / mendaftar."
-              : "Distributor prices will be visible after you login / register."
+              ? "Harga distributor akan terlihat setelah Anda masuk dan akun disetujui admin."
+              : "Distributor prices will be visible after you login and your account is approved by admin."
+            }
+          </p>
+        )}
+        {user && !distributorAccess.isActive && (
+          <p className="text-muted-foreground text-sm">
+            {lang === 'id'
+              ? "Harga distributor dan fitur pemesanan akan tersedia setelah akun Anda disetujui admin."
+              : "Distributor prices and ordering features will be available after your account is approved by admin."
             }
           </p>
         )}

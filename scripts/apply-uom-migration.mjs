@@ -2,9 +2,19 @@ import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
 
-// Supabase configuration
-const supabaseUrl = process.env.SUPABASE_URL || 'your-supabase-url';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'your-service-role-key';
+// Supabase configuration - REQUIRES ENVIRONMENT VARIABLES
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Validate required environment variables
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('❌ Missing required environment variables:');
+  if (!supabaseUrl) console.error('   - SUPABASE_URL');
+  if (!supabaseServiceKey) console.error('   - SUPABASE_SERVICE_ROLE_KEY');
+  console.error('');
+  console.error('Please set these environment variables before running this script.');
+  process.exit(1);
+}
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 

@@ -10,7 +10,8 @@ import {
   ShoppingBag, 
   AlertTriangle,
   BarChart3,
-  UserCheck
+  UserCheck,
+  ClipboardCheck
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import UserManager from "@/components/admin/UserManager";
 import OrderManager from "@/components/admin/OrderManager";
 import DistributorManager from "@/components/admin/DistributorManager";
 import DistributorAnalytics from "@/components/admin/DistributorAnalytics";
+import DistributorApprovalManager from "@/components/admin/DistributorApprovalManager";
 
 export default function Admin() {
   const { lang } = useLanguage();
@@ -31,19 +33,12 @@ export default function Admin() {
   const t = lang === 'id' ? id : en;
   
   useEffect(() => {
-    // Check if user is admin
-    // In a real app, this would check a role claim in the JWT
-    // or query a server endpoint to confirm admin status
+    // Check if user is admin using server-side role management
     const checkAdmin = async () => {
       if (!isLoading && user) {
-        // For demo purposes, we'll consider certain emails as admin
-        // In production, use proper role-based access control
-        const adminEmails = [
-          "rudy@baskit.app",
-          "admin.commercial@baskit.app"
-        ];
-        
-        setIsAdmin(adminEmails.includes(user.email || ""));
+        // Use server-side role from JWT token app_metadata
+        // This is set by Supabase Auth and cannot be manipulated client-side
+        setIsAdmin(user.role === 'admin');
       }
     };
     
@@ -129,6 +124,10 @@ export default function Admin() {
               <UserCheck className="h-4 w-4" />
               {t.distributors}
             </TabsTrigger>
+            <TabsTrigger value="approvals" className="flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4" />
+              {t.approvals}
+            </TabsTrigger>
             <TabsTrigger value="analytics" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               {t.analytics}
@@ -149,6 +148,10 @@ export default function Admin() {
           
           <TabsContent value="distributors" className="space-y-4">
             <DistributorManager />
+          </TabsContent>
+          
+          <TabsContent value="approvals" className="space-y-4">
+            <DistributorApprovalManager />
           </TabsContent>
           
           <TabsContent value="analytics" className="space-y-4">
@@ -180,6 +183,7 @@ const id = {
   loggedInAs: "Masuk sebagai:",
   products: "Produk",
   distributors: "Distributor",
+  approvals: "Persetujuan",
   analytics: "Analitik",
   users: "Pengguna",
   orders: "Pesanan",
@@ -197,6 +201,7 @@ const en = {
   loggedInAs: "Logged in as:",
   products: "Products",
   distributors: "Distributors",
+  approvals: "Approvals",
   analytics: "Analytics",
   users: "Users",
   orders: "Orders",
