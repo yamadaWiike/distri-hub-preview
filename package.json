@@ -9,9 +9,9 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build && powershell -Command \"Copy-Item vercel.json dist/ -Force\"",
+    "build": "vite build && node -e \"require('fs').copyFileSync('vercel.json', 'dist/vercel.json')\"",
     "build:vercel": "vite build",
-    "build:cloudflare": "vite build && powershell -Command \"Copy-Item public/_redirects dist/ -Force\"",
+    "build:cloudflare": "vite build && node -e \"require('fs').copyFileSync('public/_redirects', 'dist/_redirects')\"",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
