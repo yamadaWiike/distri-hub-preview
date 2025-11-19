@@ -2,8 +2,9 @@ pipeline {
     agent any
     
     environment {
-        // Set npm prefix to local directory to avoid permission issues
-        npm_config_prefix = "${WORKSPACE}/.npm-global"
+        // Force npm to use local directory for global installs
+        npm_config_prefix = "${env.WORKSPACE}/.npm-global"
+        PATH = "${env.WORKSPACE}/.npm-global/bin:${env.PATH}"
     }
     
     stages {
@@ -11,10 +12,11 @@ pipeline {
             steps {
                 // Configure npm to use local directory for global installs
                 sh '''
+                    set -e
                     mkdir -p ${WORKSPACE}/.npm-global
                     npm config set prefix "${WORKSPACE}/.npm-global"
-                    export PATH="${WORKSPACE}/.npm-global/bin:$PATH"
-                    echo "npm configured for local global installs"
+                    echo "npm prefix set to: $(npm config get prefix)"
+                    echo "PATH: $PATH"
                 '''
             }
         }
