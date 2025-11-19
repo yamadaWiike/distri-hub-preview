@@ -1,0 +1,100 @@
+import { useState, useEffect } from "react";
+import SEO from "@/components/seo/SEO";
+import Navbar from "@/components/layout/Navbar";
+import AdminSidebar from "@/components/layout/AdminSidebar";
+import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/use-auth";
+import { useNavigate } from "react-router-dom";
+import { AlertTriangle, FileText, Download } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+
+export default function AdminReports() {
+  const { lang } = useLanguage();
+  const { user, isLoading } = useAuth();
+  const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  const t = lang === 'id' ? {
+    title: "Laporan",
+    description: "Laporan dan ekspor data",
+    accessDenied: "Akses Ditolak",
+    adminAccessOnly: "Area khusus admin",
+    adminAccessRequired: "Anda harus masuk sebagai admin untuk mengakses halaman ini.",
+    backToHome: "Kembali ke Beranda",
+    loading: "Memuat...",
+    comingSoon: "Segera Hadir",
+    reportFeature: "Fitur laporan sedang dalam pengembangan"
+  } : {
+    title: "Reports",
+    description: "Reports and data exports",
+    accessDenied: "Access Denied",
+    adminAccessOnly: "Admin area only",
+    adminAccessRequired: "You must be logged in as an admin to access this page.",
+    backToHome: "Back to Home",
+    loading: "Loading...",
+    comingSoon: "Coming Soon",
+    reportFeature: "Report feature is under development"
+  };
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!isLoading && user) {
+        setIsAdmin(user.role === 'admin');
+      } else if (!isLoading && !user) {
+        navigate("/masuk");
+      }
+    };
+    checkAdmin();
+  }, [user, isLoading, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">{t.loading}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background">
+        <SEO title={t.accessDenied} description={t.adminAccessOnly} />
+        <Navbar />
+        <main className="container max-w-md mx-auto py-20">
+          <Card className="p-6 space-y-4 text-center">
+            <AlertTriangle className="mx-auto h-12 w-12 text-yellow-500" />
+            <h1 className="text-2xl font-bold">{t.accessDenied}</h1>
+            <p className="text-muted-foreground">{t.adminAccessRequired}</p>
+            <Button onClick={() => navigate("/")}>{t.backToHome}</Button>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <SEO title={t.title} description={t.description} />
+      <Navbar />
+      <div className="flex">
+        <AdminSidebar lang={lang} />
+        <main className="flex-1 py-8 px-4 lg:px-8">
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold">{t.title}</h1>
+            <p className="text-muted-foreground">{t.description}</p>
+          </div>
+          
+          <Card className="p-12 text-center">
+            <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+            <h2 className="text-xl font-semibold mb-2">{t.comingSoon}</h2>
+            <p className="text-muted-foreground">{t.reportFeature}</p>
+          </Card>
+        </main>
+      </div>
+    </div>
+  );
+}

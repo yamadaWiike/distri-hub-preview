@@ -35,7 +35,19 @@ export type RegistrationData = {
   provinsiId: string; 
   kota: string; 
   namaPemilik: string; 
-  kontakPemilik: string; 
+  kontakPemilik: string;
+  // Additional company information
+  emailPerusahaan?: string;
+  nomorTelpPerusahaan?: string;
+  namaDirektur?: string;
+  statusPkp?: string;
+  npwpNumber?: string;
+  nibNumber?: string;
+  // KYB Documents
+  ktpUrl?: string;
+  aktaUrl?: string;
+  npwpUrl?: string;
+  storePhotoUrl?: string;
 };
 
 /**

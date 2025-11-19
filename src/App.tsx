@@ -30,6 +30,16 @@ import Masuk from "./pages/Masuk";
 import Daftar from "./pages/Daftar";
 import Profil from "./pages/Profil";
 import Admin from "./pages/Admin";
+import AllActivities from "./pages/AllActivities";
+import AdminDistributors from "./pages/AdminDistributors";
+import AdminUsers from "./pages/AdminUsers";
+import AdminProducts from "./pages/AdminProducts";
+import AdminSKUManager from "./pages/AdminSKUManager";
+import AdminAddProduct from "./pages/AdminAddProduct";
+import AdminEditProduct from "./pages/AdminEditProduct";
+import AdminOrders from "./pages/AdminOrders";
+import AdminAnalytics from "./pages/AdminAnalytics";
+import AdminReports from "./pages/AdminReports";
 import Checkout from "./pages/Checkout";
 import NotFound from "./pages/NotFound";
 
@@ -105,6 +115,16 @@ const App: React.FC = () => (
                   
                   {/* Admin routes */}
                   <Route path="/admin" element={<Admin />} />
+                  <Route path="/admin/activities" element={<AllActivities />} />
+                  <Route path="/admin/distributors" element={<AdminDistributors />} />
+                  <Route path="/admin/users" element={<AdminUsers />} />
+                  <Route path="/admin/products" element={<AdminProducts />} />
+                  <Route path="/admin/products/add" element={<AdminAddProduct />} />
+                  <Route path="/admin/products/edit/:id" element={<AdminEditProduct />} />
+                  <Route path="/admin/sku-manager" element={<AdminSKUManager />} />
+                  <Route path="/admin/orders" element={<AdminOrders />} />
+                  <Route path="/admin/analytics" element={<AdminAnalytics />} />
+                  <Route path="/admin/reports" element={<AdminReports />} />
                   
                   {/* Fallback route for 404 errors */}
                   <Route path="*" element={<NotFound />} />

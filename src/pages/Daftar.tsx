@@ -34,10 +34,30 @@ export default function Daftar() {
     email: "",
     password: "",
     confirmPassword: "",
+    // Additional company information
+    emailPerusahaan: "",
+    nomorTelpPerusahaan: "",
+    namaDirektur: "",
+    statusPkp: "Non-PKP" as "PKP" | "Non-PKP",
+    npwpNumber: "",
+    nibNumber: "",
+    // KYB Documents
+    ktpFile: null as File | null,
+    ktpUrl: "",
+    aktaFile: null as File | null,
+    aktaUrl: "",
+    npwpFile: null as File | null,
+    npwpUrl: "",
   });
   
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [ktpPreview, setKtpPreview] = useState<string | null>(null);
+  const [aktaPreview, setAktaPreview] = useState<string | null>(null);
+  const [npwpPreview, setNpwpPreview] = useState<string | null>(null);
+  const [isUploadingKtp, setIsUploadingKtp] = useState(false);
+  const [isUploadingAkta, setIsUploadingAkta] = useState(false);
+  const [isUploadingNpwp, setIsUploadingNpwp] = useState(false);
   const [availableCities, setAvailableCities] = useState<City[]>([]);
   const [passwordError, setPasswordError] = useState("");
   const [passwordValidation, setPasswordValidation] = useState({
@@ -99,6 +119,18 @@ export default function Daftar() {
       kota: form.kota,
       namaPemilik: form.namaPemilik,
       kontakPemilik: form.nomorHpPemilik, // Using the renamed field but keeping the API parameter name
+      // Additional company information
+      emailPerusahaan: form.emailPerusahaan,
+      nomorTelpPerusahaan: form.nomorTelpPerusahaan,
+      namaDirektur: form.namaDirektur,
+      statusPkp: form.statusPkp,
+      npwpNumber: form.npwpNumber,
+      nibNumber: form.nibNumber,
+      // KYB Documents
+      storePhotoUrl: form.fotoTokoUrl,
+      ktpUrl: form.ktpUrl,
+      aktaUrl: form.aktaUrl,
+      npwpUrl: form.npwpUrl,
     });
     navigate('/daftar-produk');
   };
@@ -128,6 +160,16 @@ export default function Daftar() {
     if (!form.alamatLengkap.trim()) return false;
     if (!form.provinsiId) return false;
     if (!form.kota) return false;
+    // KYB Documents validation
+    if (!form.ktpFile) return false;
+    if (!form.aktaFile) return false;
+    if (!form.npwpFile) return false;
+    // Additional company information validation
+    if (!form.emailPerusahaan.trim()) return false;
+    if (!form.nomorTelpPerusahaan.trim()) return false;
+    if (!form.namaDirektur.trim()) return false;
+    if (!form.npwpNumber.trim()) return false;
+    if (!form.nibNumber.trim()) return false;
     return true;
   };
   
@@ -211,6 +253,169 @@ export default function Daftar() {
     setPhotoPreview(null);
   };
 
+  // KYB Document Handlers
+  const handleKtpUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: lang === 'id' ? "File Tidak Valid" : "Invalid File",
+          description: lang === 'id' ? "Hanya file gambar yang diperbolehkan" : "Only image files are allowed",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: lang === 'id' ? "File Terlalu Besar" : "File Too Large",
+          description: lang === 'id' ? "Ukuran file maksimal 5MB" : "Maximum file size is 5MB",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setIsUploadingKtp(true);
+      try {
+        const result = await uploadStorePhoto(file, 'ktp');
+        if (result.success && result.url) {
+          const previewUrl = getImageUrl(result.url);
+          setForm({ ...form, ktpFile: file, ktpUrl: result.url });
+          setKtpPreview(previewUrl);
+          toast({
+            title: lang === 'id' ? "KTP Berhasil Diunggah" : "ID Card Uploaded Successfully",
+            description: lang === 'id' ? "Foto KTP Anda telah disimpan" : "Your ID card has been saved",
+          });
+        } else {
+          throw new Error(result.error || 'Upload failed');
+        }
+      } catch (error) {
+        console.error('Upload error:', error);
+        toast({
+          title: lang === 'id' ? "Gagal Mengunggah KTP" : "Failed to Upload ID Card",
+          description: lang === 'id' ? "Terjadi kesalahan saat mengunggah KTP" : "An error occurred while uploading the ID card",
+          variant: "destructive"
+        });
+        setKtpPreview(null);
+      } finally {
+        setIsUploadingKtp(false);
+      }
+    }
+  };
+
+  const handleAktaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+        toast({
+          title: lang === 'id' ? "File Tidak Valid" : "Invalid File",
+          description: lang === 'id' ? "Hanya file gambar atau PDF yang diperbolehkan" : "Only image or PDF files are allowed",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: lang === 'id' ? "File Terlalu Besar" : "File Too Large",
+          description: lang === 'id' ? "Ukuran file maksimal 10MB" : "Maximum file size is 10MB",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setIsUploadingAkta(true);
+      try {
+        const result = await uploadStorePhoto(file, 'akta');
+        if (result.success && result.url) {
+          const previewUrl = file.type === 'application/pdf' ? '/pdf-icon.svg' : getImageUrl(result.url);
+          setForm({ ...form, aktaFile: file, aktaUrl: result.url });
+          setAktaPreview(previewUrl);
+          toast({
+            title: lang === 'id' ? "Akta Berhasil Diunggah" : "Company Registration Uploaded Successfully",
+            description: lang === 'id' ? "Dokumen Akta/NIB Anda telah disimpan" : "Your company registration document has been saved",
+          });
+        } else {
+          throw new Error(result.error || 'Upload failed');
+        }
+      } catch (error) {
+        console.error('Upload error:', error);
+        toast({
+          title: lang === 'id' ? "Gagal Mengunggah Akta" : "Failed to Upload Document",
+          description: lang === 'id' ? "Terjadi kesalahan saat mengunggah dokumen" : "An error occurred while uploading the document",
+          variant: "destructive"
+        });
+        setAktaPreview(null);
+      } finally {
+        setIsUploadingAkta(false);
+      }
+    }
+  };
+
+  const handleNpwpUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+        toast({
+          title: lang === 'id' ? "File Tidak Valid" : "Invalid File",
+          description: lang === 'id' ? "Hanya file gambar atau PDF yang diperbolehkan" : "Only image or PDF files are allowed",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: lang === 'id' ? "File Terlalu Besar" : "File Too Large",
+          description: lang === 'id' ? "Ukuran file maksimal 10MB" : "Maximum file size is 10MB",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setIsUploadingNpwp(true);
+      try {
+        const result = await uploadStorePhoto(file, 'npwp');
+        if (result.success && result.url) {
+          const previewUrl = file.type === 'application/pdf' ? '/pdf-icon.svg' : getImageUrl(result.url);
+          setForm({ ...form, npwpFile: file, npwpUrl: result.url });
+          setNpwpPreview(previewUrl);
+          toast({
+            title: lang === 'id' ? "NPWP Berhasil Diunggah" : "Tax ID Uploaded Successfully",
+            description: lang === 'id' ? "Dokumen NPWP Anda telah disimpan" : "Your tax ID document has been saved",
+          });
+        } else {
+          throw new Error(result.error || 'Upload failed');
+        }
+      } catch (error) {
+        console.error('Upload error:', error);
+        toast({
+          title: lang === 'id' ? "Gagal Mengunggah NPWP" : "Failed to Upload Tax ID",
+          description: lang === 'id' ? "Terjadi kesalahan saat mengunggah NPWP" : "An error occurred while uploading the tax ID",
+          variant: "destructive"
+        });
+        setNpwpPreview(null);
+      } finally {
+        setIsUploadingNpwp(false);
+      }
+    }
+  };
+
+  const removeKtp = () => {
+    setForm({ ...form, ktpFile: null, ktpUrl: "" });
+    setKtpPreview(null);
+  };
+
+  const removeAkta = () => {
+    setForm({ ...form, aktaFile: null, aktaUrl: "" });
+    setAktaPreview(null);
+  };
+
+  const removeNpwp = () => {
+    setForm({ ...form, npwpFile: null, npwpUrl: "" });
+    setNpwpPreview(null);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <SEO 
@@ -252,133 +457,409 @@ export default function Daftar() {
         </div>
 
         <form onSubmit={onSubmit} className="bg-card rounded-lg shadow-sm border border-gray-100">
-          {/* Step 1: Business Information */}
+          {/* Step 1: Business Information & KYB */}
           {currentStep === 1 && (
             <div className="p-8">
-              <h2 className="text-xl font-semibold mb-6">{lang === 'id' ? "Informasi Bisnis" : "Business Information"}</h2>
+              <h2 className="text-xl font-semibold mb-2">{lang === 'id' ? "Informasi & Verifikasi Bisnis" : "Business Information & Verification"}</h2>
+              <p className="text-sm text-muted-foreground mb-6">
+                {lang === 'id' 
+                  ? "Lengkapi informasi perusahaan dan upload dokumen verifikasi" 
+                  : "Complete company information and upload verification documents"}
+              </p>
               
               <div className="space-y-6">
+                {/* Basic Business Info */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">
-                    {lang === 'id' ? "Nama Bisnis" : "Business Name"} <span className="text-red-500">*</span>
-                  </label>
-                  <input 
-                    required 
-                    className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
-                    value={form.namaBisnis} 
-                    onChange={set('namaBisnis')} 
-                    placeholder={lang === 'id' ? "PT Distributor Sejahtera" : "ABC Distribution Co."}
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    {lang === 'id' ? "Foto Toko" : "Store Photo"} <span className="text-red-500">*</span>
-                  </label>
+                  <h3 className="text-base font-semibold mb-4 pb-2 border-b">
+                    {lang === 'id' ? "Data Perusahaan" : "Company Data"}
+                  </h3>
                   
-                  {!photoPreview ? (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-orange-400 transition-colors">
-                      <input
-                        type="file"
-                        id="photo-upload"
-                        className="hidden"
-                        accept="image/png,image/jpeg,image/jpg"
-                        onChange={handlePhotoUpload}
-                        disabled={isUploadingPhoto}
-                      />
-                      <label htmlFor="photo-upload" className="cursor-pointer">
-                        {isUploadingPhoto ? (
-                          <div className="mx-auto w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center mb-3">
-                            <Loader2 className="h-6 w-6 text-orange-500 animate-spin" />
-                          </div>
-                        ) : (
-                          <div className="mx-auto w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center mb-3">
-                            <Upload className="h-6 w-6 text-orange-500" />
-                          </div>
-                        )}
-                        <p className="text-orange-500 font-medium text-sm mb-1">
-                          {isUploadingPhoto 
-                            ? (lang === 'id' ? "Mengunggah..." : "Uploading...") 
-                            : (lang === 'id' ? "Klik untuk upload" : "Click to upload")
-                          }
-                        </p>
-                        <p className="text-gray-500 text-xs">
-                          {lang === 'id' ? "atau drag & drop" : "or drag & drop"}
-                        </p>
-                        <p className="text-gray-400 text-xs mt-2">
-                          PNG, JPG, JPEG (max. 5MB)
-                        </p>
+                  <div className="space-y-5">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        {lang === 'id' ? "Nama Bisnis / Perusahaan" : "Business / Company Name"} <span className="text-red-500">*</span>
                       </label>
-                    </div>
-                  ) : (
-                    <div className="relative inline-block">
-                      <img 
-                        src={photoPreview} 
-                        alt="Store preview" 
-                        className="rounded-lg border border-gray-200 w-48 h-48 object-cover"
+                      <input 
+                        required 
+                        className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
+                        value={form.namaBisnis} 
+                        onChange={set('namaBisnis')} 
+                        placeholder={lang === 'id' ? "PT Distributor Sejahtera" : "ABC Distribution Co."}
                       />
-                      <button
-                        type="button"
-                        onClick={removePhoto}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
                     </div>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {lang === 'id' ? "Upload foto tampak depan atau kilo untuk verifikasi" : "Upload front or kilo photo for verification"}
-                  </p>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    {lang === 'id' ? "Alamat Lengkap Bisnis" : "Complete Business Address"} <span className="text-red-500">*</span>
-                  </label>
-                  <textarea 
-                    required 
-                    className="w-full rounded-md border bg-background px-4 py-2.5 text-sm min-h-[80px]" 
-                    value={form.alamatLengkap} 
-                    onChange={(e) => setForm({ ...form, alamatLengkap: e.target.value })}
-                    placeholder={lang === 'id' ? "Jl. Pahlawan No. 123, Kel. Sukajadi" : "123 Business St., Prosperity Building"}
-                  />
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      {lang === 'id' ? "Provinsi" : "Province"} <span className="text-red-500">*</span>
-                    </label>
-                    <Select value={form.provinsiId} onValueChange={setSelectValue('provinsiId')} required>
-                      <SelectTrigger className="w-full h-10">
-                        <SelectValue placeholder={lang === 'id' ? "Pilih Provinsi" : "Select Province"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {provinces.map((province) => (
-                          <SelectItem key={province.id} value={province.id}>
-                            {province.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          {lang === 'id' ? "Email Perusahaan" : "Company Email"} <span className="text-red-500">*</span>
+                        </label>
+                        <input 
+                          required 
+                          type="email"
+                          className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
+                          value={form.emailPerusahaan} 
+                          onChange={set('emailPerusahaan')} 
+                          placeholder={lang === 'id' ? "info@perusahaan.com" : "info@company.com"}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          {lang === 'id' ? "Nomor Telp Perusahaan" : "Company Phone Number"} <span className="text-red-500">*</span>
+                        </label>
+                        <input 
+                          required 
+                          type="tel"
+                          className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
+                          value={form.nomorTelpPerusahaan} 
+                          onChange={set('nomorTelpPerusahaan')} 
+                          placeholder={lang === 'id' ? "021-1234567" : "021-1234567"}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        {lang === 'id' ? "Nama Direktur" : "Director Name"} <span className="text-red-500">*</span>
+                      </label>
+                      <input 
+                        required 
+                        className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
+                        value={form.namaDirektur} 
+                        onChange={set('namaDirektur')} 
+                        placeholder={lang === 'id' ? "Nama lengkap direktur" : "Full director name"}
+                      />
+                    </div>
                   </div>
+                </div>
+
+                {/* Business Address */}
+                <div>
+                  <h3 className="text-base font-semibold mb-4 pb-2 border-b">
+                    {lang === 'id' ? "Alamat Bisnis" : "Business Address"}
+                  </h3>
                   
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      {lang === 'id' ? "Kota/Kabupaten" : "City/Regency"} <span className="text-red-500">*</span>
-                    </label>
-                    <Select value={form.kota} onValueChange={setSelectValue('kota')} disabled={!form.provinsiId} required>
-                      <SelectTrigger className="w-full h-10">
-                        <SelectValue placeholder={lang === 'id' ? "Pilih Kota/Kabupaten" : "Select City/Regency"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableCities.map((city) => (
-                          <SelectItem key={city.id} value={city.name}>
-                            {city.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-5">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        {lang === 'id' ? "Alamat Lengkap" : "Complete Address"} <span className="text-red-500">*</span>
+                      </label>
+                      <textarea 
+                        required 
+                        className="w-full rounded-md border bg-background px-4 py-2.5 text-sm min-h-[80px]" 
+                        value={form.alamatLengkap} 
+                        onChange={(e) => setForm({ ...form, alamatLengkap: e.target.value })}
+                        placeholder={lang === 'id' ? "Jl. Pahlawan No. 123, Kel. Sukajadi" : "123 Business St., Prosperity Building"}
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          {lang === 'id' ? "Provinsi" : "Province"} <span className="text-red-500">*</span>
+                        </label>
+                        <Select value={form.provinsiId} onValueChange={setSelectValue('provinsiId')} required>
+                          <SelectTrigger className="w-full h-10">
+                            <SelectValue placeholder={lang === 'id' ? "Pilih Provinsi" : "Select Province"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {provinces.map((province) => (
+                              <SelectItem key={province.id} value={province.id}>
+                                {province.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          {lang === 'id' ? "Kota/Kabupaten" : "City/Regency"} <span className="text-red-500">*</span>
+                        </label>
+                        <Select value={form.kota} onValueChange={setSelectValue('kota')} disabled={!form.provinsiId} required>
+                          <SelectTrigger className="w-full h-10">
+                            <SelectValue placeholder={lang === 'id' ? "Pilih Kota/Kabupaten" : "Select City/Regency"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableCities.map((city) => (
+                              <SelectItem key={city.id} value={city.name}>
+                                {city.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Legal Documents & Tax Info */}
+                <div>
+                  <h3 className="text-base font-semibold mb-4 pb-2 border-b">
+                    {lang === 'id' ? "Dokumen & Legalitas" : "Documents & Legality"}
+                  </h3>
+                  
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          {lang === 'id' ? "NPWP" : "Tax ID (NPWP)"} <span className="text-red-500">*</span>
+                        </label>
+                        <input 
+                          required 
+                          className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
+                          value={form.npwpNumber} 
+                          onChange={set('npwpNumber')} 
+                          placeholder="XX.XXX.XXX.X-XXX.XXX"
+                          maxLength={20}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          {lang === 'id' ? "NIB" : "Business ID (NIB)"} <span className="text-red-500">*</span>
+                        </label>
+                        <input 
+                          required 
+                          className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
+                          value={form.nibNumber} 
+                          onChange={set('nibNumber')} 
+                          placeholder="XXXXXXXXXXXX"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        {lang === 'id' ? "Status PKP" : "PKP Status"} <span className="text-red-500">*</span>
+                      </label>
+                      <Select 
+                        value={form.statusPkp} 
+                        onValueChange={(value: "PKP" | "Non-PKP") => setForm({ ...form, statusPkp: value })} 
+                        required
+                      >
+                        <SelectTrigger className="w-full h-10">
+                          <SelectValue placeholder={lang === 'id' ? "Pilih Status PKP" : "Select PKP Status"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PKP">PKP (Pengusaha Kena Pajak)</SelectItem>
+                          <SelectItem value="Non-PKP">Non-PKP</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {lang === 'id' 
+                          ? "PKP wajib memungut PPN 11%" 
+                          : "PKP must collect 11% VAT"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Document Uploads */}
+                <div>
+                  <h3 className="text-base font-semibold mb-4 pb-2 border-b">
+                    {lang === 'id' ? "Upload Dokumen Verifikasi" : "Upload Verification Documents"}
+                  </h3>
+                  
+                  <div className="space-y-5">
+                    {/* Store Photo */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        {lang === 'id' ? "Foto Toko / Gudang" : "Store / Warehouse Photo"} <span className="text-red-500">*</span>
+                      </label>
+                      
+                      {!photoPreview ? (
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
+                          <input
+                            type="file"
+                            id="photo-upload"
+                            className="hidden"
+                            accept="image/png,image/jpeg,image/jpg"
+                            onChange={handlePhotoUpload}
+                            disabled={isUploadingPhoto}
+                          />
+                          <label htmlFor="photo-upload" className="cursor-pointer">
+                            {isUploadingPhoto ? (
+                              <Loader2 className="h-5 w-5 text-orange-500 animate-spin mx-auto mb-2" />
+                            ) : (
+                              <Upload className="h-5 w-5 text-orange-500 mx-auto mb-2" />
+                            )}
+                            <p className="text-sm text-orange-500 font-medium">
+                              {isUploadingPhoto 
+                                ? (lang === 'id' ? "Mengunggah..." : "Uploading...") 
+                                : (lang === 'id' ? "Klik untuk upload" : "Click to upload")
+                              }
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">PNG, JPG, JPEG (max. 5MB)</p>
+                          </label>
+                        </div>
+                      ) : (
+                        <div className="relative inline-block">
+                          <img 
+                            src={photoPreview} 
+                            alt="Store preview" 
+                            className="rounded-lg border border-gray-200 w-48 h-32 object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={removePhoto}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {lang === 'id' ? "Foto tampak depan toko atau gudang" : "Front view of store or warehouse"}
+                      </p>
+                    </div>
+
+                    {/* KTP Upload */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        {lang === 'id' ? "KTP Direktur / Pemilik" : "Director / Owner ID Card"} <span className="text-red-500">*</span>
+                      </label>
+                      
+                      {!ktpPreview ? (
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
+                          <input
+                            type="file"
+                            id="ktp-upload"
+                            className="hidden"
+                            accept="image/png,image/jpeg,image/jpg"
+                            onChange={handleKtpUpload}
+                            disabled={isUploadingKtp}
+                          />
+                          <label htmlFor="ktp-upload" className="cursor-pointer">
+                            {isUploadingKtp ? (
+                              <Loader2 className="h-5 w-5 text-orange-500 animate-spin mx-auto mb-2" />
+                            ) : (
+                              <Upload className="h-5 w-5 text-orange-500 mx-auto mb-2" />
+                            )}
+                            <p className="text-sm text-orange-500 font-medium">
+                              {isUploadingKtp 
+                                ? (lang === 'id' ? "Mengunggah..." : "Uploading...") 
+                                : (lang === 'id' ? "Upload KTP" : "Upload ID Card")
+                              }
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">PNG, JPG, JPEG (max. 5MB)</p>
+                          </label>
+                        </div>
+                      ) : (
+                        <div className="relative inline-block">
+                          <img 
+                            src={ktpPreview} 
+                            alt="KTP preview" 
+                            className="rounded-lg border border-gray-200 w-48 h-32 object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={removeKtp}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Akta/NIB Upload */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        {lang === 'id' ? "Akta Pendirian / NIB" : "Company Registration / NIB"} <span className="text-red-500">*</span>
+                      </label>
+                      
+                      {!aktaPreview ? (
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
+                          <input
+                            type="file"
+                            id="akta-upload"
+                            className="hidden"
+                            accept="image/png,image/jpeg,image/jpg,application/pdf"
+                            onChange={handleAktaUpload}
+                            disabled={isUploadingAkta}
+                          />
+                          <label htmlFor="akta-upload" className="cursor-pointer">
+                            {isUploadingAkta ? (
+                              <Loader2 className="h-5 w-5 text-orange-500 animate-spin mx-auto mb-2" />
+                            ) : (
+                              <Upload className="h-5 w-5 text-orange-500 mx-auto mb-2" />
+                            )}
+                            <p className="text-sm text-orange-500 font-medium">
+                              {isUploadingAkta 
+                                ? (lang === 'id' ? "Mengunggah..." : "Uploading...") 
+                                : (lang === 'id' ? "Upload Dokumen" : "Upload Document")
+                              }
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">PNG, JPG, JPEG, PDF (max. 10MB)</p>
+                          </label>
+                        </div>
+                      ) : (
+                        <div className="relative inline-block">
+                          <img 
+                            src={aktaPreview} 
+                            alt="Akta preview" 
+                            className="rounded-lg border border-gray-200 w-48 h-32 object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={removeAkta}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* NPWP Upload */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        {lang === 'id' ? "Dokumen NPWP" : "Tax ID Document (NPWP)"} <span className="text-red-500">*</span>
+                      </label>
+                      
+                      {!npwpPreview ? (
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
+                          <input
+                            type="file"
+                            id="npwp-upload"
+                            className="hidden"
+                            accept="image/png,image/jpeg,image/jpg,application/pdf"
+                            onChange={handleNpwpUpload}
+                            disabled={isUploadingNpwp}
+                          />
+                          <label htmlFor="npwp-upload" className="cursor-pointer">
+                            {isUploadingNpwp ? (
+                              <Loader2 className="h-5 w-5 text-orange-500 animate-spin mx-auto mb-2" />
+                            ) : (
+                              <Upload className="h-5 w-5 text-orange-500 mx-auto mb-2" />
+                            )}
+                            <p className="text-sm text-orange-500 font-medium">
+                              {isUploadingNpwp 
+                                ? (lang === 'id' ? "Mengunggah..." : "Uploading...") 
+                                : (lang === 'id' ? "Upload NPWP" : "Upload Tax ID")
+                              }
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">PNG, JPG, JPEG, PDF (max. 10MB)</p>
+                          </label>
+                        </div>
+                      ) : (
+                        <div className="relative inline-block">
+                          <img 
+                            src={npwpPreview} 
+                            alt="NPWP preview" 
+                            className="rounded-lg border border-gray-200 w-48 h-32 object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={removeNpwp}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

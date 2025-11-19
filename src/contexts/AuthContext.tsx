@@ -208,7 +208,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           kota: data.kota,
           nama_pemilik: data.namaPemilik,
           kontak_pemilik: data.kontakPemilik,
-          status: 'pending'
+          status: 'pending',
+          // Additional company information
+          email_perusahaan: data.emailPerusahaan || null,
+          nomor_telp_perusahaan: data.nomorTelpPerusahaan || null,
+          nama_direktur: data.namaDirektur || null,
+          status_pkp: data.statusPkp || 'Non-PKP',
+          npwp_number: data.npwpNumber || null,
+          nib_number: data.nibNumber || null,
+          // KYB Documents
+          store_photo_url: data.storePhotoUrl || null,
+          ktp_url: data.ktpUrl || null,
+          akta_url: data.aktaUrl || null,
+          npwp_url: data.npwpUrl || null,
           // Note: Removed provinsi_id for now since it expects UUID but we're sending string
           // The province data is stored as string in kota field for now
         };
