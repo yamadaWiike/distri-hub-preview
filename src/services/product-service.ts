@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Product, RegionPricing, ProductVariant } from '@/data/products';
-import { withAuth, requireAuth, validateAuth } from '@/utils/auth-guards';
+import { withAuth, requireAuth, requireAuthForViewing, validateAuth } from '@/utils/auth-guards';
 
 // Define database types to match our schema
 export type ProductFromDB = {
@@ -165,8 +165,8 @@ type ProductVariantWithOption = ProductVariantFromDB & {
 
 // Fetch product variants for a specific product
 export async function fetchProductVariants(productId: string) {
-  // Ensure user is authenticated and approved
-  await requireAuth();
+  // Only require authentication, not approval (allows pending users to view products)
+  await requireAuthForViewing();
   
   try {
     
@@ -301,7 +301,7 @@ interface ProductWithVariantCount {
   brand_id?: string;
   name: string;
   size: string;
-  distributor_price: number;
+  base_distributor_price: number;
   consumer_price: number;
   moq: number;
   description: string;
@@ -355,8 +355,8 @@ interface FallbackProduct {
 
 // Fetch all products with variant information
 export async function fetchProductsWithVariants(): Promise<Product[]> {
-  // Ensure user is authenticated and approved
-  await requireAuth();
+  // Only require authentication, not approval (allows pending users to view products)
+  await requireAuthForViewing();
   
   try {
     // First try to get products from the products_with_variants view
@@ -369,7 +369,7 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
         brand_id,
         name,
         size,
-        distributor_price,
+        base_distributor_price,
         consumer_price,
         moq,
         description,
@@ -424,7 +424,7 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
         brand: p.brands?.name || 'Unknown',
         name: p.name,
         size: p.size,
-        distributor_price: p.base_distributor_price,
+        base_distributor_price: p.base_distributor_price,
         consumer_price: p.consumer_price,
         moq: p.base_moq,
         description: p.description,
@@ -469,7 +469,7 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
         brand: dbProduct.brand_id || 'Unknown', // Use brand_id instead of brand
         name: dbProduct.name,
         size: dbProduct.size,
-        distributorPrice: dbProduct.distributor_price,
+        distributorPrice: dbProduct.base_distributor_price,
         consumerPrice: dbProduct.consumer_price,
         moq: dbProduct.moq,
         description: dbProduct.description,
@@ -507,8 +507,8 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
 
 // Get all products with their region pricing
 export async function getAllProducts(): Promise<Product[]> {
-  // Ensure user is authenticated and approved
-  await requireAuth();
+  // Only require authentication, not approval (allows pending users to view products)
+  await requireAuthForViewing();
   
   try {
     // Fetch all products with brand and category names - explicitly select UOM fields
@@ -567,8 +567,8 @@ export async function getAllProducts(): Promise<Product[]> {
 
 // Get a single product by ID
 export async function getProductById(id: string): Promise<Product | null> {
-  // Ensure user is authenticated and approved
-  await requireAuth();
+  // Only require authentication, not approval (allows pending users to view products)
+  await requireAuthForViewing();
   
   try {
     // Check if the id looks like a UUID or a SKU
@@ -634,8 +634,8 @@ export async function getProductById(id: string): Promise<Product | null> {
 
 // Get areas where products are available (distinct list)
 export async function getAllAreas(): Promise<string[]> {
-  // Ensure user is authenticated and approved
-  await requireAuth();
+  // Only require authentication, not approval (allows pending users to view products)
+  await requireAuthForViewing();
   
   try {
     const { data, error } = await supabase
@@ -658,8 +658,8 @@ export async function getAllAreas(): Promise<string[]> {
 
 // Get all available brands (distinct list)
 export async function getAllBrands(): Promise<string[]> {
-  // Ensure user is authenticated and approved
-  await requireAuth();
+  // Only require authentication, not approval (allows pending users to view products)
+  await requireAuthForViewing();
   
   try {
     // Query the brands table directly - not the products table
@@ -699,8 +699,8 @@ export interface ProductWithVariant extends Omit<Product, 'variants' | 'hasVaria
 
 // Fetch products expanded by variants - each variant becomes a separate product entry
 export async function fetchProductsExpandedByVariants(): Promise<ProductWithVariant[]> {
-  // Ensure user is authenticated and approved
-  await requireAuth();
+  // Only require authentication, not approval (allows pending users to view products)
+  await requireAuthForViewing();
   
   try {
     // First get all base products

@@ -216,60 +216,110 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
 
       {/* Pricing Section */}
       <div className="mb-4">
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div className="bg-gray-50 rounded-lg p-3">
-            <div className="text-xs font-medium text-muted-foreground mb-2">
-              {lang === 'id' ? "Harga Pelanggan" : "Customer Price"}
-            </div>
-            <div className="text-sm font-bold text-foreground flex flex-wrap items-baseline gap-1">
-              <span>{formatIDR(product.consumerPrice)}</span>
-              {product.pricing_uom && product.pricing_uom !== 'pcs' && (
-                <span className="text-xs text-muted-foreground">/{product.pricing_uom}</span>
-              )}
-            </div>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-3">
-            <div className="text-xs font-medium text-muted-foreground mb-2">
-              {lang === 'id' ? "Harga Distributor" : "Distributor Price"}
-            </div>
-            {loggedIn ? (
-              <div className="text-sm font-bold text-foreground flex flex-wrap items-baseline gap-1">
-                <span>{distributorAccess.canViewPrices ? formatIDR(basePrice) : '••••••'}</span>
-                {(() => {
-                  const priceUom = product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (regional?.price_uom || 'pcs');
-                  return priceUom !== 'pcs' ? <span className="text-xs text-muted-foreground">/{priceUom}</span> : null;
-                })()}
-              </div>
-            ) : (
-              <div className="text-sm font-bold text-foreground blur-sm select-none flex flex-wrap items-baseline gap-1">
-                <span>{formatIDR(basePrice)}</span>
-                {(() => {
-                  const priceUom = product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (regional?.price_uom || 'pcs');
-                  return priceUom !== 'pcs' ? <span className="text-xs text-muted-foreground">/{priceUom}</span> : null;
-                })()}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="text-center">
-            <div className="text-xs font-medium text-muted-foreground mb-1">MOQ</div>
-            <div className="text-sm font-semibold text-foreground">
-              {displayMoq} {product.moq_uom && product.moq_uom !== 'pcs' ? product.moq_uom : (regional?.moq_uom || 'pcs')}
-              {allowMixVariants && product.isVariant ? (
-                <div className="text-xs text-emerald-700 font-bold mt-1">
-                  {lang === 'id' ? "Boleh Mix Variant untuk MOQ" : "Allow Mix Variant for MOQ"}
+        {distributorAccess.isPending ? (
+          // Pending approval state - show blurred prices with overlay
+          <div className="relative">
+            <div className="grid grid-cols-2 gap-4 mb-4 blur-sm select-none pointer-events-none">
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="text-xs font-medium text-muted-foreground mb-2">
+                  {lang === 'id' ? "Harga Pelanggan" : "Customer Price"}
                 </div>
-              ) : null}
+                <div className="text-sm font-bold text-foreground flex flex-wrap items-baseline gap-1">
+                  <span>{formatIDR(product.consumerPrice)}</span>
+                </div>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="text-xs font-medium text-muted-foreground mb-2">
+                  {lang === 'id' ? "Harga Distributor" : "Distributor Price"}
+                </div>
+                <div className="text-sm font-bold text-foreground flex flex-wrap items-baseline gap-1">
+                  <span>••••••</span>
+                </div>
+              </div>
             </div>
-            {/* Removed debug information for min per variant and cart counts */}
+            
+            <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg">
+              <div className="text-center px-4">
+                <Clock className="h-8 w-8 text-orange-500 mx-auto mb-2" />
+                <p className="text-sm font-medium text-orange-700">
+                  {lang === 'id' ? 'Menunggu Persetujuan' : 'Pending Approval'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {lang === 'id' ? 'Harga akan terlihat setelah disetujui' : 'Prices visible after approval'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 blur-sm select-none pointer-events-none">
+              <div className="text-center">
+                <div className="text-xs font-medium text-muted-foreground mb-1">MOQ</div>
+                <div className="text-sm font-semibold text-foreground">••••</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xs font-medium text-muted-foreground mb-1">Area Distribusi</div>
+                <div className="text-sm font-semibold text-foreground">••••</div>
+              </div>
+            </div>
           </div>
-          <div className="text-center">
-            <div className="text-xs font-medium text-muted-foreground mb-1">Area Distribusi</div>
-            <div className="text-sm font-semibold text-foreground">{regional?.area ?? '-'}</div>
-          </div>
-        </div>
+        ) : (
+          // Active/Normal state - show full pricing
+          <>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="text-xs font-medium text-muted-foreground mb-2">
+                  {lang === 'id' ? "Harga Pelanggan" : "Customer Price"}
+                </div>
+                <div className="text-sm font-bold text-foreground flex flex-wrap items-baseline gap-1">
+                  <span>{formatIDR(product.consumerPrice)}</span>
+                  {product.pricing_uom && product.pricing_uom !== 'pcs' && (
+                    <span className="text-xs text-muted-foreground">/{product.pricing_uom}</span>
+                  )}
+                </div>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="text-xs font-medium text-muted-foreground mb-2">
+                  {lang === 'id' ? "Harga Distributor" : "Distributor Price"}
+                </div>
+                {loggedIn ? (
+                  <div className="text-sm font-bold text-foreground flex flex-wrap items-baseline gap-1">
+                    <span>{distributorAccess.canViewPrices ? formatIDR(basePrice) : '••••••'}</span>
+                    {(() => {
+                      const priceUom = product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (regional?.price_uom || 'pcs');
+                      return priceUom !== 'pcs' ? <span className="text-xs text-muted-foreground">/{priceUom}</span> : null;
+                    })()}
+                  </div>
+                ) : (
+                  <div className="text-sm font-bold text-foreground blur-sm select-none flex flex-wrap items-baseline gap-1">
+                    <span>{formatIDR(basePrice)}</span>
+                    {(() => {
+                      const priceUom = product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (regional?.price_uom || 'pcs');
+                      return priceUom !== 'pcs' ? <span className="text-xs text-muted-foreground">/{priceUom}</span> : null;
+                    })()}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center">
+                <div className="text-xs font-medium text-muted-foreground mb-1">MOQ</div>
+                <div className="text-sm font-semibold text-foreground">
+                  {displayMoq} {product.moq_uom && product.moq_uom !== 'pcs' ? product.moq_uom : (regional?.moq_uom || 'pcs')}
+                  {allowMixVariants && product.isVariant ? (
+                    <div className="text-xs text-emerald-700 font-bold mt-1">
+                      {lang === 'id' ? "Boleh Mix Variant untuk MOQ" : "Allow Mix Variant for MOQ"}
+                    </div>
+                  ) : null}
+                </div>
+                {/* Removed debug information for min per variant and cart counts */}
+              </div>
+              <div className="text-center">
+                <div className="text-xs font-medium text-muted-foreground mb-1">Area Distribusi</div>
+                <div className="text-sm font-semibold text-foreground">{regional?.area ?? '-'}</div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Use mt-auto to push this section to the bottom of the card */}

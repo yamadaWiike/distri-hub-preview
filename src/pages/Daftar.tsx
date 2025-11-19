@@ -7,6 +7,8 @@ import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 import { toast } from "@/components/ui/use-toast";
+import { Upload, X, Loader2 } from "lucide-react";
+import { uploadStorePhoto, getImageUrl } from "@/lib/s3-upload";
 import { 
   Select, 
   SelectContent, 
@@ -22,6 +24,8 @@ export default function Daftar() {
   const t = translations[lang];
   const [form, setForm] = useState({
     namaBisnis: "",
+    fotoToko: null as File | null,
+    fotoTokoUrl: "", // URL from S3 after upload
     alamatLengkap: "",
     provinsiId: "",
     kota: "",
@@ -32,10 +36,29 @@ export default function Daftar() {
     confirmPassword: "",
   });
   
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [availableCities, setAvailableCities] = useState<City[]>([]);
   const [passwordError, setPasswordError] = useState("");
+  const [passwordValidation, setPasswordValidation] = useState({
+    minLength: false,
+    hasLowercase: false,
+    hasUppercase: false,
+    hasNumber: false,
+  });
   const [currentStep, setCurrentStep] = useState(1);
   const navigate = useNavigate();
+
+  const validatePassword = (password: string) => {
+    const validation = {
+      minLength: password.length >= 8,
+      hasLowercase: /[a-z]/.test(password),
+      hasUppercase: /[A-Z]/.test(password),
+      hasNumber: /[0-9]/.test(password),
+    };
+    setPasswordValidation(validation);
+    return Object.values(validation).every(v => v);
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +69,16 @@ export default function Daftar() {
       toast({
         title: lang === 'id' ? "Email Tidak Valid" : "Invalid Email",
         description: lang === 'id' ? "Format email tidak valid" : "Email format is not valid",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Validate password strength
+    if (!validatePassword(form.password)) {
+      toast({
+        title: lang === 'id' ? "Password Tidak Valid" : "Invalid Password",
+        description: lang === 'id' ? "Password harus memenuhi semua persyaratan" : "Password must meet all requirements",
         variant: "destructive"
       });
       return;
@@ -91,6 +124,7 @@ export default function Daftar() {
   // Step validation
   const validateStep1 = () => {
     if (!form.namaBisnis.trim()) return false;
+    if (!form.fotoToko) return false;
     if (!form.alamatLengkap.trim()) return false;
     if (!form.provinsiId) return false;
     if (!form.kota) return false;
@@ -114,6 +148,67 @@ export default function Daftar() {
     } else if (currentStep === 2 && validateStep2()) {
       nextStep();
     }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: lang === 'id' ? "File Tidak Valid" : "Invalid File",
+          description: lang === 'id' ? "Hanya file gambar yang diperbolehkan" : "Only image files are allowed",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: lang === 'id' ? "File Terlalu Besar" : "File Too Large",
+          description: lang === 'id' ? "Ukuran file maksimal 5MB" : "Maximum file size is 5MB",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Upload to S3 or localStorage
+      setIsUploadingPhoto(true);
+      try {
+        const result = await uploadStorePhoto(file);
+        
+        if (result.success && result.url) {
+          // Get the actual URL for preview
+          const previewUrl = getImageUrl(result.url);
+          
+          setForm({ ...form, fotoToko: file, fotoTokoUrl: result.url });
+          setPhotoPreview(previewUrl);
+          
+          toast({
+            title: lang === 'id' ? "Foto Berhasil Diunggah" : "Photo Uploaded Successfully",
+            description: lang === 'id' ? "Foto toko Anda telah disimpan" : "Your store photo has been saved",
+          });
+        } else {
+          throw new Error(result.error || 'Upload failed');
+        }
+      } catch (error) {
+        console.error('Upload error:', error);
+        toast({
+          title: lang === 'id' ? "Gagal Mengunggah Foto" : "Failed to Upload Photo",
+          description: lang === 'id' ? "Terjadi kesalahan saat mengunggah foto" : "An error occurred while uploading the photo",
+          variant: "destructive"
+        });
+        setPhotoPreview(null);
+      } finally {
+        setIsUploadingPhoto(false);
+      }
+    }
+  };
+
+  const removePhoto = () => {
+    setForm({ ...form, fotoToko: null, fotoTokoUrl: "" });
+    setPhotoPreview(null);
   };
 
   return (
@@ -164,7 +259,9 @@ export default function Daftar() {
               
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium mb-2">{lang === 'id' ? "Nama Bisnis" : "Business Name"}</label>
+                  <label className="block text-sm font-medium mb-2">
+                    {lang === 'id' ? "Nama Bisnis" : "Business Name"} <span className="text-red-500">*</span>
+                  </label>
                   <input 
                     required 
                     className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
@@ -175,7 +272,69 @@ export default function Daftar() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-2">{lang === 'id' ? "Alamat Lengkap Bisnis" : "Complete Business Address"}</label>
+                  <label className="block text-sm font-medium mb-2">
+                    {lang === 'id' ? "Foto Toko" : "Store Photo"} <span className="text-red-500">*</span>
+                  </label>
+                  
+                  {!photoPreview ? (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-orange-400 transition-colors">
+                      <input
+                        type="file"
+                        id="photo-upload"
+                        className="hidden"
+                        accept="image/png,image/jpeg,image/jpg"
+                        onChange={handlePhotoUpload}
+                        disabled={isUploadingPhoto}
+                      />
+                      <label htmlFor="photo-upload" className="cursor-pointer">
+                        {isUploadingPhoto ? (
+                          <div className="mx-auto w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center mb-3">
+                            <Loader2 className="h-6 w-6 text-orange-500 animate-spin" />
+                          </div>
+                        ) : (
+                          <div className="mx-auto w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center mb-3">
+                            <Upload className="h-6 w-6 text-orange-500" />
+                          </div>
+                        )}
+                        <p className="text-orange-500 font-medium text-sm mb-1">
+                          {isUploadingPhoto 
+                            ? (lang === 'id' ? "Mengunggah..." : "Uploading...") 
+                            : (lang === 'id' ? "Klik untuk upload" : "Click to upload")
+                          }
+                        </p>
+                        <p className="text-gray-500 text-xs">
+                          {lang === 'id' ? "atau drag & drop" : "or drag & drop"}
+                        </p>
+                        <p className="text-gray-400 text-xs mt-2">
+                          PNG, JPG, JPEG (max. 5MB)
+                        </p>
+                      </label>
+                    </div>
+                  ) : (
+                    <div className="relative inline-block">
+                      <img 
+                        src={photoPreview} 
+                        alt="Store preview" 
+                        className="rounded-lg border border-gray-200 w-48 h-48 object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={removePhoto}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {lang === 'id' ? "Upload foto tampak depan atau kilo untuk verifikasi" : "Upload front or kilo photo for verification"}
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    {lang === 'id' ? "Alamat Lengkap Bisnis" : "Complete Business Address"} <span className="text-red-500">*</span>
+                  </label>
                   <textarea 
                     required 
                     className="w-full rounded-md border bg-background px-4 py-2.5 text-sm min-h-[80px]" 
@@ -187,7 +346,9 @@ export default function Daftar() {
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-sm font-medium mb-2">{lang === 'id' ? "Provinsi" : "Province"}</label>
+                    <label className="block text-sm font-medium mb-2">
+                      {lang === 'id' ? "Provinsi" : "Province"} <span className="text-red-500">*</span>
+                    </label>
                     <Select value={form.provinsiId} onValueChange={setSelectValue('provinsiId')} required>
                       <SelectTrigger className="w-full h-10">
                         <SelectValue placeholder={lang === 'id' ? "Pilih Provinsi" : "Select Province"} />
@@ -203,7 +364,9 @@ export default function Daftar() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium mb-2">{lang === 'id' ? "Kota/Kabupaten" : "City/Regency"}</label>
+                    <label className="block text-sm font-medium mb-2">
+                      {lang === 'id' ? "Kota/Kabupaten" : "City/Regency"} <span className="text-red-500">*</span>
+                    </label>
                     <Select value={form.kota} onValueChange={setSelectValue('kota')} disabled={!form.provinsiId} required>
                       <SelectTrigger className="w-full h-10">
                         <SelectValue placeholder={lang === 'id' ? "Pilih Kota/Kabupaten" : "Select City/Regency"} />
@@ -220,15 +383,22 @@ export default function Daftar() {
                 </div>
               </div>
 
-              <div className="mt-10 flex justify-end">
+              <div className="mt-10 flex justify-between">
                 <Button 
                   type="button" 
-                  variant="hero" 
-                  onClick={handleNext}
-                  disabled={!validateStep1()}
+                  variant="outline"
+                  onClick={() => navigate(-1)}
                   className="px-6"
                 >
-                  {lang === 'id' ? "Selanjutnya" : "Next"}
+                  {lang === 'id' ? "Kembali" : "Back"}
+                </Button>
+                <Button 
+                  type="button" 
+                  className="bg-orange-500 hover:bg-orange-600 text-white px-6"
+                  onClick={handleNext}
+                  disabled={!validateStep1()}
+                >
+                  {lang === 'id' ? "Selanjutnya →" : "Next →"}
                 </Button>
               </div>
             </div>
@@ -309,24 +479,81 @@ export default function Daftar() {
               
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium mb-2">{lang === 'id' ? "Buat Password" : "Create Password"}</label>
+                  <label className="block text-sm font-medium mb-2">{lang === 'id' ? "Buat Password" : "Create Password"} <span className="text-red-500">*</span></label>
                   <input 
                     type="password" 
                     required 
                     className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
                     value={form.password} 
                     onChange={(e) => {
-                      setForm({ ...form, password: e.target.value });
-                      if (form.confirmPassword && e.target.value !== form.confirmPassword) {
+                      const newPassword = e.target.value;
+                      setForm({ ...form, password: newPassword });
+                      validatePassword(newPassword);
+                      if (form.confirmPassword && newPassword !== form.confirmPassword) {
                         setPasswordError(lang === 'id' ? "Konfirmasi password tidak cocok" : "Password confirmation doesn't match");
                       } else {
                         setPasswordError("");
                       }
                     }}
-                    minLength={6}
                     placeholder="••••••••"
                   />
-                  <p className="text-xs text-muted-foreground mt-1.5">{lang === 'id' ? "Minimal 6 karakter" : "Minimum 6 characters"}</p>
+                  
+                  {/* Password Requirements */}
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {lang === 'id' ? "Password harus mengandung:" : "Password must contain:"}
+                    </p>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${
+                          passwordValidation.minLength ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                        }`}>
+                          {passwordValidation.minLength ? '✓' : '○'}
+                        </div>
+                        <span className={`text-xs ${
+                          passwordValidation.minLength ? 'text-green-600' : 'text-muted-foreground'
+                        }`}>
+                          {lang === 'id' ? 'Minimal 8 karakter' : 'At least 8 characters'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${
+                          passwordValidation.hasLowercase ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                        }`}>
+                          {passwordValidation.hasLowercase ? '✓' : '○'}
+                        </div>
+                        <span className={`text-xs ${
+                          passwordValidation.hasLowercase ? 'text-green-600' : 'text-muted-foreground'
+                        }`}>
+                          {lang === 'id' ? 'Huruf kecil (a-z)' : 'Lowercase letter (a-z)'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${
+                          passwordValidation.hasUppercase ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                        }`}>
+                          {passwordValidation.hasUppercase ? '✓' : '○'}
+                        </div>
+                        <span className={`text-xs ${
+                          passwordValidation.hasUppercase ? 'text-green-600' : 'text-muted-foreground'
+                        }`}>
+                          {lang === 'id' ? 'Huruf besar (A-Z)' : 'Uppercase letter (A-Z)'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${
+                          passwordValidation.hasNumber ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                        }`}>
+                          {passwordValidation.hasNumber ? '✓' : '○'}
+                        </div>
+                        <span className={`text-xs ${
+                          passwordValidation.hasNumber ? 'text-green-600' : 'text-muted-foreground'
+                        }`}>
+                          {lang === 'id' ? 'Angka (0-9)' : 'Number (0-9)'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 
                 <div>
@@ -365,7 +592,14 @@ export default function Daftar() {
                 <Button 
                   type="submit" 
                   variant="hero"
-                  disabled={!!passwordError || form.password !== form.confirmPassword || form.password.length < 6}
+                  disabled={
+                    !!passwordError || 
+                    form.password !== form.confirmPassword || 
+                    !passwordValidation.minLength ||
+                    !passwordValidation.hasLowercase ||
+                    !passwordValidation.hasUppercase ||
+                    !passwordValidation.hasNumber
+                  }
                   className="px-6"
                 >
                   {lang === 'id' ? "Daftar Sekarang" : "Register Now"}

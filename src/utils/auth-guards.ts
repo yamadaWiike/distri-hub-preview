@@ -119,6 +119,21 @@ export async function requireAuth(): Promise<AuthValidationResult> {
 }
 
 /**
+ * Authentication guard for viewing products (allows pending users)
+ * Only requires authentication, not approval
+ */
+export async function requireAuthForViewing(): Promise<AuthValidationResult> {
+  const authResult = await validateAuth();
+  
+  if (!authResult.isAuthenticated) {
+    throw new Error('Authentication required. Please log in to access this resource.');
+  }
+  
+  // Allow pending users to view products (just not prices/order)
+  return authResult;
+}
+
+/**
  * Admin-only authentication guard
  * Throws error if user is not an admin
  */

@@ -37,10 +37,9 @@ const Hotjar: React.FC = () => {
     script.defer = true;
     script.src = `https://static.hotjar.com/c/hotjar-${HOTJAR_ID}.js?sv=${HOTJAR_SNIPPET_VERSION}`;
     
-    // Add error handling
+    // Add error handling - silently fail if blocked
     script.onerror = () => {
-      console.warn('Failed to load Hotjar script. Analytics may be blocked by an extension or network policy.');
-      // Remove the failed script
+      // Silently handle - Hotjar may be blocked by ad blockers or network policies
       if (document.head.contains(script)) {
         document.head.removeChild(script);
       }
