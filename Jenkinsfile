@@ -7,6 +7,17 @@ pipeline {
     }
     
     stages {
+        stage('Setup') {
+            steps {
+                // Configure npm to use local directory for global installs
+                sh '''
+                    mkdir -p ${WORKSPACE}/.npm-global
+                    npm config set prefix "${WORKSPACE}/.npm-global"
+                    export PATH="${WORKSPACE}/.npm-global/bin:$PATH"
+                    echo "npm configured for local global installs"
+                '''
+            }
+        }
         stage('Install') {
             steps {
                 sh 'npm install'
