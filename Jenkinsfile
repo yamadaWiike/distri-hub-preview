@@ -11,13 +11,17 @@ pipeline {
         stage('Setup Environment') {
             steps {
                 script {
-                    // Create .env file from Jenkins credentials or use .env.example
-                    sh '''
-                        if [ ! -f .env ]; then
-                            echo "Creating .env from .env.example..."
-                            cp .env.example .env || echo "No .env.example found, skipping..."
-                        fi
-                    '''
+                    // Create .env file with credentials from Jenkins environment/secrets
+                    withCredentials([
+                        string(credentialsId: 'SUPABASE_URL', variable: 'SUPABASE_URL'),
+                        string(credentialsId: 'SUPABASE_ANON_KEY', variable: 'SUPABASE_ANON_KEY')
+                    ]) {
+                        sh '''
+                            echo "VITE_SUPABASE_URL=${SUPABASE_URL}" > .env
+                            echo "VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}" >> .env
+                            echo ".env file created successfully"
+                        '''
+                    }
                 }
             }
         }
