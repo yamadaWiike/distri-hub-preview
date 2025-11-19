@@ -296,7 +296,7 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
                 <div className="flex items-center gap-1">
                   <span className="text-xs line-through text-muted-foreground">{formatIDR(product.consumerPrice)}</span>
                   <span className="text-lg font-bold text-blue-600">
-                    {loggedIn ? (distributorAccess.canViewPrices ? formatIDR(basePrice) : '••••••') : formatIDR(basePrice)}
+                    {loggedIn ? (distributorAccess.canViewPrices ? formatIDR(basePrice) : '••••••') : '••••••'}
                   </span>
                 </div>
               </div>
@@ -408,16 +408,16 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
               {lang === 'id' ? 'Lihat Harga' : 'View Price'}
             </button>
           </div>
-        ) : (
+        ) : !loggedIn ? (
           <div className="space-y-2">
-            <div className="text-xs text-center text-muted-foreground py-2">
-              {lang === 'id'
-                ? "Masuk untuk melihat harga"
-                : "Login to view prices"
-              }
-            </div>
+            <button
+              disabled
+              className="w-full py-2.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg cursor-not-allowed"
+            >
+              {lang === 'id' ? 'Silakan login terlebih dahulu' : 'Please login first'}
+            </button>
             <Link to="/masuk" className="block">
-              <button className="w-full py-2.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors flex items-center justify-center gap-2">
+              <button className="w-full py-2.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors flex items-center justify-center gap-2">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -425,6 +425,25 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
                 {lang === 'id' ? "Lihat Harga" : "View Price"}
               </button>
             </Link>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="text-xs text-center text-muted-foreground py-2">
+              {lang === 'id'
+                ? "Hubungi admin untuk aktivasi akun"
+                : "Contact admin for account activation"
+              }
+            </div>
+            <button
+              disabled
+              className="w-full py-2.5 text-sm font-medium text-white bg-gray-300 rounded-lg cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              {lang === 'id' ? "Lihat Harga" : "View Price"}
+            </button>
           </div>
         )}
       </div>
@@ -1390,6 +1409,22 @@ export default function DaftarProduk() {
                     distributorAccess.isInactive ? 'Your account is inactive. Please contact admin to reactivate your account.' :
                     'Account status unknown. Please contact admin.'
                   )}
+                </AlertDescription>
+              </div>
+            </div>
+          </Alert>
+        )}
+
+        {/* Alert for non-logged-in users */}
+        {!user && (
+          <Alert className="border-blue-200 bg-blue-50">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-blue-500" />
+              <div className="flex-1">
+                <AlertDescription className="text-sm font-medium">
+                  {lang === 'id' 
+                    ? 'Anda belum login. Silakan login untuk mengakses harga dan melakukan pemesanan.' 
+                    : 'You are not logged in. Please login to access prices and place orders.'}
                 </AlertDescription>
               </div>
             </div>
