@@ -8,6 +8,19 @@ pipeline {
                 sh 'rm -rf dist'
             }
         }
+        stage('Setup Environment') {
+            steps {
+                script {
+                    // Create .env file from Jenkins credentials or use .env.example
+                    sh '''
+                        if [ ! -f .env ]; then
+                            echo "Creating .env from .env.example..."
+                            cp .env.example .env || echo "No .env.example found, skipping..."
+                        fi
+                    '''
+                }
+            }
+        }
         stage('Build') {
             steps {
                 // Use the Jenkins-specific build script
