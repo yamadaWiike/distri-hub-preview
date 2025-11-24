@@ -128,41 +128,62 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
 // Function to fetch a single product by SKU or ID
 export async function fetchProductBySku(skuOrId: string): Promise<Product | null> {
   try {
-    // First try to look up by SKU
-    const { data: productBySku, error: productSkuError } = await supabase
-      .from('products')
-      .select(`
-        id,
-        sku,
-        name,
-        size,
-        base_distributor_price,
-        consumer_price,
-        base_moq,
-        description,
-        image_url,
-        stock_quantity,
-        has_variants,
-        base_uom,
-        moq_uom,
-        pricing_uom,
-        enable_uom_conversions,
-        brands(name),
-        product_categories(name)
-      `)
-      .eq('sku', skuOrId)
-      .single();
-    
-    // If not found by SKU, try by ID (UUID) if it looks like one
     let product: ProductRecord | null = null;
     let productId: string | null = null;
     
-    if (productBySku) {
-      product = productBySku as ProductRecord;
-      productId = product.id;
-    } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(skuOrId)) {
-      // It looks like a UUID, so try by ID
-      const { data: productById, error: productByIdError } = await supabase
+    console.log('fetchProductBySku called with:', skuOrId);
+    
+    // Check if it looks like a short prefix (less than full SKU length)
+    const isShortPrefix = skuOrId.length >= 6 && skuOrId.length <= 10 && !skuOrId.includes('-');
+    
+    console.log('isShortPrefix:', isShortPrefix, 'length:', skuOrId.length);
+    
+    if (isShortPrefix) {
+      console.log('Searching by ID prefix:', `${skuOrId}%`);
+      // It's likely a prefix from slug, search by ID prefix
+      // We need to fetch all products and filter in memory since PostgreSQL UUID doesn't support ilike
+      const { data: allProducts, error: prefixError } = await supabase
+        .from('products')
+        .select(`
+          id,
+          sku,
+          name,
+          size,
+          base_distributor_price,
+          consumer_price,
+          base_moq,
+          description,
+          image_url,
+          stock_quantity,
+          has_variants,
+          base_uom,
+          moq_uom,
+          pricing_uom,
+          enable_uom_conversions,
+          brands(name),
+          product_categories(name)
+        `);
+      
+      if (prefixError) {
+        console.error('Error searching products:', prefixError);
+        return null;
+      }
+      
+      // Filter by ID prefix in JavaScript
+      const productsByPrefix = (allProducts as ProductRecord[])?.filter((p: ProductRecord) => p.id.startsWith(skuOrId)) || [];
+      console.log('Filtered products by prefix:', productsByPrefix.length);
+        
+      if (productsByPrefix && productsByPrefix.length > 0) {
+        product = productsByPrefix[0] as ProductRecord;
+        productId = product.id;
+        console.log('Found product by prefix:', { sku: product.sku, id: product.id });
+      } else {
+        console.log('No product found by prefix');
+        return null;
+      }
+    } else {
+      // Try exact SKU match first
+      const { data: productBySku, error: productSkuError } = await supabase
         .from('products')
         .select(`
           id,
@@ -183,21 +204,43 @@ export async function fetchProductBySku(skuOrId: string): Promise<Product | null
           brands(name),
           product_categories(name)
         `)
-        .eq('id', skuOrId)
-        .single();
-        
-      if (productById) {
-        product = productById as ProductRecord;
+        .eq('sku', skuOrId)
+        .maybeSingle();
+      
+      if (productBySku) {
+        product = productBySku as ProductRecord;
         productId = product.id;
-      } else {
-        // Neither SKU nor ID matched
-        // Product not found with identifier
-        return null;
+      } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(skuOrId)) {
+        // It looks like a UUID, so try by ID
+        const { data: productById, error: productByIdError } = await supabase
+          .from('products')
+          .select(`
+            id,
+            sku,
+            name,
+            size,
+            base_distributor_price,
+            consumer_price,
+            base_moq,
+            description,
+            image_url,
+            stock_quantity,
+            has_variants,
+            base_uom,
+            moq_uom,
+            pricing_uom,
+            enable_uom_conversions,
+            brands(name),
+            product_categories(name)
+          `)
+          .eq('id', skuOrId)
+          .maybeSingle();
+          
+        if (productById) {
+          product = productById as ProductRecord;
+          productId = product.id;
+        }
       }
-    } else if (productSkuError && productSkuError.code !== 'PGRST116') {
-      // Only log actual errors, not "product not found" errors
-      console.error('Error fetching product:', productSkuError);
-      return null;
     }
     
     if (!product || !productId) {

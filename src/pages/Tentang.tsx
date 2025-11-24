@@ -1,5 +1,6 @@
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
 import { Building2, CheckCircle, Globe, LineChart, ShieldCheck, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useLanguage } from "@/hooks/use-language";
@@ -158,6 +159,7 @@ export default function Tentang() {
           </div>
         </div>
       </section>
+      <Footer />
     </div>
   );
 }

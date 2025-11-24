@@ -1,6 +1,7 @@
 import SEO from "@/components/seo/SEO";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
 import heroImage from "@/assets/hero-baskit.jpg";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -324,6 +325,7 @@ const Index = () => {
           </div>
         </section>
       </main>
+      <Footer />
     </div>
   );
 };

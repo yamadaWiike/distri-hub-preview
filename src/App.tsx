@@ -103,7 +103,7 @@ const App: React.FC = () => (
                   {/* Public pages */}
                   <Route path="/" element={<Index />} />
                   <Route path="/daftar-produk" element={<DaftarProduk />} />
-                  <Route path="/produk/:id" element={<ProdukDetail />} />
+                  <Route path="/produk/:category/:slug" element={<ProdukDetail />} />
                   <Route path="/tentang" element={<Tentang />} />
                   <Route path="/hubungi" element={<Hubungi />} />
                   <Route path="/masuk" element={<Masuk />} />

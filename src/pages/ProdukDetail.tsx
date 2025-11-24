@@ -6,66 +6,160 @@ import { useAuth } from "@/hooks/use-auth";
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/hooks/use-cart";
-import { formatIDR } from "@/lib/utils";
+import { formatIDR, getProductIdFromSlug } from "@/lib/utils";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 import { useToast } from "@/components/ui/use-toast";
 import { fetchProductBySku } from "@/lib/db";
 import { Dialog, DialogContent, DialogDescription } from "@/components/ui/dialog";
+import { checkMixedVariantsMOQ } from "@/utils/mixVariants";
+import { getAllProducts } from "@/services/product-service";
+import useEmblaCarousel from "embla-carousel-react";
+import { generateProductSlug } from "@/lib/utils";
 
 export default function ProdukDetail() {
-  const { id } = useParams();
+  const { category, slug } = useParams();
   const { user } = useAuth();
-  const { addItem } = useCart();
+  const { addItem, items } = useCart();
   const { toast } = useToast();
   const { lang } = useLanguage();
   const t = translations[lang];
   const navigate = useNavigate();
   
+  // Reconstruct the full slug from category and slug params
+  const fullSlug = category && slug ? `${category}/${slug}` : '';
+  
+  // Extract product ID from slug
+  const idPrefix = fullSlug ? getProductIdFromSlug(fullSlug) : '';
+  
+  // Add some logging to debug
+  console.log('ProdukDetail Debug:', { category, slug, fullSlug, idPrefix });
+  
   // Add state for fetched product
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
   
-  // First look for product in hardcoded data
-  const hardcodedProduct = PRODUCTS.find((p) => p.id === id);
+  // First look for product in hardcoded data using ID prefix
+  const hardcodedProduct = PRODUCTS.find((p) => p.id.startsWith(idPrefix));
   
   // Always fetch product from database to get UOM data
   useEffect(() => {
     async function loadProduct() {
-      if (id) {
+      if (idPrefix || hardcodedProduct) {
         try {
-          const fetchedProduct = await fetchProductBySku(id);
+          let fetchedProduct = null;
+          
+          console.log('Attempting to fetch product:', { idPrefix, hardcodedProductId: hardcodedProduct?.id });
+          
+          // If we found the product in hardcoded data, use its full ID
+          if (hardcodedProduct) {
+            console.log('Fetching by hardcoded ID:', hardcodedProduct.id);
+            fetchedProduct = await fetchProductBySku(hardcodedProduct.id);
+          }
+          
+          // If not found by full ID and we have a prefix, try prefix search
+          if (!fetchedProduct && idPrefix) {
+            console.log('Fetching by ID prefix:', idPrefix);
+            fetchedProduct = await fetchProductBySku(idPrefix);
+          }
+          
+          console.log('Fetched product result:', fetchedProduct);
+          
           if (fetchedProduct) {
             setProduct(fetchedProduct);
           } else {
             // Fallback to hardcoded if database fetch fails
-            setProduct(hardcodedProduct);
+            setProduct(hardcodedProduct || null);
           }
         } catch (error) {
           console.error("Error fetching product:", error);
           // Fallback to hardcoded if database fetch fails
-          setProduct(hardcodedProduct);
+          setProduct(hardcodedProduct || null);
         } finally {
           setLoading(false);
         }
+      } else {
+        setLoading(false);
       }
     }
     
     loadProduct();
-  }, [id, hardcodedProduct]);
+  }, [idPrefix, hardcodedProduct]);
+  
+  // Fetch similar products
+  useEffect(() => {
+    async function loadSimilarProducts() {
+      if (product) {
+        try {
+          const allProducts = await getAllProducts();
+          // Filter similar products by category, brand, or region
+          const similar = allProducts
+            .filter(p => p.id !== product.id) // Exclude current product
+            .filter(p => 
+              p.category === product.category || 
+              p.brand === product.brand ||
+              p.regions.some(r => product.regions.some(pr => pr.area === r.area))
+            )
+            .slice(0, 12); // Limit to 12 products
+          setSimilarProducts(similar);
+        } catch (error) {
+          console.error("Error fetching similar products:", error);
+        }
+      }
+    }
+    
+    loadSimilarProducts();
+  }, [product]);
   
   // Move hooks to the top level and use default values
   const [selectedArea, setSelectedArea] = useState('');
   const [qty, setQty] = useState(0);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  
+  // Embla carousel for similar products
+  const [emblaRef, emblaApi] = useEmblaCarousel({ 
+    loop: false, 
+    align: 'start',
+    slidesToScroll: 1,
+    breakpoints: {
+      '(min-width: 768px)': { slidesToScroll: 2 },
+      '(min-width: 1024px)': { slidesToScroll: 4 }
+    }
+  });
   
   // Initialize the state values when product changes
   useEffect(() => {
     if (product) {
+      const initialRegional = product.regions[0];
+      const allowMixVariants = Boolean(initialRegional?.allowMixVariants === true || product.allowMixVariants === true);
+      const skuLevelMoq = Number(initialRegional?.skuLevelMoq || product.singleSkuMoq || 0);
+      const canMixVariants = Boolean(allowMixVariants === true && product.hasVariants === true);
+      const initialQty = canMixVariants ? 1 : product.moq;
+      
       setSelectedArea(product.regions[0]?.area || '');
-      setQty(product.moq);
+      setQty(initialQty);
+      setCurrentImageIndex(0); // Reset image index when product changes
     }
   }, [product]);
+  
+  // Create product images array - if product has image, use it (could be extended to support multiple images)
+  const productImages = product ? [
+    product.image?.startsWith('http') || product.image?.startsWith('https') ? product.image : product.image || '/placeholder.svg'
+    // Add more images here if product data structure supports it
+    // Example: ...(product.images || [])
+  ].filter(Boolean) : [];
+  
+  const hasMultipleImages = productImages.length > 1;
+  
+  const goToPreviousImage = () => {
+    setCurrentImageIndex((prev) => prev === 0 ? productImages.length - 1 : prev - 1);
+  };
+  
+  const goToNextImage = () => {
+    setCurrentImageIndex((prev) => prev === productImages.length - 1 ? 0 : prev + 1);
+  };
   
   if (loading) return <div className="min-h-screen"><Navbar /><main className="container max-w-6xl mx-auto py-10">{lang === 'id' ? "Memuat..." : "Loading..."}</main></div>;
   if (!product) return (
@@ -82,8 +176,8 @@ export default function ProdukDetail() {
           </h1>
           <p className="text-muted-foreground mb-6">
             {lang === 'id' 
-              ? `SKU "${id}" tidak tersedia dalam katalog kami saat ini.`
-              : `SKU "${id}" is not available in our current catalog.`
+              ? `Produk "${fullSlug}" tidak tersedia dalam katalog kami saat ini.`
+              : `Product "${fullSlug}" is not available in our current catalog.`
             }
           </p>
           <Button variant="default" onClick={() => window.history.back()}>
@@ -96,198 +190,745 @@ export default function ProdukDetail() {
   const regional = product.regions.find((r) => r.area === selectedArea) || product.regions[0];
   const usedPrice = regional?.distributorPrice ?? product.distributorPrice;
   const usedMoq = regional?.moq ?? product.moq;
+  
+  // Mix variant logic
+  const allowMixVariants = Boolean(regional?.allowMixVariants === true || product.allowMixVariants === true);
+  const skuLevelMoq = Number(regional?.skuLevelMoq || product.singleSkuMoq || 0);
+  const displayMoq = (allowMixVariants && skuLevelMoq > 0) ? skuLevelMoq : usedMoq;
+  const canMixVariants = Boolean(allowMixVariants === true && product.hasVariants === true);
+  
+  // Calculate content per carton from UOM conversion factors
+  const pricingConversionFactor = product.pricing_conversion_factor || regional?.pricing_conversion_factor || 0;
+  const contentPerCarton = pricingConversionFactor > 0 ? pricingConversionFactor : null;
+  const baseUom = product.base_uom || 'pcs';
 
   return (
-    <div className="min-h-screen bg-background">
-      <SEO title={`${product.name} — ${product.size} | Baskit`} description={product.description} />
+    <div className="min-h-screen bg-gray-50">
+      <SEO title={`${product.name} ${product.size} | Baskit`} description={product.description} />
       <Navbar />
-      <main className="container max-w-6xl mx-auto py-8 space-y-6">
-        <header>
-          <h1 className="text-2xl font-bold">{product.name} — {product.size}</h1>
-          <p className="text-sm text-muted-foreground">{product.category} • {product.brand}</p>
-        </header>
-        <section className="grid md:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <div 
-              className="cursor-pointer relative group" 
-              onClick={() => setImageDialogOpen(true)}
-            >
+      
+      <main className="container max-w-7xl mx-auto py-6 px-4">
+        {/* Breadcrumb */}
+        <nav className="flex items-center space-x-2 text-sm text-gray-600 mb-6">
+          <button onClick={() => navigate('/daftar-produk')} className="hover:text-gray-900 flex items-center gap-1">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            {lang === 'id' ? 'Kembali ke Katalog' : 'Back to Catalog'}
+          </button>
+          <span>/</span>
+          <button onClick={() => navigate('/daftar-produk')} className="hover:text-gray-900">
+            {lang === 'id' ? 'Katalog Produk' : 'Product Catalog'}
+          </button>
+          <span>/</span>
+          <span className="text-gray-900">{product.name} {product.size}</span>
+        </nav>
+
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          {/* Left Column - Product Images (2 columns) */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Main Product Image */}
+            <div className="bg-white rounded-lg border overflow-hidden relative group">
               <img 
-                src={product.image || '/placeholder.svg'} 
-                alt={`${product.name} — ${product.size}`} 
-                className="w-full h-64 object-cover rounded-md transition-transform duration-300 group-hover:scale-[1.02]" 
+                src={productImages[currentImageIndex]} 
+                alt={`${product.name} ${product.size}`} 
+                className="w-full aspect-square object-contain cursor-pointer hover:scale-105 transition-transform duration-300" 
+                onClick={() => setImageDialogOpen(true)}
               />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-md">
-                <span className="bg-white/80 text-black text-xs font-medium px-2 py-1 rounded">
-                  {lang === 'id' ? "Klik untuk memperbesar" : "Click to enlarge"}
-                </span>
-              </div>
+              
+              {/* Navigation Arrows - Only show if multiple images */}
+              {hasMultipleImages && (
+                <>
+                  <button
+                    onClick={goToPreviousImage}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label="Previous image"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={goToNextImage}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label="Next image"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                  
+                  {/* Image Counter */}
+                  <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                    {currentImageIndex + 1} / {productImages.length}
+                  </div>
+                </>
+              )}
             </div>
-            <p className="text-muted-foreground">{product.description}</p>
-          </div>
-          
-          {/* Image Dialog */}
-          <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
-            <DialogContent className="max-w-3xl p-1 border-none">
-              <DialogDescription className="sr-only">
-                Product image preview for {product.name}
-              </DialogDescription>
-              <img 
-                src={product.image || '/placeholder.svg'} 
-                alt={`${product.name} — ${product.size}`} 
-                className="w-full h-auto object-contain max-h-[80vh] rounded-md"
-              />
-            </DialogContent>
-          </Dialog>
-          <div className="space-y-4">
-            <div>
-              <div className="text-xs text-muted-foreground">
-                {lang === 'id' ? 
-                  `Harga Pelanggan${product.pricing_uom && product.pricing_uom !== 'pcs' ? ` (per ${product.pricing_uom})` : ` (per ${product.pricing_uom || 'pcs'})`}` : 
-                  `Customer Price${product.pricing_uom && product.pricing_uom !== 'pcs' ? ` (per ${product.pricing_uom})` : ` (per ${product.pricing_uom || 'pcs'})`}`
-                }
-              </div>
-              <div className="text-lg font-medium">{formatIDR(product.consumerPrice)}</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">
-                {(() => {
-                  const priceUom = product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (regional?.price_uom || 'pcs');
-                  return lang === 'id' ? 
-                    `Harga Distributor${priceUom !== 'pcs' ? ` (per ${priceUom})` : ' (per pcs)'}` : 
-                    `Distributor Price${priceUom !== 'pcs' ? ` (per ${priceUom})` : ' (per pcs)'}`;
-                })()}
-              </div>
-              <div className={`text-lg font-medium ${user ? '' : 'blur-sm select-none'}`}>{formatIDR(usedPrice)}</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">MOQ</div>
-              <div className="text-lg font-medium">{usedMoq} {product.moq_uom && product.moq_uom !== 'pcs' ? product.moq_uom : (regional?.moq_uom || 'pcs')}</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">
-                {lang === 'id' ? "Stok" : "Stock"}
-              </div>
-              <div className="text-lg font-medium">{product.stock || 0} pcs</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground mb-1">
-                {lang === 'id' ? "Area Distribusi" : "Distribution Area"}
-              </div>
-              <div className="flex flex-wrap gap-2 text-sm">
-                {product.regions.map((r) => (
-                  <span key={r.area} className="px-2 py-1 rounded-md border">{r.area}</span>
+            
+            {/* Thumbnail Gallery - Only show if there are images */}
+            {productImages.length > 0 && (
+              <div className={`grid gap-2 ${productImages.length === 1 ? 'grid-cols-1' : productImages.length === 2 ? 'grid-cols-2' : 'grid-cols-4'}`}>
+                {productImages.map((img, idx) => (
+                  <div 
+                    key={idx} 
+                    className={`bg-white rounded-md border overflow-hidden cursor-pointer transition-all h-20 w-20 ${
+                      currentImageIndex === idx ? 'ring-2 ring-orange-500 border-orange-500' : 'hover:border-gray-400'
+                    }`}
+                    onClick={() => setCurrentImageIndex(idx)}
+                  >
+                    <img 
+                      src={img} 
+                      alt={`Thumbnail ${idx + 1}`} 
+                      className="w-full h-full object-contain hover:opacity-75 transition"
+                    />
+                  </div>
                 ))}
-              </div>
-            </div>
-            {user && (
-              <div className="grid sm:grid-cols-3 gap-3 items-end">
-                <div>
-                  <label className="text-xs text-muted-foreground">
-                    {lang === 'id' ? "Pilih Area" : "Select Area"}
-                  </label>
-                  <select
-                    value={selectedArea}
-                    onChange={(e) => setSelectedArea(e.target.value)}
-                    className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  >
-                    {product.regions.map((r) => (
-                      <option key={r.area} value={r.area}>{r.area}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">
-                    {lang === 'id' ? "Kuantitas" : "Quantity"}
-                  </label>
-                  <input type="number" min={usedMoq} value={qty} onChange={(e) => setQty(parseInt(e.target.value || '0'))} className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" />
-                </div>
-                <div>
-                  <Button 
-                    variant="hero" 
-                    className="w-full mt-5" 
-                    onClick={() => {
-                      // Get the regional and product mix variant settings
-                      const regional = product.regions.find(r => r.area === selectedArea) || product.regions[0];
-                      const allowMixVariants = Boolean(regional?.allowMixVariants === true || product.allowMixVariants === true);
-                      const skuLevelMoq = Number(regional?.skuLevelMoq || product.singleSkuMoq || 0);
-                      
-                      addItem({
-                        id: product.id, 
-                        name: product.name, 
-                        size: product.size, 
-                        image: product.image, 
-                        province: selectedArea, 
-                        unitPrice: usedPrice, 
-                        moq: usedMoq, 
-                        qty: qty, // Use exactly what the user specified 
-                        consumerPrice: product.consumerPrice,
-                        // Add mix variant properties
-                        allowMixVariants: allowMixVariants,
-                        skuLevelMoq: skuLevelMoq,
-                        // Note: ProdukDetail currently doesn't handle variant information
-                        // This will be added when variant selection UI is implemented
-                      });
-                      
-                      // Show toast notification
-                      toast({
-                        title: `${product.name} ${product.size}`,
-                        description: lang === 'id' 
-                          ? `${qty} item ditambahkan ke keranjang` 
-                          : `${qty} items added to cart`,
-                        duration: 3000,
-                        action: (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => navigate('/checkout')}
-                          >
-                            {lang === 'id' ? "Checkout" : "Checkout"}
-                          </Button>
-                        ),
-                      });
-                    }}
-                  >
-                    {lang === 'id' ? "Tambah ke Keranjang" : "Add to Cart"}
-                  </Button>
-                </div>
               </div>
             )}
           </div>
-        </section>
-        <section>
-          <h2 className="text-lg font-semibold mb-2">
-            {lang === 'id' ? "Harga & MOQ per Area Distribusi" : "Price & MOQ by Distribution Area"}
-          </h2>
-          <div className="divide-y border rounded-lg">
-            {/* Table Headers */}
-            <div className="grid grid-cols-3 gap-3 p-3 text-xs font-semibold text-muted-foreground bg-muted/30">
-              <div>{lang === 'id' ? "Area" : "Area"}</div>
-              <div>{lang === 'id' ? "Harga Distributor" : "Distributor Price"}</div>
-              <div>{lang === 'id' ? "MOQ" : "MOQ"}</div>
+
+          {/* Right Column - Product Details (3 columns) */}
+          <div className="lg:col-span-3 bg-white rounded-lg border p-6">
+            {/* Category Badge */}
+            <div className="inline-block bg-orange-100 text-orange-600 px-3 py-1 rounded text-xs font-medium mb-3">
+              {product.category}
             </div>
-            {product.regions.map((r) => {
-              const moqUom = product.moq_uom && product.moq_uom !== 'pcs' ? product.moq_uom : (r.moq_uom || 'pcs');
-              const priceUom = product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (r.price_uom || 'pcs');
-              return (
-                <div key={r.area} className="grid grid-cols-3 gap-3 p-3 text-sm">
-                  <div className="font-medium">{r.area}</div>
-                  <div className={`${user ? '' : 'blur-sm select-none'}`}>
-                    {formatIDR(r.distributorPrice)}
-                    {priceUom !== 'pcs' && <span className="text-xs text-muted-foreground ml-1">/{priceUom}</span>}
-                  </div>
-                  <div>{r.moq} {moqUom}</div>
+
+            {/* Product Title */}
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              {product.name} {product.size}
+            </h1>
+            
+            {/* Subtitle */}
+            <p className="text-sm text-gray-600 mb-4">
+              {product.brand} • {lang === 'id' ? 'Rasa Sapi Panggang' : 'Beef Flavor'}
+            </p>
+
+            {/* Description Section */}
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                {lang === 'id' ? 'Deskripsi Produk' : 'Product Description'}
+              </h3>
+              <p className="text-sm text-gray-700 leading-relaxed">
+                {product.description}
+              </p>
+              <button className="text-sm text-orange-600 hover:text-orange-700 font-medium mt-2">
+                {lang === 'id' ? 'Lihat lebih lanjut' : 'See more'}
+              </button>
+            </div>
+
+            {/* Features Row */}
+            <div className="grid grid-cols-3 gap-4 mb-6 pb-6 border-b">
+              <div className="flex items-start gap-2">
+                <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                 </div>
-              );
-            })}
+                <div>
+                  <p className="text-xs font-semibold text-gray-900">{lang === 'id' ? 'Garansi Kualitas' : 'Quality Guarantee'}</p>
+                  <p className="text-xs text-gray-600">{lang === 'id' ? '100% Original' : '100% Original'}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-900">{lang === 'id' ? 'Estimasi Pengiriman' : 'Estimated Delivery'}</p>
+                  <p className="text-xs text-gray-600">{lang === 'id' ? '1-3 Hari' : '1-3 Days'}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-900">{lang === 'id' ? 'Support 24/7' : 'Support 24/7'}</p>
+                  <p className="text-xs text-gray-600">{lang === 'id' ? 'Siap Membantu' : 'Ready to Help'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Area Distribution Selector */}
+            <div className="mb-4">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-2">
+                <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                {lang === 'id' ? 'Area Distribusi' : 'Distribution Area'}
+              </label>
+              <select
+                value={selectedArea}
+                onChange={(e) => setSelectedArea(e.target.value)}
+                className="w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition"
+              >
+                {product.regions.map((r) => (
+                  <option key={r.area} value={r.area}>{r.area}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* MOQ Info Only - Stock Hidden */}
+            <div className="mb-4">
+              <div className="text-center p-3 bg-gray-50 rounded-md border">
+                <p className="text-xs text-gray-600 mb-1">MOQ</p>
+                <p className="text-lg font-bold text-gray-900">{displayMoq} {lang === 'id' ? 'karton' : 'cartons'}</p>
+                {canMixVariants && (
+                  <p className="text-xs text-orange-600 mt-1">
+                    {lang === 'id' ? 'Dapat dicampur varian' : 'Can mix variants'}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Price Details Section */}
+            <div className="border-t border-b py-4 mb-4">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-sm font-semibold text-gray-900">
+                  {lang === 'id' ? 'Detail Harga' : 'Price Details'}
+                </h3>
+                <button className="text-orange-600 hover:text-orange-700">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                </button>
+              </div>
+
+              {contentPerCarton ? (
+                <p className="text-xs text-gray-500 mb-3">
+                  {lang === 'id' ? `Isi: ${contentPerCarton} ${baseUom}/karton` : `Content: ${contentPerCarton} ${baseUom}/carton`}
+                </p>
+              ) : (
+                <p className="text-xs text-gray-500 mb-3">
+                  {lang === 'id' ? 'Isi: Informasi tidak tersedia' : 'Content: Information not available'}
+                </p>
+              )}
+
+              {/* Distributor Price - Orange Background */}
+              <div className="bg-orange-50 -mx-6 px-6 py-3 mb-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{lang === 'id' ? 'Harga Distributor' : 'Distributor Price'}</p>
+                    <p className="text-xs text-gray-500">{lang === 'id' ? 'per karton' : 'per carton'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-xl font-bold text-orange-600 ${!user ? 'blur-sm select-none' : ''}`}>
+                      {formatIDR(usedPrice)}
+                    </p>
+                    {contentPerCarton && (
+                      <p className="text-xs text-gray-600">
+                        {lang === 'id' ? `Per ${baseUom}` : `Per ${baseUom}`}: <span className={`font-semibold ${!user ? 'blur-sm select-none' : ''}`}>{formatIDR(Math.round(usedPrice / contentPerCarton))}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Retail Price */}
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{lang === 'id' ? 'Harga Retail' : 'Retail Price'}</p>
+                  <p className="text-xs text-gray-500">{lang === 'id' ? 'per karton' : 'per carton'}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-base font-semibold text-gray-900">
+                    {formatIDR(product.retailPrice || product.consumerPrice * 0.9)}
+                  </p>
+                  {contentPerCarton && (
+                    <p className="text-xs text-gray-600">
+                      {lang === 'id' ? `Per ${baseUom}` : `Per ${baseUom}`}: <span className="font-semibold">{formatIDR(Math.round((product.retailPrice || product.consumerPrice * 0.9) / contentPerCarton))}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Consumer Price */}
+              <div className="flex justify-between items-start pb-3 mb-3 border-b">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{lang === 'id' ? 'Harga Konsumen' : 'Consumer Price'}</p>
+                  <p className="text-xs text-gray-500">{lang === 'id' ? 'per karton' : 'per carton'}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-base font-normal text-gray-900">
+                    {formatIDR(product.consumerPrice)}
+                  </p>
+                  {contentPerCarton && (
+                    <p className="text-xs text-gray-600">
+                      {lang === 'id' ? `Per ${baseUom}` : `Per ${baseUom}`}: <span className="font-normal">{formatIDR(Math.round(product.consumerPrice / contentPerCarton))}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Note */}
+              {contentPerCarton && (
+                <p className="text-xs text-gray-500 italic">
+                  {lang === 'id' 
+                    ? `*Harga per ${baseUom} hanya untuk informasi, pembelian minimal ${displayMoq} karton`
+                    : `*Price per ${baseUom} is for information only, minimum purchase ${displayMoq} cartons`}
+                </p>
+              )}
+
+              {/* Estimated Margin */}
+              <div className="bg-teal-50 -mx-6 px-6 py-3 mt-3">
+                <div className="flex justify-between items-center">
+                  <p className="text-sm font-medium text-gray-900">
+                    {lang === 'id' ? `Estimasi Margin (${qty} karton)` : `Estimated Margin (${qty} cartons)`}
+                  </p>
+                  <p className={`text-base font-bold text-teal-600 ${!user ? 'blur-sm select-none' : ''}`}>
+                    {formatIDR(Math.round(((product.retailPrice || product.consumerPrice * 0.9) - usedPrice) * qty))} ({((((product.retailPrice || product.consumerPrice * 0.9) - usedPrice) / (product.retailPrice || product.consumerPrice * 0.9)) * 100).toFixed(1)}%)
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Quantity Selector & Add to Cart */}
+            {user ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-900 block mb-2">
+                    {lang === 'id' ? 'Jumlah Pesanan' : 'Order Quantity'}
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center border rounded-md overflow-hidden">
+                      <button 
+                        onClick={() => {
+                          const minQty = canMixVariants ? 1 : usedMoq;
+                          setQty(Math.max(minQty, qty - 1));
+                        }}
+                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 transition text-gray-700 font-semibold"
+                      >
+                        −
+                      </button>
+                      <input 
+                        type="number" 
+                        min={canMixVariants ? 1 : usedMoq} 
+                        value={qty} 
+                        onChange={(e) => {
+                          const minQty = canMixVariants ? 1 : usedMoq;
+                          setQty(Math.max(minQty, parseInt(e.target.value || String(minQty))));
+                        }} 
+                        className="w-20 text-center py-2 border-x focus:outline-none font-semibold" 
+                      />
+                      <button 
+                        onClick={() => setQty(qty + 1)}
+                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 transition text-gray-700 font-semibold"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <span className="text-sm text-gray-600">{lang === 'id' ? 'karton' : 'cartons'}</span>
+                  </div>
+                </div>
+
+                {/* Total */}
+                <div className="bg-gray-50 rounded-md p-4 border">
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm font-medium text-gray-700">{lang === 'id' ? 'Total' : 'Total'}</p>
+                    <p className="text-2xl font-bold text-gray-900">{formatIDR(usedPrice * qty)}</p>
+                  </div>
+                </div>
+
+                {/* Add to Cart Button */}
+                <Button 
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white py-6 text-base font-semibold rounded-md shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                  onClick={() => {
+                    let finalQty = qty;
+                    let moqMessage = '';
+                    
+                    if (allowMixVariants && skuLevelMoq > 0 && product.hasVariants) {
+                      const { hasEnoughItems, currentTotal } = checkMixedVariantsMOQ(
+                        items,
+                        product.id,
+                        selectedArea,
+                        skuLevelMoq
+                      );
+                      
+                      const newTotal = currentTotal + qty;
+                      
+                      if (hasEnoughItems || newTotal >= skuLevelMoq) {
+                        moqMessage = lang === 'id'
+                          ? ` (Total varian: ${newTotal}/${skuLevelMoq})`
+                          : ` (Total variants: ${newTotal}/${skuLevelMoq})`;
+                      } else {
+                        const stillNeeded = skuLevelMoq - newTotal;
+                        moqMessage = lang === 'id'
+                          ? ` (${newTotal}/${skuLevelMoq}, perlu ${stillNeeded} lagi)`
+                          : ` (${newTotal}/${skuLevelMoq}, need ${stillNeeded} more)`;
+                      }
+                      
+                      finalQty = qty;
+                    } else if (qty < usedMoq) {
+                      finalQty = usedMoq;
+                    }
+                    
+                    addItem({
+                      id: product.id, 
+                      name: product.name, 
+                      size: product.size, 
+                      image: product.image, 
+                      province: selectedArea, 
+                      unitPrice: usedPrice, 
+                      moq: usedMoq, 
+                      qty: finalQty,
+                      consumerPrice: product.consumerPrice,
+                      allowMixVariants: allowMixVariants,
+                      skuLevelMoq: allowMixVariants ? skuLevelMoq : undefined,
+                    });
+                    
+                    toast({
+                      title: `${product.name} ${product.size}`,
+                      description: lang === 'id' 
+                        ? `${finalQty} karton ditambahkan ke keranjang${moqMessage}` 
+                        : `${finalQty} cartons added to cart${moqMessage}`,
+                      duration: 3000,
+                      action: (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => navigate('/checkout')}
+                        >
+                          {lang === 'id' ? "Checkout" : "Checkout"}
+                        </Button>
+                      ),
+                    });
+                  }}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  {lang === 'id' ? 'Tambahkan ke Keranjang' : 'Add to Cart'}
+                </Button>
+              </div>
+            ) : (
+              <div className="bg-orange-50 border border-orange-200 rounded-md p-4">
+                <p className="text-sm text-orange-800 text-center font-medium mb-3">
+                  {lang === 'id' 
+                    ? 'Silakan login untuk mengakses harga dan melakukan pemesanan.' 
+                    : 'Please login to access prices and place orders.'}
+                </p>
+                <Button 
+                  className="w-full bg-orange-500 hover:bg-orange-600"
+                  onClick={() => navigate('/masuk')}
+                >
+                  {lang === 'id' ? 'Login' : 'Login'}
+                </Button>
+              </div>
+            )}
           </div>
-          {!user && <p className="text-sm text-muted-foreground mt-2">
-            {lang === 'id' 
-              ? "Masuk untuk melihat harga dan simulasi lengkap." 
-              : "Login to view complete pricing and simulation."}
-          </p>}
-        </section>
+        </div>
+
+        {/* Similar Products Section */}
+        {similarProducts.length > 0 && (
+          <div className="mt-12">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">
+                {lang === 'id' ? 'Produk Sejenis Lainnya' : 'Similar Products'}
+              </h2>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => emblaApi?.scrollPrev()}
+                  className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Previous"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button 
+                  onClick={() => emblaApi?.scrollNext()}
+                  className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Next"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="overflow-hidden" ref={emblaRef}>
+              <div className="flex gap-4">
+              {similarProducts.map((similar) => {
+                const similarRegional = similar.regions[0];
+                const similarPrice = similarRegional?.distributorPrice ?? similar.distributorPrice;
+                const similarMoq = similarRegional?.moq ?? similar.moq;
+                const unitMargin = similar.retailPrice && similar.retailPrice > 0 && similarPrice > 0
+                  ? ((similar.retailPrice - similarPrice) / similarPrice) * 100
+                  : 0;
+                
+                return (
+                  <article 
+                    key={similar.id} 
+                    className="flex-shrink-0 w-[calc(100%-16px)] md:w-[calc(50%-16px)] lg:w-[calc(25%-16px)] border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow h-full flex flex-col"
+                  >
+                    {/* Product Image with Area Badge */}
+                    <div className="relative w-full h-48">
+                      <img 
+                        src={similar.image?.startsWith('http') || similar.image?.startsWith('https') ? similar.image : similar.image || '/placeholder.svg'} 
+                        alt={`${similar.name} ${similar.size}`} 
+                        loading="lazy"
+                        className="w-full h-48 object-cover"
+                      />
+                      {/* Area Badge - top right corner */}
+                      <div className="absolute top-2 right-2 bg-gray-600 text-white rounded px-2 py-1 text-xs font-medium">
+                        {similarRegional?.area ?? '-'}
+                      </div>
+                    </div>
+                    
+                    {/* Product Info Section */}
+                    <div className="p-3 flex-1 flex flex-col">
+                      {/* Brand Name */}
+                      {similar.brand && similar.brand !== 'unknown' && similar.brand !== 'Unknown Brand' && similar.brand !== 'Unknown' && (
+                        <div className="text-xs text-gray-600 mb-1">{similar.brand}</div>
+                      )}
+
+                      {/* Product Name */}
+                      <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2">
+                        {similar.name}
+                      </h3>
+
+                      {/* Category */}
+                      <div className="text-xs text-gray-500 mb-3">
+                        {similar.category && similar.category !== 'unknown' && similar.category !== 'Uncategorized' && similar.category}
+                      </div>
+
+                      {/* Price Section */}
+                      {user ? (
+                        <>
+                          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
+                            <div className="text-xs text-gray-600 mb-2">
+                              {lang === 'id' ? "Harga per karton" : "Price per carton"}
+                            </div>
+                            
+                            {/* Distributor Price with Orange Background */}
+                            <div className="mb-1 -mx-3 px-3 py-1.5 bg-orange-50">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-600">{lang === 'id' ? 'Distributor' : 'Distributor'}</span>
+                                <span className="text-sm font-bold text-orange-600">{formatIDR(similarPrice)}</span>
+                              </div>
+                            </div>
+
+                            {/* Retail Price */}
+                            <div className="mb-1">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-600">{lang === 'id' ? 'Retail' : 'Retail'}</span>
+                                <span className="text-sm font-semibold text-gray-900">
+                                  {similar.retailPrice && similar.retailPrice > 0 ? formatIDR(similar.retailPrice) : formatIDR(Math.round(similar.consumerPrice * 0.9))}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Konsumen Price */}
+                            <div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-600">{lang === 'id' ? 'Konsumen' : 'Consumer'}</span>
+                                <span className="text-sm font-normal text-gray-900">
+                                  {similar.consumerPrice && similar.consumerPrice > 0 ? formatIDR(similar.consumerPrice) : '-'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Margin Display */}
+                          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-gray-600">
+                                Margin (Distributor — Retail)
+                              </span>
+                              <span className="text-sm font-bold text-teal-600">
+                                {unitMargin.toFixed(0)}%
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* MOQ Info */}
+                          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-600">MOQ</span>
+                              <span className="font-medium text-gray-900">{similarMoq} karton</span>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
+                            <div className="text-xs text-gray-600 mb-2">
+                              {lang === 'id' ? "Harga per karton" : "Price per carton"}
+                            </div>
+                            
+                            {/* Distributor Price with Orange Background - Blurred */}
+                            <div className="mb-1 -mx-3 px-3 py-1.5 bg-orange-50">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-600">{lang === 'id' ? 'Distributor' : 'Distributor'}</span>
+                                <span className="text-sm font-bold text-orange-600 blur-sm select-none">{formatIDR(similarPrice)}</span>
+                              </div>
+                            </div>
+
+                            {/* Retail Price - Blurred */}
+                            <div className="mb-1">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-600">{lang === 'id' ? 'Retail' : 'Retail'}</span>
+                                <span className="text-sm font-semibold text-gray-900 blur-sm select-none">
+                                  {formatIDR(similar.retailPrice || Math.round(similar.consumerPrice * 0.9))}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Konsumen Price - Blurred */}
+                            <div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-600">{lang === 'id' ? 'Konsumen' : 'Consumer'}</span>
+                                <span className="text-sm font-normal text-gray-900 blur-sm select-none">
+                                  {formatIDR(similar.consumerPrice)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Margin Display - Blurred */}
+                          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-gray-600">
+                                Margin (Distributor — Retail)
+                              </span>
+                              <span className="text-sm font-bold text-teal-600 blur-sm select-none">
+                                {unitMargin.toFixed(0)}%
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* MOQ Info */}
+                          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-600">MOQ</span>
+                              <span className="font-medium text-gray-900">{similarMoq} karton</span>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="mt-auto grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            window.location.href = `/produk/${generateProductSlug(similar)}`;
+                          }}
+                          className="w-full py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                        >
+                          {lang === 'id' ? 'Lihat Detail' : 'View Details'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
+                            if (user) {
+                              const allowMixVariants = Boolean(similarRegional?.allowMixVariants === true || similar.allowMixVariants === true);
+                              const skuLevelMoq = Number(similarRegional?.skuLevelMoq || similar.singleSkuMoq || 0);
+                              
+                              addItem({
+                                id: similar.id,
+                                name: similar.name,
+                                size: similar.size,
+                                image: similar.image,
+                                province: similarRegional?.area || '',
+                                unitPrice: similarPrice,
+                                moq: similarMoq,
+                                qty: similarMoq,
+                                consumerPrice: similar.consumerPrice,
+                                allowMixVariants: allowMixVariants,
+                                skuLevelMoq: skuLevelMoq,
+                              });
+                              
+                              toast({
+                                title: `${similar.name} ${similar.size}`,
+                                description: lang === 'id' 
+                                  ? `${similarMoq} karton ditambahkan ke keranjang` 
+                                  : `${similarMoq} cartons added to cart`,
+                                duration: 3000,
+                              });
+                            } else {
+                              navigate('/masuk');
+                            }
+                          }}
+                          disabled={!user}
+                          className={`w-full py-2.5 text-sm font-medium text-white rounded-md transition-colors flex items-center justify-center gap-2 ${
+                            user 
+                              ? 'bg-orange-500 hover:bg-orange-600' 
+                              : 'bg-gray-300 cursor-not-allowed'
+                          }`}
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
+
+      {/* Image Dialog */}
+      <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
+        <DialogContent className="max-w-4xl p-2 border-none">
+          <DialogDescription className="sr-only">
+            Product image preview for {product.name}
+          </DialogDescription>
+          <div className="relative">
+            <img 
+              src={productImages[currentImageIndex]} 
+              alt={`${product.name} ${product.size}`} 
+              className="w-full h-auto object-contain max-h-[85vh] rounded-lg"
+            />
+            
+            {/* Navigation in Dialog - Only show if multiple images */}
+            {hasMultipleImages && (
+              <>
+                <button
+                  onClick={goToPreviousImage}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full"
+                  aria-label="Previous image"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={goToNextImage}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full"
+                  aria-label="Next image"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+                
+                {/* Image Counter in Dialog */}
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-3 py-2 rounded">
+                  {currentImageIndex + 1} / {productImages.length}
+                </div>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -11,11 +11,13 @@ export type ProductFromDB = {
   name: string;
   size: string;
   base_distributor_price: number;
+  retail_price?: number;
   consumer_price: number;
   base_moq: number;
   description: string;
   image_url?: string;
   stock_quantity?: number;
+  allow_negative_stock?: boolean;
   created_at?: string;
   brands?: { name: string };
   product_categories?: { name: string };
@@ -105,10 +107,12 @@ export function mapDBProductToProduct(
     name: dbProduct.name,
     size: dbProduct.size,
     distributorPrice: dbProduct.base_distributor_price,
+    retailPrice: dbProduct.retail_price,
     consumerPrice: dbProduct.consumer_price,
     moq: dbProduct.base_moq,
     description: dbProduct.description,
     stock: dbProduct.stock_quantity || 0,
+    allow_negative_stock: dbProduct.allow_negative_stock ?? false,
     image: dbProduct.image_url,
     hasVariants: dbProduct.variant_count ? dbProduct.variant_count > 0 : (dbProduct.has_variants || false),
     // UOM fields
@@ -302,10 +306,13 @@ interface ProductWithVariantCount {
   name: string;
   size: string;
   base_distributor_price: number;
+  retail_price?: number;
   consumer_price: number;
   moq: number;
   description: string;
   image?: string;
+  stock_quantity?: number;
+  allow_negative_stock?: boolean;
   variant_count: number;
   base_uom?: string;
   moq_uom?: string;
@@ -337,10 +344,13 @@ interface FallbackProduct {
   name: string;
   size: string;
   base_distributor_price: number;
+  retail_price?: number;
   consumer_price: number;
   base_moq: number;
   description: string;
   image_url?: string;
+  stock_quantity?: number;
+  allow_negative_stock?: boolean;
   has_variants: boolean;
   base_uom?: string;
   moq_uom?: string;
@@ -359,89 +369,64 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
   await requireAuthForViewing();
   
   try {
-    // First try to get products from the products_with_variants view
-    const { data: viewProducts, error: productsError } = await supabase
-      .from('products_with_variants')
+    // Query products directly from the products table (view doesn't exist in schema)
+    const { data: fallbackProducts, error: fallbackError } = await supabase
+      .from('products')
       .select(`
         id,
         sku,
-        category_id,
-        brand_id,
         name,
         size,
         base_distributor_price,
+        retail_price,
         consumer_price,
-        moq,
+        base_moq,
         description,
-        image,
-        variant_count,
+        image_url,
+        stock_quantity,
+        allow_negative_stock,
+        has_variants,
         base_uom,
         moq_uom,
         pricing_uom,
         enable_uom_conversions,
         single_sku_moq,
-        allow_mix_variants
+        allow_mix_variants,
+        brands:brand_id(name),
+        product_categories:category_id(name)
       `);
     
     // Variable to hold our final products list
     let productsData: ProductWithVariantCount[] = [];
     
-    // If the view doesn't exist, fallback to joining the tables directly
-    if (productsError) {
-      console.error('Error fetching from products_with_variants view, falling back to direct query:', productsError);
-      
-      // Use a direct query to get the same information
-      const { data: fallbackProducts, error: fallbackError } = await supabase
-        .from('products')
-        .select(`
-          id,
-          sku,
-          name,
-          size,
-          base_distributor_price,
-          consumer_price,
-          base_moq,
-          description,
-          image_url,
-          has_variants,
-          base_uom,
-          moq_uom,
-          pricing_uom,
-          enable_uom_conversions,
-          brands:brand_id(name),
-          product_categories:category_id(name)
-        `);
-      
-      if (fallbackError || !fallbackProducts) {
-        console.error('Error with fallback products query:', fallbackError);
-        return [];
-      }
-      
-      // Transform the fallback data to match the expected format
-      productsData = (fallbackProducts as FallbackProduct[]).map(p => ({
-        id: p.id,
-        category: p.product_categories?.name || 'Uncategorized',
-        brand: p.brands?.name || 'Unknown',
-        name: p.name,
-        size: p.size,
-        base_distributor_price: p.base_distributor_price,
-        consumer_price: p.consumer_price,
-        moq: p.base_moq,
-        description: p.description,
-        image: p.image_url,
-        variant_count: p.has_variants ? 1 : 0, // Assume has_variants flag means at least one variant
-        base_uom: p.base_uom || 'pcs',
-        moq_uom: p.moq_uom || 'pcs',
-        pricing_uom: p.pricing_uom || 'pcs',
-        enable_uom_conversions: p.enable_uom_conversions || false,
-        // Mix variants fields
-        single_sku_moq: p.single_sku_moq || 0,
-        allow_mix_variants: p.allow_mix_variants || false
-      }));
-    } else {
-      // Use the view data if available
-      productsData = viewProducts as ProductWithVariantCount[];
+    if (fallbackError || !fallbackProducts) {
+      console.error('Error fetching products:', fallbackError);
+      return [];
     }
+    
+    // Transform the data to match the expected format
+    productsData = (fallbackProducts as FallbackProduct[]).map(p => ({
+      id: p.id,
+      category: p.product_categories?.name || 'Uncategorized',
+      brand: p.brands?.name || 'Unknown',
+      name: p.name,
+      size: p.size,
+      base_distributor_price: p.base_distributor_price,
+      retail_price: p.retail_price,
+      consumer_price: p.consumer_price,
+      moq: p.base_moq,
+      description: p.description,
+      image: p.image_url,
+      variant_count: p.has_variants ? 1 : 0,
+      stock_quantity: p.stock_quantity,
+      allow_negative_stock: p.allow_negative_stock,
+      base_uom: p.base_uom || 'pcs',
+      moq_uom: p.moq_uom || 'pcs',
+      pricing_uom: p.pricing_uom || 'pcs',
+      enable_uom_conversions: p.enable_uom_conversions || false,
+      single_sku_moq: p.single_sku_moq || 0,
+      allow_mix_variants: p.allow_mix_variants || false
+    }));
     
     if (!productsData || productsData.length === 0) {
       console.error('No product data available');
@@ -466,14 +451,17 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
       return {
         id: dbProduct.id,
         category: dbProduct.category,
-        brand: dbProduct.brand_id || 'Unknown', // Use brand_id instead of brand
+        brand: dbProduct.brand || 'Unknown',
         name: dbProduct.name,
         size: dbProduct.size,
         distributorPrice: dbProduct.base_distributor_price,
+        retailPrice: dbProduct.retail_price,
         consumerPrice: dbProduct.consumer_price,
         moq: dbProduct.moq,
         description: dbProduct.description,
         image: dbProduct.image,
+        stock: dbProduct.stock_quantity || 0,
+        allow_negative_stock: dbProduct.allow_negative_stock ?? false,
         hasVariants: dbProduct.variant_count > 0,
         // UOM fields
         base_uom: dbProduct.base_uom || 'pcs',
@@ -520,11 +508,13 @@ export async function getAllProducts(): Promise<Product[]> {
         name,
         size,
         base_distributor_price,
+        retail_price,
         consumer_price,
         base_moq,
         description,
         image_url,
         stock_quantity,
+        allow_negative_stock,
         has_variants,
         base_uom,
         moq_uom,
