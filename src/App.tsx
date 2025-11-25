@@ -29,6 +29,7 @@ import Hubungi from "./pages/Hubungi";
 import Masuk from "./pages/Masuk";
 import Daftar from "./pages/Daftar";
 import Profil from "./pages/Profil";
+import LengkapiProfil from "./pages/LengkapiProfil";
 import Admin from "./pages/Admin";
 import AllActivities from "./pages/AllActivities";
 import AdminDistributors from "./pages/AdminDistributors";
@@ -111,6 +112,7 @@ const App: React.FC = () => (
                   
                   {/* Protected routes - require authentication */}
                   <Route path="/profil" element={<Protected><Profil /></Protected>} />
+                  <Route path="/lengkapi-profil" element={<Protected><LengkapiProfil /></Protected>} />
                   <Route path="/checkout" element={<Protected><Checkout /></Protected>} />
                   
                   {/* Admin routes */}

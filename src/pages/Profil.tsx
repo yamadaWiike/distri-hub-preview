@@ -80,6 +80,23 @@ export default function Profil() {
     status_pkp: "Non-PKP",
     npwp_number: "",
     nib_number: "",
+    
+    // Document URLs
+    npwp_file_url: "",
+    nib_file_url: "",
+    ktp_file_url: "",
+    
+    // PIC fields
+    nama_pic: "",
+    posisi_pic: "",
+    nomor_kontak_pic: "",
+    email_pic: "",
+    
+    // Banking fields
+    nama_bank: "",
+    nama_pemilik_akun: "",
+    nomor_rekening: "",
+    jumlah_armada_pengiriman: "",
   });
   
   const [isLocating, setIsLocating] = useState(false);
@@ -87,6 +104,38 @@ export default function Profil() {
   const [mapDialogOpen, setMapDialogOpen] = useState(false);
   const [selectedCoordinates, setSelectedCoordinates] = useState<[number, number] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [userStatus, setUserStatus] = useState<'pending' | 'active' | 'incomplete'>('pending');
+  const [profileCompletion, setProfileCompletion] = useState(0);
+  
+  // Calculate profile completion percentage
+  const calculateProfileCompletion = useCallback(() => {
+    const requiredFields = [
+      form.nama_bisnis,
+      form.nama_pemilik,
+      form.kontak_pemilik,
+      form.email_pemilik,
+      form.alamat_lengkap,
+      form.kota,
+      form.email_perusahaan,
+      form.nomor_telp_perusahaan,
+      form.nama_direktur,
+      form.npwp_number,
+      form.nib_number,
+      form.status_pkp,
+      form.alamat_gudang,
+    ];
+    
+    const filledFields = requiredFields.filter(field => field && field.trim() !== '').length;
+    const percentage = Math.round((filledFields / requiredFields.length) * 100);
+    setProfileCompletion(percentage);
+    
+    return percentage;
+  }, [form]);
+  
+  // Update profile completion when form changes
+  useEffect(() => {
+    calculateProfileCompletion();
+  }, [calculateProfileCompletion]);
   
   // Load profile data from Supabase if user is logged in
   useEffect(() => {
@@ -112,6 +161,10 @@ export default function Profil() {
         
         // If we have data, populate the form
         if (data) {
+          // Set user status based on profile status
+          const status = data.status || 'pending';
+          setUserStatus(status as 'pending' | 'active' | 'incomplete');
+          
           setForm({
             nama_bisnis: data.nama_bisnis || "",
             alamat_lengkap: data.alamat_lengkap || "",
@@ -137,6 +190,20 @@ export default function Profil() {
             status_pkp: (data as ExtendedDistributorProfile).status_pkp || "Non-PKP",
             npwp_number: (data as ExtendedDistributorProfile).npwp_number || "",
             nib_number: (data as ExtendedDistributorProfile).nib_number || "",
+            // Document URLs
+            npwp_file_url: (data as any).npwp_file_url || "",
+            nib_file_url: (data as any).nib_file_url || "",
+            ktp_file_url: (data as any).ktp_file_url || "",
+            // PIC fields
+            nama_pic: (data as any).nama_pic || data.nama_pemilik || "",
+            posisi_pic: (data as any).posisi_pic || "",
+            nomor_kontak_pic: (data as any).nomor_kontak_pic || data.kontak_pemilik || "",
+            email_pic: (data as any).email_pic || (data as ExtendedDistributorProfile).email_pemilik || "",
+            // Banking fields
+            nama_bank: (data as any).nama_bank || "",
+            nama_pemilik_akun: (data as any).nama_pemilik_akun || "",
+            nomor_rekening: (data as any).nomor_rekening || "",
+            jumlah_armada_pengiriman: (data as any).jumlah_armada_pengiriman || "",
           });
         } else {
           // If no profile data yet but we have user data, prefill what we can
@@ -189,6 +256,207 @@ export default function Profil() {
   }, [user, navigate]);
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm({ ...form, [k]: e.target.value });
+  
+  const setTemp = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTempForm({ ...tempForm, [k]: e.target.value });
+  
+  // File upload handler
+  const handleFileChange = (fileType: 'npwp_file' | 'nib_file' | 'ktp_file' | 'foto_gudang') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setTempFiles({ ...tempFiles, [fileType]: e.target.files[0] });
+    }
+  };
+  
+  // Upload file to S3
+  const uploadFileToS3 = async (file: File, folder: string): Promise<string | null> => {
+    try {
+      const { uploadStorePhoto } = await import('@/lib/utils');
+      const fileUrl = await uploadStorePhoto(file, folder);
+      return fileUrl;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      return null;
+    }
+  };
+  
+  // Save section edits
+  const saveOwnerInfo = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setIsSubmitting(true);
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      const { error } = await supabase
+        .from('distributor_profiles')
+        // @ts-expect-error - Bypassing type check
+        .update({
+          nama_pemilik: tempForm.nama_pemilik,
+          kontak_pemilik: tempForm.kontak_pemilik,
+          email_pemilik: tempForm.email_pemilik,
+        })
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      setForm(tempForm);
+      setEditOwnerOpen(false);
+      toast({ title: "Berhasil", description: "Informasi pemilik berhasil diperbarui" });
+    } catch (error) {
+      console.error('Error updating owner info:', error);
+      toast({ title: "Gagal", description: "Gagal memperbarui informasi", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const saveCompanyInfo = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setIsSubmitting(true);
+      setUploadingFiles(true);
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      // Upload files if they exist
+      const updateData: any = {
+        nama_bisnis: tempForm.nama_bisnis,
+        email_perusahaan: tempForm.email_perusahaan,
+        nomor_telp_perusahaan: tempForm.nomor_telp_perusahaan,
+        nama_direktur: tempForm.nama_direktur,
+        alamat_lengkap: tempForm.alamat_lengkap,
+        kota: tempForm.kota,
+        status_pkp: tempForm.status_pkp,
+        bentuk_usaha: tempForm.bentuk_usaha,
+        npwp_number: tempForm.npwp_number,
+        nib_number: tempForm.nib_number,
+      };
+      
+      // Upload NPWP file
+      if (tempFiles.npwp_file) {
+        const npwpUrl = await uploadFileToS3(tempFiles.npwp_file, 'documents/npwp');
+        if (npwpUrl) {
+          updateData.npwp_file_url = npwpUrl;
+          setTempForm({ ...tempForm, npwp_file_url: npwpUrl });
+        }
+      }
+      
+      // Upload NIB file
+      if (tempFiles.nib_file) {
+        const nibUrl = await uploadFileToS3(tempFiles.nib_file, 'documents/nib');
+        if (nibUrl) {
+          updateData.nib_file_url = nibUrl;
+          setTempForm({ ...tempForm, nib_file_url: nibUrl });
+        }
+      }
+      
+      // Upload KTP file
+      if (tempFiles.ktp_file) {
+        const ktpUrl = await uploadFileToS3(tempFiles.ktp_file, 'documents/ktp');
+        if (ktpUrl) {
+          updateData.ktp_file_url = ktpUrl;
+          setTempForm({ ...tempForm, ktp_file_url: ktpUrl });
+        }
+      }
+      
+      const { error } = await supabase
+        .from('distributor_profiles')
+        // @ts-expect-error - Bypassing type check
+        .update(updateData)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      setForm(tempForm);
+      setTempFiles({ npwp_file: null, nib_file: null, ktp_file: null, foto_gudang: null });
+      setEditCompanyOpen(false);
+      toast({ title: "Berhasil", description: "Profil perusahaan berhasil diperbarui" });
+    } catch (error) {
+      console.error('Error updating company info:', error);
+      toast({ title: "Gagal", description: "Gagal memperbarui informasi", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+      setUploadingFiles(false);
+    }
+  };
+  
+  const saveWarehouseInfo = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setIsSubmitting(true);
+      setUploadingFiles(true);
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      const updateData: any = {
+        nama_pic: tempForm.nama_pic,
+        posisi_pic: tempForm.posisi_pic,
+        nomor_kontak_pic: tempForm.nomor_kontak_pic,
+        email_pic: tempForm.email_pic,
+        alamat_gudang: tempForm.alamat_gudang,
+        koordinat: tempForm.koordinat,
+      };
+      
+      // Upload warehouse photo if exists
+      if (tempFiles.foto_gudang) {
+        const photoUrl = await uploadFileToS3(tempFiles.foto_gudang, 'warehouse');
+        if (photoUrl) {
+          updateData.foto_gudang = photoUrl;
+          setTempForm({ ...tempForm, foto_gudang: photoUrl });
+        }
+      }
+      
+      const { error } = await supabase
+        .from('distributor_profiles')
+        // @ts-expect-error - Bypassing type check
+        .update(updateData)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      setForm(tempForm);
+      setTempFiles({ ...tempFiles, foto_gudang: null });
+      setEditWarehouseOpen(false);
+      toast({ title: "Berhasil", description: "Informasi gudang berhasil diperbarui" });
+    } catch (error) {
+      console.error('Error updating warehouse info:', error);
+      toast({ title: "Gagal", description: "Gagal memperbarui informasi", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+      setUploadingFiles(false);
+    }
+  };
+  
+  const saveBankingInfo = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setIsSubmitting(true);
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      const { error } = await supabase
+        .from('distributor_profiles')
+        // @ts-expect-error - Bypassing type check
+        .update({
+          nama_bank: tempForm.nama_bank,
+          nama_pemilik_akun: tempForm.nama_pemilik_akun,
+          nomor_rekening: tempForm.nomor_rekening,
+          jumlah_karyawan: tempForm.jumlah_karyawan ? parseInt(tempForm.jumlah_karyawan, 10) : null,
+          jumlah_armada_pengiriman: tempForm.jumlah_armada_pengiriman,
+        })
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      setForm(tempForm);
+      setEditBankingOpen(false);
+      toast({ title: "Berhasil", description: "Informasi operasional berhasil diperbarui" });
+    } catch (error) {
+      console.error('Error updating banking info:', error);
+      toast({ title: "Gagal", description: "Gagal memperbarui informasi", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Detect user location
   const detectUserLocation = useCallback(() => {
@@ -267,6 +535,29 @@ export default function Profil() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  
+  // Edit dialogs state
+  const [editOwnerOpen, setEditOwnerOpen] = useState(false);
+  const [editCompanyOpen, setEditCompanyOpen] = useState(false);
+  const [editWarehouseOpen, setEditWarehouseOpen] = useState(false);
+  const [editBankingOpen, setEditBankingOpen] = useState(false);
+  
+  // Temporary form state for editing
+  const [tempForm, setTempForm] = useState(form);
+  
+  // File upload states
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [tempFiles, setTempFiles] = useState<{
+    npwp_file: File | null;
+    nib_file: File | null;
+    ktp_file: File | null;
+    foto_gudang: File | null;
+  }>({
+    npwp_file: null,
+    nib_file: null,
+    ktp_file: null,
+    foto_gudang: null,
+  });
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -363,7 +654,7 @@ export default function Profil() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gray-50">
       <SEO 
         title={lang === 'id' ? "Profil | Baskit Distributor Hub" : "Profile | Baskit Distributor Hub"}
         description={lang === 'id' 
@@ -373,214 +664,285 @@ export default function Profil() {
       />
       <Navbar />
       <main className="container max-w-4xl mx-auto py-8 px-4">
-        {/* User Info Header */}
-        <div className="bg-card rounded-lg shadow-sm border p-6 mb-6">
-          <div className="flex flex-col items-center text-center">
-            <div className="w-16 h-16 rounded-full bg-orange-500 flex items-center justify-center text-white text-2xl font-bold mb-3">
-              {user?.email?.charAt(0).toUpperCase() || 'U'}
+        {/* User Info Header Card */}
+        <div className="bg-white rounded-lg shadow-sm border mb-6">
+          <div className="p-6">
+            {/* Profile Avatar and Name */}
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-14 h-14 rounded-full bg-orange-500 flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
+                {form.nama_bisnis?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h1 className="text-lg font-semibold text-gray-900 mb-1">
+                  {form.nama_bisnis || 'PT Maju Bersama'}
+                </h1>
+                <p className="text-sm text-gray-600">
+                  {user?.email || 'budi@majubersama.co.id'}
+                </p>
+              </div>
             </div>
-            <h1 className="text-lg font-semibold">{form.nama_bisnis || user?.email || 'User'}</h1>
-            <p className="text-sm text-muted-foreground mb-3">{user?.email}</p>
-            <span className="inline-flex px-3 py-1 bg-orange-100 text-orange-600 rounded-full text-xs font-medium mb-4">
-              {lang === 'id' ? '⏳ Menunggu Approval' : '⏳ Pending Approval'}
-            </span>
-            <p className="text-sm text-muted-foreground mb-3">
-              {lang === 'id' 
-                ? 'Menunggu persetujuan dari pihak Baskit, pastikan untuk mengisi data secara lengkap dan benar' 
-                : 'Awaiting approval from Baskit, please ensure all data is complete and accurate'}
-            </p>
-            <Button 
-              type="button"
-              className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-md text-sm font-medium"
-            >
-              {lang === 'id' ? 'Lengkapi Data Distributor' : 'Complete Distributor Data'}
-            </Button>
+
+            {/* Status and Progress */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">Status Akun</span>
+                <span className="text-sm font-semibold text-gray-900">{profileCompletion}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
+                <div 
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    profileCompletion === 100 ? 'bg-green-500' : 
+                    profileCompletion >= 60 ? 'bg-orange-500' : 
+                    'bg-yellow-400'
+                  }`} 
+                  style={{ width: `${profileCompletion}%` }}
+                ></div>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                {userStatus === 'pending' && (
+                  <span className="inline-flex items-center px-2.5 py-1 bg-yellow-50 text-yellow-700 rounded text-xs font-medium">
+                    ⏱️ Menunggu Persetujuan
+                  </span>
+                )}
+                {userStatus === 'active' && profileCompletion < 100 && (
+                  <span className="inline-flex items-center px-2.5 py-1 bg-orange-50 text-orange-700 rounded text-xs font-medium">
+                    📝 Belum Lengkap
+                  </span>
+                )}
+                {userStatus === 'active' && profileCompletion === 100 && (
+                  <span className="inline-flex items-center px-2.5 py-1 bg-green-50 text-green-700 rounded text-xs font-medium">
+                    ✅ Aktif
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Alert Message - Different messages based on status */}
+            {userStatus === 'pending' && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex gap-3">
+                  <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm text-yellow-800 leading-relaxed">
+                      {lang === 'id'
+                        ? 'ℹ️ Pendaftaran Anda sedang ditinjau oleh tim kami. Anda akan menerima notifikasi via email setelah disetujui. Proses ini biasanya memakan waktu 1-2 hari kerja.'
+                        : 'ℹ️ Your registration is being reviewed by our team. You will receive an email notification once approved. This process typically takes 1-2 business days.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {userStatus === 'active' && profileCompletion < 100 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <div className="flex flex-col gap-3">
+                  <div className="flex gap-3">
+                    <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-orange-800 leading-relaxed mb-3">
+                        {lang === 'id'
+                          ? 'Lengkapi profil untuk mendapatkan akses penuh ke semua fitur'
+                          : 'Complete your profile to get full access to all features'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                    onClick={() => navigate('/lengkapi-profil')}
+                  >
+                    {lang === 'id' ? 'Lengkapi Profil Sekarang' : 'Complete Profile Now'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {userStatus === 'active' && profileCompletion === 100 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex gap-3">
+                  <svg className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm text-green-800 leading-relaxed">
+                      {lang === 'id'
+                        ? '✅ Profil Anda lengkap dan telah diverifikasi. Anda dapat mengakses semua fitur.'
+                        : '✅ Your profile is complete and verified. You can access all features.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         <form onSubmit={onSubmit}>
           {isLoading && (
-            <div className="bg-card rounded-lg shadow-sm border p-6 mb-6 text-center">
+            <div className="bg-white rounded-lg shadow-sm border p-6 mb-6 text-center">
               <div className="inline-block h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></div>
               <span>{lang === 'id' ? "Memuat data profil..." : "Loading profile data..."}</span>
             </div>
           )}
 
-          {/* Informasi Bisnis */}
-          <div className="bg-card rounded-lg shadow-sm border mb-4">
-            <div className="px-6 py-3 border-b flex items-center justify-between">
-              <h2 className="text-sm font-semibold flex items-center gap-2">
-                {lang === 'id' ? 'Informasi Bisnis' : 'Business Information'}
-              </h2>
-              <Button type="button" variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-foreground">
-                ✏️ Edit
-              </Button>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-                <div>
-                  <p className="text-muted-foreground mb-1">Nama Bisnis</p>
-                  <p className="font-medium">{form.nama_bisnis || 'asdasdasd'}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground mb-1">Nomor HP</p>
-                  <p className="font-medium">{form.kontak_pemilik || 'asdasd123'}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-muted-foreground mb-1">Alamat</p>
-                  <p className="font-medium">{form.alamat_lengkap || 'asdasd123'}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground mb-1">Kota/Kab</p>
-                  <p className="font-medium">{form.kota || 'tangerang, banten'}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Informasi Pemilik */}
-          <div className="bg-card rounded-lg shadow-sm border mb-4">
-            <div className="px-6 py-3 border-b flex items-center justify-between">
+          <div className="bg-white rounded-lg shadow-sm border mb-4">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="text-sm font-semibold flex items-center gap-2">
+                <span className="text-lg">👤</span>
                 {lang === 'id' ? 'Informasi Pemilik' : 'Owner Information'}
               </h2>
-              <Button type="button" variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-foreground">
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                onClick={() => {
+                  setTempForm(form);
+                  setEditOwnerOpen(true);
+                }}
+              >
                 ✏️ Edit
               </Button>
             </div>
             <div className="p-6">
-              <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground mb-1">Nama Pemilik</p>
-                  <p className="font-medium">{form.nama_pemilik || 'asdasdas'}</p>
+                  <p className="text-gray-500 mb-1">Nama Pemilik</p>
+                  <p className="font-medium text-gray-900">{form.nama_pemilik || 'Budi Santoso'}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1">Nomor HP Pemilik</p>
-                  <p className="font-medium">{form.kontak_pemilik || 'asdasd123'}</p>
+                  <p className="text-gray-500 mb-1">Nomor HP Pemilik</p>
+                  <p className="font-medium text-gray-900">{form.kontak_pemilik || '08123456789'}</p>
                 </div>
-                <div className="col-span-2">
-                  <p className="text-muted-foreground mb-1">Email</p>
-                  <p className="font-medium">{form.email_pemilik || 'test@gmail.com'}</p>
+                <div className="sm:col-span-2">
+                  <p className="text-gray-500 mb-1">Email Pemilik</p>
+                  <p className="font-medium text-gray-900">{form.email_pemilik || user?.email || 'budi@majubersama.co.id'}</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Profil Perusahaan */}
-          <div className="bg-card rounded-lg shadow-sm border mb-4">
-            <div className="px-6 py-3 border-b flex items-center justify-between">
+          <div className="bg-white rounded-lg shadow-sm border mb-4">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="text-sm font-semibold flex items-center gap-2">
+                <span className="text-lg">🏢</span>
                 {lang === 'id' ? 'Profil Perusahaan' : 'Company Profile'}
               </h2>
-              <Button type="button" variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-foreground">
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                onClick={() => {
+                  setTempForm(form);
+                  setTempFiles({ npwp_file: null, nib_file: null, ktp_file: null, foto_gudang: null });
+                  setEditCompanyOpen(true);
+                }}
+              >
                 ✏️ Edit
               </Button>
             </div>
             <div className="p-6">
-              <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground mb-1">Nama Perusahaan</p>
-                  <p className="font-medium">{form.nama_bisnis || '-'}</p>
+                  <p className="text-gray-500 mb-1">Nama Perusahaan</p>
+                  <p className="font-medium text-gray-900">{form.nama_bisnis || 'PT Maju Bersama'}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1">Email Perusahaan</p>
-                  <p className="font-medium">{form.email_perusahaan || '-'}</p>
+                  <p className="text-gray-500 mb-1">Email Perusahaan</p>
+                  <p className="font-medium text-gray-900">{form.email_perusahaan || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1">Nomor Kontak</p>
-                  <p className="font-medium">{form.nomor_telp_perusahaan || '-'}</p>
+                  <p className="text-gray-500 mb-1">Nomor Kontak</p>
+                  <p className="font-medium text-gray-900">{form.nomor_telp_perusahaan || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1">Nama Direktur</p>
-                  <p className="font-medium">{form.nama_direktur || '-'}</p>
+                  <p className="text-gray-500 mb-1">Nama Direktur</p>
+                  <p className="font-medium text-gray-900">{form.nama_direktur || '-'}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-gray-500 mb-1">Alamat Perusahaan</p>
+                  <p className="font-medium text-gray-900">{form.alamat_lengkap || 'Jl. Pahlawan No. 123, Kel. Sukajadi'}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1">Status PKP</p>
-                  <p className="font-medium">{form.status_pkp || '-'}</p>
+                  <p className="text-gray-500 mb-1">Kota</p>
+                  <p className="font-medium text-gray-900">{form.kota || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1">Status Kepemilikan</p>
-                  <p className="font-medium">{form.bentuk_usaha || '-'}</p>
+                  <p className="text-gray-500 mb-1">Status PKP</p>
+                  <p className="font-medium text-gray-900">{form.status_pkp || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1">NPWP</p>
-                  <p className="font-medium">{form.npwp_number || '-'}</p>
+                  <p className="text-gray-500 mb-1">Status Kepemilikan</p>
+                  <p className="font-medium text-gray-900">{form.bentuk_usaha || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1">NIB</p>
-                  <p className="font-medium">{form.nib_number || '-'}</p>
+                  <p className="text-gray-500 mb-1">NPWP</p>
+                  <p className="font-medium text-gray-900">{form.npwp_number || '-'}</p>
                 </div>
-              </div>
-
-              {/* Dokumen Pendukung */}
-              <div className="mt-6">
-                <p className="text-sm font-medium mb-3">Dokumen Pendukung</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-shrink-0 w-12 h-12 border rounded flex items-center justify-center bg-gray-50">
-                      📄
+                <div>
+                  <p className="text-gray-500 mb-1">NIB</p>
+                  <p className="font-medium text-gray-900">{form.nib_number || '-'}</p>
+                </div>
+                
+                {/* Legal Documents */}
+                <div className="sm:col-span-2 mt-4 pt-4 border-t border-gray-200">
+                  <p className="text-gray-700 font-medium mb-3">📄 Dokumen Legal</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-2">Dokumen NPWP</p>
+                      {form.npwp_file_url ? (
+                        <a 
+                          href={form.npwp_file_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-md text-xs hover:bg-blue-100 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Lihat Dokumen
+                        </a>
+                      ) : (
+                        <p className="text-xs text-gray-400">Belum diunggah</p>
+                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">KTP</p>
-                      <div className="flex gap-2 mt-1">
-                        <button type="button" className="text-xs text-orange-500 hover:text-orange-600">
-                          📁 Lihat
-                        </button>
-                        <button type="button" className="text-xs text-muted-foreground hover:text-foreground">
-                          ⬇️ Download
-                        </button>
-                      </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-2">Dokumen NIB</p>
+                      {form.nib_file_url ? (
+                        <a 
+                          href={form.nib_file_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-md text-xs hover:bg-blue-100 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Lihat Dokumen
+                        </a>
+                      ) : (
+                        <p className="text-xs text-gray-400">Belum diunggah</p>
+                      )}
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="flex-shrink-0 w-12 h-12 border rounded flex items-center justify-center bg-gray-50">
-                      📄
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">NIB.pdf</p>
-                      <div className="flex gap-2 mt-1">
-                        <button type="button" className="text-xs text-orange-500 hover:text-orange-600">
-                          📁 Lihat
-                        </button>
-                        <button type="button" className="text-xs text-muted-foreground hover:text-foreground">
-                          ⬇️ Download
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="flex-shrink-0 w-12 h-12 border rounded flex items-center justify-center bg-gray-50">
-                      📄
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">Akta.pdf</p>
-                      <div className="flex gap-2 mt-1">
-                        <button type="button" className="text-xs text-orange-500 hover:text-orange-600">
-                          📁 Lihat
-                        </button>
-                        <button type="button" className="text-xs text-muted-foreground hover:text-foreground">
-                          ⬇️ Download
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="flex-shrink-0 w-12 h-12 border rounded flex items-center justify-center bg-gray-50">
-                      📄
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">NPWP</p>
-                      <div className="flex gap-2 mt-1">
-                        <button type="button" className="text-xs text-orange-500 hover:text-orange-600">
-                          📁 Lihat
-                        </button>
-                        <button type="button" className="text-xs text-muted-foreground hover:text-foreground">
-                          ⬇️ Download
-                        </button>
-                      </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-2">Dokumen KTP Pemilik</p>
+                      {form.ktp_file_url ? (
+                        <a 
+                          href={form.ktp_file_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-md text-xs hover:bg-blue-100 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Lihat Dokumen
+                        </a>
+                      ) : (
+                        <p className="text-xs text-gray-400">Belum diunggah</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -589,72 +951,121 @@ export default function Profil() {
           </div>
 
           {/* PIC & Gudang */}
-          <div className="bg-card rounded-lg shadow-sm border mb-4">
-            <div className="px-6 py-3 border-b flex items-center justify-between">
+          <div className="bg-white rounded-lg shadow-sm border mb-4">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="text-sm font-semibold flex items-center gap-2">
+                <span className="text-lg">📦</span>
                 {lang === 'id' ? 'PIC & Gudang' : 'PIC & Warehouse'}
               </h2>
-              <Button type="button" variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-foreground">
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                onClick={() => {
+                  setTempForm(form);
+                  setTempFiles({ npwp_file: null, nib_file: null, ktp_file: null, foto_gudang: null });
+                  setEditWarehouseOpen(true);
+                }}
+              >
                 ✏️ Edit
               </Button>
             </div>
             <div className="p-6">
-              <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground mb-1">Nama PIC</p>
-                  <p className="font-medium">{form.nama_pemilik || '-'}</p>
+                  <p className="text-gray-500 mb-1">Nama PIC</p>
+                  <p className="font-medium text-gray-900">{form.nama_pic || form.nama_pemilik || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1">Nomor Kontak PIC</p>
-                  <p className="font-medium">{form.kontak_pemilik || '-'}</p>
+                  <p className="text-gray-500 mb-1">Posisi PIC</p>
+                  <p className="font-medium text-gray-900">{form.posisi_pic || '-'}</p>
                 </div>
-                <div className="col-span-2">
-                  <p className="text-muted-foreground mb-1">Email PIC</p>
-                  <p className="font-medium">{form.email_pemilik || '-'}</p>
+                <div>
+                  <p className="text-gray-500 mb-1">Nomor Kontak PIC</p>
+                  <p className="font-medium text-gray-900">{form.nomor_kontak_pic || form.kontak_pemilik || '-'}</p>
                 </div>
-                <div className="col-span-2">
-                  <p className="text-muted-foreground mb-1">Alamat Gudang</p>
-                  <p className="font-medium">{form.alamat_gudang || '-'}</p>
+                <div>
+                  <p className="text-gray-500 mb-1">Email PIC</p>
+                  <p className="font-medium text-gray-900">{form.email_pic || form.email_pemilik || '-'}</p>
                 </div>
+                <div className="sm:col-span-2">
+                  <p className="text-gray-500 mb-1">Alamat Gudang</p>
+                  <p className="font-medium text-gray-900">{form.alamat_gudang || '-'}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-gray-500 mb-1">Koordinat</p>
+                  <p className="font-medium text-gray-900">{form.koordinat || '-'}</p>
+                </div>
+                
+                {/* Warehouse Photo */}
+                {form.foto_gudang && (
+                  <div className="sm:col-span-2 mt-4 pt-4 border-t border-gray-200">
+                    <p className="text-gray-700 font-medium mb-3">📸 Foto Gudang</p>
+                    <img 
+                      src={form.foto_gudang} 
+                      alt="Foto Gudang" 
+                      className="w-full max-w-md h-48 object-cover rounded-lg border border-gray-200"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Pembayaran & Operasional */}
-          <div className="bg-card rounded-lg shadow-sm border mb-6">
-            <div className="px-6 py-3 border-b flex items-center justify-between">
+          {/* Perbankan & Operasional */}
+          <div className="bg-white rounded-lg shadow-sm border mb-6">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="text-sm font-semibold flex items-center gap-2">
-                {lang === 'id' ? 'Pembayaran & Operasional' : 'Payment & Operational'}
+                <span className="text-lg">💳</span>
+                {lang === 'id' ? 'Perbankan & Operasional' : 'Banking & Operational'}
               </h2>
-              <Button type="button" variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-foreground">
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                onClick={() => {
+                  setTempForm(form);
+                  setEditBankingOpen(true);
+                }}
+              >
                 ✏️ Edit
               </Button>
             </div>
             <div className="p-6">
-              <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground mb-1">Nama Sales</p>
-                  <p className="font-medium">-</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground mb-1">Nomor Rekening</p>
-                  <p className="font-medium">-</p>
+                  <p className="text-gray-500 mb-1">Nama Bank</p>
+                  <p className="font-medium text-gray-900">{form.nama_bank || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1">Jumlah Karyawan</p>
-                  <p className="font-medium">{form.jumlah_karyawan || '-'}</p>
+                  <p className="text-gray-500 mb-1">Nama Pemilik Rekening</p>
+                  <p className="font-medium text-gray-900">{form.nama_pemilik_akun || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1">Metode Pengiriman</p>
-                  <p className="font-medium">-</p>
+                  <p className="text-gray-500 mb-1">Nomor Rekening</p>
+                  <p className="font-medium text-gray-900">{form.nomor_rekening || '-'}</p>
                 </div>
-                <div className="col-span-2">
-                  <p className="text-muted-foreground mb-1">Metode Pembayaran</p>
-                  <p className="font-medium">-</p>
+                <div>
+                  <p className="text-gray-500 mb-1">Jumlah Karyawan</p>
+                  <p className="font-medium text-gray-900">{form.jumlah_karyawan || '-'}</p>
                 </div>
-                <div className="col-span-2">
-                  <p className="text-muted-foreground mb-1">Aplikasi Perusahaan</p>
-                  <p className="font-medium">-</p>
+                <div>
+                  <p className="text-gray-500 mb-1">Jumlah Armada Pengiriman</p>
+                  <p className="font-medium text-gray-900">{form.jumlah_armada_pengiriman || '-'}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-gray-500 mb-1">Metode Pembayaran</p>
+                  <p className="font-medium text-gray-900">-</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1">Aplikasi Pencatatan</p>
+                  <p className="font-medium text-gray-900">-</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1">Area Distribusi</p>
+                  <p className="font-medium text-gray-900">-</p>
                 </div>
               </div>
             </div>
@@ -680,6 +1091,529 @@ export default function Profil() {
             </div>
           </div>
         )}
+
+        {/* Edit Owner Dialog */}
+        <Dialog open={editOwnerOpen} onOpenChange={setEditOwnerOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{lang === 'id' ? 'Edit Informasi Pemilik' : 'Edit Owner Information'}</DialogTitle>
+              <DialogDescription>
+                {lang === 'id' ? 'Perbarui informasi pemilik bisnis' : 'Update business owner information'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {lang === 'id' ? 'Nama Pemilik' : 'Owner Name'}
+                </label>
+                <input
+                  type="text"
+                  value={tempForm.nama_pemilik}
+                  onChange={setTemp('nama_pemilik')}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {lang === 'id' ? 'Nomor HP Pemilik' : 'Owner Phone Number'}
+                </label>
+                <input
+                  type="tel"
+                  value={tempForm.kontak_pemilik}
+                  onChange={setTemp('kontak_pemilik')}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {lang === 'id' ? 'Email Pemilik' : 'Owner Email'}
+                </label>
+                <input
+                  type="email"
+                  value={tempForm.email_pemilik}
+                  onChange={setTemp('email_pemilik')}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditOwnerOpen(false)}
+                disabled={isSubmitting}
+              >
+                {lang === 'id' ? 'Batal' : 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                onClick={saveOwnerInfo}
+                disabled={isSubmitting}
+                className="bg-orange-500 hover:bg-orange-600"
+              >
+                {isSubmitting ? (lang === 'id' ? 'Menyimpan...' : 'Saving...') : (lang === 'id' ? 'Simpan' : 'Save')}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Company Dialog */}
+        <Dialog open={editCompanyOpen} onOpenChange={setEditCompanyOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{lang === 'id' ? 'Edit Profil Perusahaan' : 'Edit Company Profile'}</DialogTitle>
+              <DialogDescription>
+                {lang === 'id' ? 'Perbarui informasi perusahaan' : 'Update company information'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {lang === 'id' ? 'Nama Perusahaan' : 'Company Name'}
+                  </label>
+                  <input
+                    type="text"
+                    value={tempForm.nama_bisnis}
+                    onChange={setTemp('nama_bisnis')}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {lang === 'id' ? 'Email Perusahaan' : 'Company Email'}
+                  </label>
+                  <input
+                    type="email"
+                    value={tempForm.email_perusahaan}
+                    onChange={setTemp('email_perusahaan')}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {lang === 'id' ? 'Nomor Kontak' : 'Contact Number'}
+                  </label>
+                  <input
+                    type="tel"
+                    value={tempForm.nomor_telp_perusahaan}
+                    onChange={setTemp('nomor_telp_perusahaan')}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {lang === 'id' ? 'Nama Direktur' : 'Director Name'}
+                  </label>
+                  <input
+                    type="text"
+                    value={tempForm.nama_direktur}
+                    onChange={setTemp('nama_direktur')}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {lang === 'id' ? 'Alamat Perusahaan' : 'Company Address'}
+                </label>
+                <textarea
+                  value={tempForm.alamat_lengkap}
+                  onChange={setTemp('alamat_lengkap')}
+                  rows={2}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {lang === 'id' ? 'Kota' : 'City'}
+                </label>
+                <input
+                  type="text"
+                  value={tempForm.kota}
+                  onChange={setTemp('kota')}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {lang === 'id' ? 'Status PKP' : 'PKP Status'}
+                  </label>
+                  <select
+                    value={tempForm.status_pkp}
+                    onChange={setTemp('status_pkp')}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none bg-white"
+                  >
+                    <option value="PKP">PKP</option>
+                    <option value="Non-PKP">Non-PKP</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {lang === 'id' ? 'Status Kepemilikan' : 'Ownership Status'}
+                  </label>
+                  <select
+                    value={tempForm.bentuk_usaha}
+                    onChange={setTemp('bentuk_usaha')}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none bg-white"
+                  >
+                    <option value="">Pilih...</option>
+                    <option value="Milik Sendiri">Milik Sendiri</option>
+                    <option value="Sewa">Sewa</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">NPWP</label>
+                  <input
+                    type="text"
+                    value={tempForm.npwp_number}
+                    onChange={setTemp('npwp_number')}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">NIB</label>
+                  <input
+                    type="text"
+                    value={tempForm.nib_number}
+                    onChange={setTemp('nib_number')}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                  />
+                </div>
+              </div>
+              
+              {/* Document Uploads */}
+              <div className="border-t pt-4 mt-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">📄 Upload Dokumen Legal</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Dokumen NPWP {tempForm.npwp_file_url && <span className="text-green-600 text-xs">(Sudah ada)</span>}
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={handleFileChange('npwp_file')}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    />
+                    {tempForm.npwp_file_url && (
+                      <a href={tempForm.npwp_file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
+                        Lihat dokumen saat ini
+                      </a>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Dokumen NIB {tempForm.nib_file_url && <span className="text-green-600 text-xs">(Sudah ada)</span>}
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={handleFileChange('nib_file')}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    />
+                    {tempForm.nib_file_url && (
+                      <a href={tempForm.nib_file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
+                        Lihat dokumen saat ini
+                      </a>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Dokumen KTP Pemilik {tempForm.ktp_file_url && <span className="text-green-600 text-xs">(Sudah ada)</span>}
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={handleFileChange('ktp_file')}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    />
+                    {tempForm.ktp_file_url && (
+                      <a href={tempForm.ktp_file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
+                        Lihat dokumen saat ini
+                      </a>
+                    )}
+                  </div>
+                  {uploadingFiles && (
+                    <p className="text-xs text-orange-600">📤 Mengupload dokumen...</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditCompanyOpen(false)}
+                disabled={isSubmitting}
+              >
+                {lang === 'id' ? 'Batal' : 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                onClick={saveCompanyInfo}
+                disabled={isSubmitting}
+                className="bg-orange-500 hover:bg-orange-600"
+              >
+                {isSubmitting ? (lang === 'id' ? 'Menyimpan...' : 'Saving...') : (lang === 'id' ? 'Simpan' : 'Save')}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Warehouse Dialog */}
+        <Dialog open={editWarehouseOpen} onOpenChange={setEditWarehouseOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{lang === 'id' ? 'Edit PIC & Gudang' : 'Edit PIC & Warehouse'}</DialogTitle>
+              <DialogDescription>
+                {lang === 'id' ? 'Perbarui informasi PIC dan lokasi gudang' : 'Update PIC and warehouse location'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="border-b pb-4 mb-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Informasi PIC</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {lang === 'id' ? 'Nama PIC' : 'PIC Name'}
+                    </label>
+                    <input
+                      type="text"
+                      value={tempForm.nama_pic}
+                      onChange={setTemp('nama_pic')}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {lang === 'id' ? 'Posisi PIC' : 'PIC Position'}
+                    </label>
+                    <select
+                      value={tempForm.posisi_pic}
+                      onChange={setTemp('posisi_pic')}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none bg-white"
+                    >
+                      <option value="">Pilih Posisi...</option>
+                      <option value="Owner">Owner</option>
+                      <option value="Direktur">Direktur</option>
+                      <option value="General Manager">General Manager</option>
+                      <option value="Operations Manager">Operations Manager</option>
+                      <option value="Warehouse Manager">Warehouse Manager</option>
+                      <option value="Staff">Staff</option>
+                      <option value="Lainnya">Lainnya</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {lang === 'id' ? 'Nomor Kontak PIC' : 'PIC Contact Number'}
+                    </label>
+                    <input
+                      type="tel"
+                      value={tempForm.nomor_kontak_pic}
+                      onChange={setTemp('nomor_kontak_pic')}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {lang === 'id' ? 'Email PIC' : 'PIC Email'}
+                    </label>
+                    <input
+                      type="email"
+                      value={tempForm.email_pic}
+                      onChange={setTemp('email_pic')}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Lokasi Gudang</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {lang === 'id' ? 'Alamat Gudang' : 'Warehouse Address'}
+                    </label>
+                    <textarea
+                      value={tempForm.alamat_gudang}
+                      onChange={setTemp('alamat_gudang')}
+                      rows={3}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {lang === 'id' ? 'Koordinat' : 'Coordinates'}
+                    </label>
+                    <input
+                      type="text"
+                      value={tempForm.koordinat}
+                      onChange={setTemp('koordinat')}
+                      placeholder="Latitude, Longitude"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {lang === 'id' ? 'Foto Gudang' : 'Warehouse Photo'} {tempForm.foto_gudang && <span className="text-green-600 text-xs">(Sudah ada)</span>}
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange('foto_gudang')}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    />
+                    {tempForm.foto_gudang && (
+                      <div className="mt-2">
+                        <img src={tempForm.foto_gudang} alt="Preview" className="w-32 h-32 object-cover rounded border" />
+                      </div>
+                    )}
+                  </div>
+                  {uploadingFiles && (
+                    <p className="text-xs text-orange-600">📤 Mengupload foto...</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditWarehouseOpen(false)}
+                disabled={isSubmitting}
+              >
+                {lang === 'id' ? 'Batal' : 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                onClick={saveWarehouseInfo}
+                disabled={isSubmitting}
+                className="bg-orange-500 hover:bg-orange-600"
+              >
+                {isSubmitting ? (lang === 'id' ? 'Menyimpan...' : 'Saving...') : (lang === 'id' ? 'Simpan' : 'Save')}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Banking Dialog */}
+        <Dialog open={editBankingOpen} onOpenChange={setEditBankingOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{lang === 'id' ? 'Edit Perbankan & Operasional' : 'Edit Banking & Operational'}</DialogTitle>
+              <DialogDescription>
+                {lang === 'id' ? 'Perbarui informasi perbankan dan operasional bisnis' : 'Update banking and operational information'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="border-b pb-4 mb-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Keterangan Bank</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {lang === 'id' ? 'Nama Bank' : 'Bank Name'}
+                    </label>
+                    <select
+                      value={tempForm.nama_bank}
+                      onChange={setTemp('nama_bank')}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none bg-white"
+                    >
+                      <option value="">Pilih Bank...</option>
+                      <option value="BCA">BCA</option>
+                      <option value="Mandiri">Mandiri</option>
+                      <option value="BNI">BNI</option>
+                      <option value="BRI">BRI</option>
+                      <option value="CIMB Niaga">CIMB Niaga</option>
+                      <option value="Permata">Permata</option>
+                      <option value="Danamon">Danamon</option>
+                      <option value="BTN">BTN</option>
+                      <option value="Maybank">Maybank</option>
+                      <option value="BSI">BSI</option>
+                      <option value="Lainnya">Lainnya</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {lang === 'id' ? 'Nama Pemilik Rekening' : 'Account Owner Name'}
+                    </label>
+                    <input
+                      type="text"
+                      value={tempForm.nama_pemilik_akun}
+                      onChange={setTemp('nama_pemilik_akun')}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {lang === 'id' ? 'Nomor Rekening' : 'Account Number'}
+                    </label>
+                    <input
+                      type="text"
+                      value={tempForm.nomor_rekening}
+                      onChange={setTemp('nomor_rekening')}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Informasi Operasional</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {lang === 'id' ? 'Jumlah Karyawan' : 'Number of Employees'}
+                    </label>
+                    <input
+                      type="text"
+                      value={tempForm.jumlah_karyawan}
+                      onChange={setTemp('jumlah_karyawan')}
+                      placeholder="Contoh: 50"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {lang === 'id' ? 'Jumlah Armada Pengiriman' : 'Delivery Fleet Size'}
+                    </label>
+                    <input
+                      type="text"
+                      value={tempForm.jumlah_armada_pengiriman}
+                      onChange={setTemp('jumlah_armada_pengiriman')}
+                      placeholder="Contoh: 10"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditBankingOpen(false)}
+                disabled={isSubmitting}
+              >
+                {lang === 'id' ? 'Batal' : 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                onClick={saveBankingInfo}
+                disabled={isSubmitting}
+                className="bg-orange-500 hover:bg-orange-600"
+              >
+                {isSubmitting ? (lang === 'id' ? 'Menyimpan...' : 'Saving...') : (lang === 'id' ? 'Simpan' : 'Save')}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

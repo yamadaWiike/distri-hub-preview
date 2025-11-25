@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 import { toast } from "@/components/ui/use-toast";
-import { Upload, X, Loader2 } from "lucide-react";
+import { Upload, X, Loader2, Eye, EyeOff } from "lucide-react";
 import { uploadStorePhoto, getImageUrl } from "@/lib/s3-upload";
 import { 
   Select, 
@@ -66,6 +66,8 @@ export default function Daftar() {
     hasUppercase: false,
     hasNumber: false,
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const navigate = useNavigate();
 
@@ -160,16 +162,6 @@ export default function Daftar() {
     if (!form.alamatLengkap.trim()) return false;
     if (!form.provinsiId) return false;
     if (!form.kota) return false;
-    // KYB Documents validation
-    if (!form.ktpFile) return false;
-    if (!form.aktaFile) return false;
-    if (!form.npwpFile) return false;
-    // Additional company information validation
-    if (!form.emailPerusahaan.trim()) return false;
-    if (!form.nomorTelpPerusahaan.trim()) return false;
-    if (!form.namaDirektur.trim()) return false;
-    if (!form.npwpNumber.trim()) return false;
-    if (!form.nibNumber.trim()) return false;
     return true;
   };
   
@@ -457,429 +449,151 @@ export default function Daftar() {
         </div>
 
         <form onSubmit={onSubmit} className="bg-card rounded-lg shadow-sm border border-gray-100">
-          {/* Step 1: Business Information & KYB */}
+          {/* Step 1: Business Information */}
           {currentStep === 1 && (
             <div className="p-8">
-              <h2 className="text-xl font-semibold mb-2">{lang === 'id' ? "Informasi & Verifikasi Bisnis" : "Business Information & Verification"}</h2>
-              <p className="text-sm text-muted-foreground mb-6">
-                {lang === 'id' 
-                  ? "Lengkapi informasi perusahaan dan upload dokumen verifikasi" 
-                  : "Complete company information and upload verification documents"}
-              </p>
+              <h2 className="text-xl font-semibold mb-6">{lang === 'id' ? "Informasi Bisnis" : "Business Information"}</h2>
               
               <div className="space-y-6">
-                {/* Basic Business Info */}
                 <div>
-                  <h3 className="text-base font-semibold mb-4 pb-2 border-b">
-                    {lang === 'id' ? "Data Perusahaan" : "Company Data"}
-                  </h3>
-                  
-                  <div className="space-y-5">
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        {lang === 'id' ? "Nama Bisnis / Perusahaan" : "Business / Company Name"} <span className="text-red-500">*</span>
-                      </label>
-                      <input 
-                        required 
-                        className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
-                        value={form.namaBisnis} 
-                        onChange={set('namaBisnis')} 
-                        placeholder={lang === 'id' ? "PT Distributor Sejahtera" : "ABC Distribution Co."}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          {lang === 'id' ? "Email Perusahaan" : "Company Email"} <span className="text-red-500">*</span>
-                        </label>
-                        <input 
-                          required 
-                          type="email"
-                          className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
-                          value={form.emailPerusahaan} 
-                          onChange={set('emailPerusahaan')} 
-                          placeholder={lang === 'id' ? "info@perusahaan.com" : "info@company.com"}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          {lang === 'id' ? "Nomor Telp Perusahaan" : "Company Phone Number"} <span className="text-red-500">*</span>
-                        </label>
-                        <input 
-                          required 
-                          type="tel"
-                          className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
-                          value={form.nomorTelpPerusahaan} 
-                          onChange={set('nomorTelpPerusahaan')} 
-                          placeholder={lang === 'id' ? "021-1234567" : "021-1234567"}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        {lang === 'id' ? "Nama Direktur" : "Director Name"} <span className="text-red-500">*</span>
-                      </label>
-                      <input 
-                        required 
-                        className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
-                        value={form.namaDirektur} 
-                        onChange={set('namaDirektur')} 
-                        placeholder={lang === 'id' ? "Nama lengkap direktur" : "Full director name"}
-                      />
-                    </div>
-                  </div>
+                  <label className="block text-sm font-medium mb-2">
+                    {lang === 'id' ? "Nama Bisnis" : "Business Name"} <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    required 
+                    className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
+                    value={form.namaBisnis} 
+                    onChange={set('namaBisnis')} 
+                    placeholder={lang === 'id' ? "PT Distributor Sejahtera" : "ABC Distribution Co."}
+                  />
                 </div>
 
-                {/* Business Address */}
                 <div>
-                  <h3 className="text-base font-semibold mb-4 pb-2 border-b">
-                    {lang === 'id' ? "Alamat Bisnis" : "Business Address"}
-                  </h3>
+                  <label className="block text-sm font-medium mb-2">
+                    {lang === 'id' ? "Foto Toko" : "Store Photo"} <span className="text-red-500">*</span>
+                  </label>
                   
-                  <div className="space-y-5">
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        {lang === 'id' ? "Alamat Lengkap" : "Complete Address"} <span className="text-red-500">*</span>
-                      </label>
-                      <textarea 
-                        required 
-                        className="w-full rounded-md border bg-background px-4 py-2.5 text-sm min-h-[80px]" 
-                        value={form.alamatLengkap} 
-                        onChange={(e) => setForm({ ...form, alamatLengkap: e.target.value })}
-                        placeholder={lang === 'id' ? "Jl. Pahlawan No. 123, Kel. Sukajadi" : "123 Business St., Prosperity Building"}
+                  {!photoPreview ? (
+                    <div className="border-2 border-dashed border-orange-300 rounded-lg p-8 text-center hover:border-orange-400 transition-colors cursor-pointer">
+                      <input
+                        type="file"
+                        id="photo-upload"
+                        className="hidden"
+                        accept="image/png,image/jpeg,image/jpg"
+                        onChange={handlePhotoUpload}
+                        disabled={isUploadingPhoto}
                       />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          {lang === 'id' ? "Provinsi" : "Province"} <span className="text-red-500">*</span>
-                        </label>
-                        <Select value={form.provinsiId} onValueChange={setSelectValue('provinsiId')} required>
-                          <SelectTrigger className="w-full h-10">
-                            <SelectValue placeholder={lang === 'id' ? "Pilih Provinsi" : "Select Province"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {provinces.map((province) => (
-                              <SelectItem key={province.id} value={province.id}>
-                                {province.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          {lang === 'id' ? "Kota/Kabupaten" : "City/Regency"} <span className="text-red-500">*</span>
-                        </label>
-                        <Select value={form.kota} onValueChange={setSelectValue('kota')} disabled={!form.provinsiId} required>
-                          <SelectTrigger className="w-full h-10">
-                            <SelectValue placeholder={lang === 'id' ? "Pilih Kota/Kabupaten" : "Select City/Regency"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableCities.map((city) => (
-                              <SelectItem key={city.id} value={city.name}>
-                                {city.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Legal Documents & Tax Info */}
-                <div>
-                  <h3 className="text-base font-semibold mb-4 pb-2 border-b">
-                    {lang === 'id' ? "Dokumen & Legalitas" : "Documents & Legality"}
-                  </h3>
-                  
-                  <div className="space-y-5">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          {lang === 'id' ? "NPWP" : "Tax ID (NPWP)"} <span className="text-red-500">*</span>
-                        </label>
-                        <input 
-                          required 
-                          className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
-                          value={form.npwpNumber} 
-                          onChange={set('npwpNumber')} 
-                          placeholder="XX.XXX.XXX.X-XXX.XXX"
-                          maxLength={20}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          {lang === 'id' ? "NIB" : "Business ID (NIB)"} <span className="text-red-500">*</span>
-                        </label>
-                        <input 
-                          required 
-                          className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
-                          value={form.nibNumber} 
-                          onChange={set('nibNumber')} 
-                          placeholder="XXXXXXXXXXXX"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        {lang === 'id' ? "Status PKP" : "PKP Status"} <span className="text-red-500">*</span>
+                      <label htmlFor="photo-upload" className="cursor-pointer">
+                        {isUploadingPhoto ? (
+                          <Loader2 className="h-12 w-12 text-orange-500 animate-spin mx-auto mb-3" />
+                        ) : (
+                          <Upload className="h-12 w-12 text-orange-500 mx-auto mb-3" />
+                        )}
+                        <p className="text-sm text-orange-500 font-medium mb-1">
+                          {isUploadingPhoto 
+                            ? (lang === 'id' ? "Mengunggah..." : "Uploading...") 
+                            : (lang === 'id' ? "Klik untuk upload" : "Click to upload")
+                          }
+                        </p>
+                        <p className="text-xs text-muted-foreground mb-1">
+                          {lang === 'id' ? "atau drag & drop" : "or drag & drop"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          PNG, JPG, JPEG (maks. 5MB)
+                        </p>
                       </label>
-                      <Select 
-                        value={form.statusPkp} 
-                        onValueChange={(value: "PKP" | "Non-PKP") => setForm({ ...form, statusPkp: value })} 
-                        required
+                    </div>
+                  ) : (
+                    <div className="relative inline-block">
+                      <img 
+                        src={photoPreview} 
+                        alt="Store preview" 
+                        className="rounded-lg border border-gray-200 w-full max-w-xs h-48 object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={removePhoto}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 transition-colors shadow-lg"
                       >
-                        <SelectTrigger className="w-full h-10">
-                          <SelectValue placeholder={lang === 'id' ? "Pilih Status PKP" : "Select PKP Status"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="PKP">PKP (Pengusaha Kena Pajak)</SelectItem>
-                          <SelectItem value="Non-PKP">Non-PKP</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {lang === 'id' 
-                          ? "PKP wajib memungut PPN 11%" 
-                          : "PKP must collect 11% VAT"}
-                      </p>
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
-                  </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {lang === 'id' 
+                      ? "Upload foto tampak depan toko untuk verifikasi" 
+                      : "Upload front view of store photo for verification"}
+                  </p>
                 </div>
-
-                {/* Document Uploads */}
+                
                 <div>
-                  <h3 className="text-base font-semibold mb-4 pb-2 border-b">
-                    {lang === 'id' ? "Upload Dokumen Verifikasi" : "Upload Verification Documents"}
-                  </h3>
+                  <label className="block text-sm font-medium mb-2">
+                    {lang === 'id' ? "Alamat Lengkap Bisnis" : "Complete Business Address"} <span className="text-red-500">*</span>
+                  </label>
+                  <textarea 
+                    required 
+                    className="w-full rounded-md border bg-background px-4 py-2.5 text-sm min-h-[100px]" 
+                    value={form.alamatLengkap} 
+                    onChange={(e) => setForm({ ...form, alamatLengkap: e.target.value })}
+                    placeholder={lang === 'id' ? "Jl. Pahlawan No. 123, Kel. Sukajadi" : "123 Business St., Prosperity District"}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      {lang === 'id' ? "Provinsi" : "Province"} <span className="text-red-500">*</span>
+                    </label>
+                    <Select value={form.provinsiId} onValueChange={setSelectValue('provinsiId')} required>
+                      <SelectTrigger className="w-full h-10">
+                        <SelectValue placeholder={lang === 'id' ? "Pilih Provinsi" : "Select Province"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {provinces.map((province) => (
+                          <SelectItem key={province.id} value={province.id}>
+                            {province.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   
-                  <div className="space-y-5">
-                    {/* Store Photo */}
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        {lang === 'id' ? "Foto Toko / Gudang" : "Store / Warehouse Photo"} <span className="text-red-500">*</span>
-                      </label>
-                      
-                      {!photoPreview ? (
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
-                          <input
-                            type="file"
-                            id="photo-upload"
-                            className="hidden"
-                            accept="image/png,image/jpeg,image/jpg"
-                            onChange={handlePhotoUpload}
-                            disabled={isUploadingPhoto}
-                          />
-                          <label htmlFor="photo-upload" className="cursor-pointer">
-                            {isUploadingPhoto ? (
-                              <Loader2 className="h-5 w-5 text-orange-500 animate-spin mx-auto mb-2" />
-                            ) : (
-                              <Upload className="h-5 w-5 text-orange-500 mx-auto mb-2" />
-                            )}
-                            <p className="text-sm text-orange-500 font-medium">
-                              {isUploadingPhoto 
-                                ? (lang === 'id' ? "Mengunggah..." : "Uploading...") 
-                                : (lang === 'id' ? "Klik untuk upload" : "Click to upload")
-                              }
-                            </p>
-                            <p className="text-xs text-gray-400 mt-1">PNG, JPG, JPEG (max. 5MB)</p>
-                          </label>
-                        </div>
-                      ) : (
-                        <div className="relative inline-block">
-                          <img 
-                            src={photoPreview} 
-                            alt="Store preview" 
-                            className="rounded-lg border border-gray-200 w-48 h-32 object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={removePhoto}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {lang === 'id' ? "Foto tampak depan toko atau gudang" : "Front view of store or warehouse"}
-                      </p>
-                    </div>
-
-                    {/* KTP Upload */}
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        {lang === 'id' ? "KTP Direktur / Pemilik" : "Director / Owner ID Card"} <span className="text-red-500">*</span>
-                      </label>
-                      
-                      {!ktpPreview ? (
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
-                          <input
-                            type="file"
-                            id="ktp-upload"
-                            className="hidden"
-                            accept="image/png,image/jpeg,image/jpg"
-                            onChange={handleKtpUpload}
-                            disabled={isUploadingKtp}
-                          />
-                          <label htmlFor="ktp-upload" className="cursor-pointer">
-                            {isUploadingKtp ? (
-                              <Loader2 className="h-5 w-5 text-orange-500 animate-spin mx-auto mb-2" />
-                            ) : (
-                              <Upload className="h-5 w-5 text-orange-500 mx-auto mb-2" />
-                            )}
-                            <p className="text-sm text-orange-500 font-medium">
-                              {isUploadingKtp 
-                                ? (lang === 'id' ? "Mengunggah..." : "Uploading...") 
-                                : (lang === 'id' ? "Upload KTP" : "Upload ID Card")
-                              }
-                            </p>
-                            <p className="text-xs text-gray-400 mt-1">PNG, JPG, JPEG (max. 5MB)</p>
-                          </label>
-                        </div>
-                      ) : (
-                        <div className="relative inline-block">
-                          <img 
-                            src={ktpPreview} 
-                            alt="KTP preview" 
-                            className="rounded-lg border border-gray-200 w-48 h-32 object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={removeKtp}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Akta/NIB Upload */}
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        {lang === 'id' ? "Akta Pendirian / NIB" : "Company Registration / NIB"} <span className="text-red-500">*</span>
-                      </label>
-                      
-                      {!aktaPreview ? (
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
-                          <input
-                            type="file"
-                            id="akta-upload"
-                            className="hidden"
-                            accept="image/png,image/jpeg,image/jpg,application/pdf"
-                            onChange={handleAktaUpload}
-                            disabled={isUploadingAkta}
-                          />
-                          <label htmlFor="akta-upload" className="cursor-pointer">
-                            {isUploadingAkta ? (
-                              <Loader2 className="h-5 w-5 text-orange-500 animate-spin mx-auto mb-2" />
-                            ) : (
-                              <Upload className="h-5 w-5 text-orange-500 mx-auto mb-2" />
-                            )}
-                            <p className="text-sm text-orange-500 font-medium">
-                              {isUploadingAkta 
-                                ? (lang === 'id' ? "Mengunggah..." : "Uploading...") 
-                                : (lang === 'id' ? "Upload Dokumen" : "Upload Document")
-                              }
-                            </p>
-                            <p className="text-xs text-gray-400 mt-1">PNG, JPG, JPEG, PDF (max. 10MB)</p>
-                          </label>
-                        </div>
-                      ) : (
-                        <div className="relative inline-block">
-                          <img 
-                            src={aktaPreview} 
-                            alt="Akta preview" 
-                            className="rounded-lg border border-gray-200 w-48 h-32 object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={removeAkta}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* NPWP Upload */}
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        {lang === 'id' ? "Dokumen NPWP" : "Tax ID Document (NPWP)"} <span className="text-red-500">*</span>
-                      </label>
-                      
-                      {!npwpPreview ? (
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
-                          <input
-                            type="file"
-                            id="npwp-upload"
-                            className="hidden"
-                            accept="image/png,image/jpeg,image/jpg,application/pdf"
-                            onChange={handleNpwpUpload}
-                            disabled={isUploadingNpwp}
-                          />
-                          <label htmlFor="npwp-upload" className="cursor-pointer">
-                            {isUploadingNpwp ? (
-                              <Loader2 className="h-5 w-5 text-orange-500 animate-spin mx-auto mb-2" />
-                            ) : (
-                              <Upload className="h-5 w-5 text-orange-500 mx-auto mb-2" />
-                            )}
-                            <p className="text-sm text-orange-500 font-medium">
-                              {isUploadingNpwp 
-                                ? (lang === 'id' ? "Mengunggah..." : "Uploading...") 
-                                : (lang === 'id' ? "Upload NPWP" : "Upload Tax ID")
-                              }
-                            </p>
-                            <p className="text-xs text-gray-400 mt-1">PNG, JPG, JPEG, PDF (max. 10MB)</p>
-                          </label>
-                        </div>
-                      ) : (
-                        <div className="relative inline-block">
-                          <img 
-                            src={npwpPreview} 
-                            alt="NPWP preview" 
-                            className="rounded-lg border border-gray-200 w-48 h-32 object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={removeNpwp}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      {lang === 'id' ? "Kota/Kabupaten" : "City/Regency"} <span className="text-red-500">*</span>
+                    </label>
+                    <Select value={form.kota} onValueChange={setSelectValue('kota')} disabled={!form.provinsiId} required>
+                      <SelectTrigger className="w-full h-10">
+                        <SelectValue placeholder={lang === 'id' ? "Pilih Kota/Kabupaten" : "Select City/Regency"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableCities.map((city) => (
+                          <SelectItem key={city.id} value={city.name}>
+                            {city.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-10 flex justify-between">
+              <div className="mt-10 flex justify-between items-center">
                 <Button 
                   type="button" 
-                  variant="outline"
+                  variant="ghost"
                   onClick={() => navigate(-1)}
-                  className="px-6"
+                  className="text-muted-foreground hover:text-foreground"
                 >
-                  {lang === 'id' ? "Kembali" : "Back"}
+                  ← {lang === 'id' ? "Kembali" : "Back"}
                 </Button>
                 <Button 
                   type="button" 
-                  className="bg-orange-500 hover:bg-orange-600 text-white px-6"
+                  className="bg-orange-500 hover:bg-orange-600 text-white px-8"
                   onClick={handleNext}
                   disabled={!validateStep1()}
                 >
-                  {lang === 'id' ? "Selanjutnya →" : "Next →"}
+                  {lang === 'id' ? "Selanjutnya" : "Next"} →
                 </Button>
               </div>
             </div>
@@ -961,23 +675,32 @@ export default function Daftar() {
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium mb-2">{lang === 'id' ? "Buat Password" : "Create Password"} <span className="text-red-500">*</span></label>
-                  <input 
-                    type="password" 
-                    required 
-                    className="w-full rounded-md border bg-background px-4 py-2.5 text-sm" 
-                    value={form.password} 
-                    onChange={(e) => {
-                      const newPassword = e.target.value;
-                      setForm({ ...form, password: newPassword });
-                      validatePassword(newPassword);
-                      if (form.confirmPassword && newPassword !== form.confirmPassword) {
-                        setPasswordError(lang === 'id' ? "Konfirmasi password tidak cocok" : "Password confirmation doesn't match");
-                      } else {
-                        setPasswordError("");
-                      }
-                    }}
-                    placeholder="••••••••"
-                  />
+                  <div className="relative">
+                    <input 
+                      type={showPassword ? "text" : "password"}
+                      required 
+                      className="w-full rounded-md border bg-background px-4 py-2.5 pr-12 text-sm" 
+                      value={form.password} 
+                      onChange={(e) => {
+                        const newPassword = e.target.value;
+                        setForm({ ...form, password: newPassword });
+                        validatePassword(newPassword);
+                        if (form.confirmPassword && newPassword !== form.confirmPassword) {
+                          setPasswordError(lang === 'id' ? "Konfirmasi password tidak cocok" : "Password confirmation doesn't match");
+                        } else {
+                          setPasswordError("");
+                        }
+                      }}
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
                   
                   {/* Password Requirements */}
                   <div className="mt-3 space-y-2">
@@ -1039,21 +762,30 @@ export default function Daftar() {
                 
                 <div>
                   <label className="block text-sm font-medium mb-2">{lang === 'id' ? "Konfirmasi Password" : "Confirm Password"}</label>
-                  <input 
-                    type="password" 
-                    required 
-                    className={`w-full rounded-md border ${passwordError ? "border-red-500" : "border-input"} bg-background px-4 py-2.5 text-sm`} 
-                    value={form.confirmPassword} 
-                    onChange={(e) => {
-                      setForm({ ...form, confirmPassword: e.target.value });
-                      if (form.password !== e.target.value) {
-                        setPasswordError(lang === 'id' ? "Konfirmasi password tidak cocok" : "Password confirmation doesn't match");
-                      } else {
-                        setPasswordError("");
-                      }
-                    }}
-                    placeholder="••••••••"
-                  />
+                  <div className="relative">
+                    <input 
+                      type={showConfirmPassword ? "text" : "password"}
+                      required 
+                      className={`w-full rounded-md border ${passwordError ? "border-red-500" : "border-input"} bg-background px-4 py-2.5 pr-12 text-sm`} 
+                      value={form.confirmPassword} 
+                      onChange={(e) => {
+                        setForm({ ...form, confirmPassword: e.target.value });
+                        if (form.password !== e.target.value) {
+                          setPasswordError(lang === 'id' ? "Konfirmasi password tidak cocok" : "Password confirmation doesn't match");
+                        } else {
+                          setPasswordError("");
+                        }
+                      }}
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
                   {passwordError && <p className="text-xs text-red-500 mt-1.5">{passwordError}</p>}
                 </div>
                 

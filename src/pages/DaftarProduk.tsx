@@ -300,12 +300,17 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
             </div>
           </div>
 
-          {/* Login Message */}
+          {/* Login/Approval Message */}
           <div className="mt-auto mb-3 p-3 bg-orange-50 border border-orange-300 rounded-md">
             <p className="text-xs text-orange-800 text-center font-medium">
-              {lang === 'id' 
-                ? 'Silakan login untuk mengakses harga dan melakukan pemesanan.' 
-                : 'Please login to access prices and place orders.'}
+              {!loggedIn 
+                ? (lang === 'id' 
+                    ? 'Silakan login untuk mengakses harga dan melakukan pemesanan.' 
+                    : 'Please login to access prices and place orders.')
+                : (lang === 'id'
+                    ? 'Menunggu approval admin untuk mengakses harga dan melakukan pemesanan.'
+                    : 'Waiting for admin approval to access prices and place orders.')
+              }
             </p>
           </div>
         </div>

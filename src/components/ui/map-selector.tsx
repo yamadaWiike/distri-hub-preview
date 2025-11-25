@@ -271,14 +271,20 @@ export default function MapSelector({ onLocationSelected, onAddressFound, initia
   return (
     <div className="flex flex-col h-full">
       <div className="p-2 bg-background border-b relative z-10">
-        <form onSubmit={handleSearchSubmit} className="flex gap-2">
+        <div className="flex gap-2">
           <div className="relative flex-1">
             <input
               ref={searchInputRef}
               type="text"
               value={searchTerm}
               onChange={handleSearchInput}
-              onKeyDown={handleKeyDown}
+              onKeyDown={(e) => {
+                handleKeyDown(e);
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  searchAddress(searchTerm);
+                }
+              }}
               onFocus={() => setShowResults(true)}
               placeholder="Cari alamat..."
               className="w-full px-3 py-2 rounded-md border text-sm"
@@ -299,13 +305,17 @@ export default function MapSelector({ onLocationSelected, onAddressFound, initia
             )}
           </div>
           <button
-            type="submit"
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              searchAddress(searchTerm);
+            }}
             className="px-3 py-2 rounded-md bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/90 transition-colors"
             disabled={isSearching || !searchTerm.trim()}
           >
             {isSearching ? 'Mencari...' : 'Cari'}
           </button>
-        </form>
+        </div>
         {error && (
           <p className="text-xs text-destructive mt-1">{error}</p>
         )}
