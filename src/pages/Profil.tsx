@@ -22,6 +22,37 @@ import MapSelector from "@/components/ui/map-selector";
 import 'leaflet/dist/leaflet.css';
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
+import { uploadFileToS3 } from '@/lib/s3-upload';
+
+// Indonesian Cities and Regencies
+const INDONESIAN_AREAS = [
+  // DKI Jakarta
+  'Jakarta Pusat', 'Jakarta Utara', 'Jakarta Barat', 'Jakarta Selatan', 'Jakarta Timur', 'Kepulauan Seribu',
+  // Jawa Barat
+  'Bandung', 'Kota Bandung', 'Bekasi', 'Kota Bekasi', 'Bogor', 'Kota Bogor', 'Cirebon', 'Kota Cirebon', 'Depok',
+  'Sukabumi', 'Kota Sukabumi', 'Tasikmalaya', 'Kota Tasikmalaya', 'Banjar', 'Cimahi', 'Garut', 'Indramayu',
+  'Karawang', 'Kuningan', 'Majalengka', 'Pangandaran', 'Purwakarta', 'Subang', 'Sumedang', 'Ciamis', 'Cianjur',
+  // Jawa Tengah
+  'Semarang', 'Surakarta (Solo)', 'Magelang', 'Kota Magelang', 'Salatiga', 'Pekalongan', 'Kota Pekalongan',
+  'Tegal', 'Kota Tegal', 'Banyumas', 'Cilacap', 'Purbalingga', 'Banjarnegara', 'Kebumen', 'Purworejo',
+  'Wonosobo', 'Boyolali', 'Klaten', 'Sukoharjo', 'Wonogiri', 'Karanganyar', 'Sragen', 'Grobogan',
+  'Blora', 'Rembang', 'Pati', 'Kudus', 'Jepara', 'Demak', 'Semarang (Kab.)', 'Temanggung', 'Kendal',
+  'Batang', 'Pemalang', 'Brebes',
+  // DI Yogyakarta
+  'Yogyakarta', 'Sleman', 'Bantul', 'Kulon Progo', 'Gunung Kidul',
+  // Jawa Timur
+  'Surabaya', 'Malang', 'Kota Malang', 'Kediri', 'Kota Kediri', 'Blitar', 'Kota Blitar', 'Madiun', 'Kota Madiun',
+  'Mojokerto', 'Kota Mojokerto', 'Pasuruan', 'Kota Pasuruan', 'Probolinggo', 'Kota Probolinggo', 'Batu',
+  'Jember', 'Lumajang', 'Bondowoso', 'Situbondo', 'Banyuwangi', 'Gresik', 'Sidoarjo', 'Bangkalan',
+  'Sampang', 'Pamekasan', 'Sumenep', 'Nganjuk', 'Magetan', 'Ngawi', 'Bojonegoro', 'Tuban', 'Lamongan',
+  'Jombang', 'Tulungagung', 'Trenggalek', 'Pacitan', 'Ponorogo',
+  // Banten
+  'Tangerang', 'Kota Tangerang', 'Tangerang Selatan', 'Serang', 'Kota Serang', 'Cilegon', 'Lebak', 'Pandeglang',
+  // Bali
+  'Denpasar', 'Badung', 'Gianyar', 'Tabanan', 'Klungkung', 'Bangli', 'Karangasem', 'Buleleng', 'Jembrana',
+  // Other major cities
+  'Medan', 'Palembang', 'Makassar', 'Banjarmasin', 'Balikpapan', 'Samarinda', 'Manado', 'Palu', 'Pontianak',
+];
 
 // Extended type for distributor profile that includes all possible fields
 type ExtendedDistributorProfile = Database['public']['Tables']['distributor_profiles']['Row'] & {
@@ -43,6 +74,23 @@ type ExtendedDistributorProfile = Database['public']['Tables']['distributor_prof
   status_pkp?: string;
   npwp_number?: string;
   nib_number?: string;
+  // Document URLs
+  npwp_file_url?: string;
+  nib_file_url?: string;
+  ktp_file_url?: string;
+  // PIC fields
+  nama_pic?: string;
+  posisi_pic?: string;
+  nomor_kontak_pic?: string;
+  email_pic?: string;
+  // Banking fields
+  nama_bank?: string;
+  nama_pemilik_akun?: string;
+  nomor_rekening?: string;
+  jumlah_armada_pengiriman?: string;
+  metode_pembayaran?: string;
+  aplikasi_pencatatan?: string;
+  area_distribusi?: string;
 };
 
 export default function Profil() {
@@ -97,6 +145,9 @@ export default function Profil() {
     nama_pemilik_akun: "",
     nomor_rekening: "",
     jumlah_armada_pengiriman: "",
+    metode_pembayaran: "",
+    aplikasi_pencatatan: "",
+    area_distribusi: "",
   });
   
   const [isLocating, setIsLocating] = useState(false);
@@ -191,19 +242,22 @@ export default function Profil() {
             npwp_number: (data as ExtendedDistributorProfile).npwp_number || "",
             nib_number: (data as ExtendedDistributorProfile).nib_number || "",
             // Document URLs
-            npwp_file_url: (data as any).npwp_file_url || "",
-            nib_file_url: (data as any).nib_file_url || "",
-            ktp_file_url: (data as any).ktp_file_url || "",
+            npwp_file_url: (data as ExtendedDistributorProfile).npwp_file_url || "",
+            nib_file_url: (data as ExtendedDistributorProfile).nib_file_url || "",
+            ktp_file_url: (data as ExtendedDistributorProfile).ktp_file_url || "",
             // PIC fields
-            nama_pic: (data as any).nama_pic || data.nama_pemilik || "",
-            posisi_pic: (data as any).posisi_pic || "",
-            nomor_kontak_pic: (data as any).nomor_kontak_pic || data.kontak_pemilik || "",
-            email_pic: (data as any).email_pic || (data as ExtendedDistributorProfile).email_pemilik || "",
+            nama_pic: (data as ExtendedDistributorProfile).nama_pic || data.nama_pemilik || "",
+            posisi_pic: (data as ExtendedDistributorProfile).posisi_pic || "",
+            nomor_kontak_pic: (data as ExtendedDistributorProfile).nomor_kontak_pic || data.kontak_pemilik || "",
+            email_pic: (data as ExtendedDistributorProfile).email_pic || (data as ExtendedDistributorProfile).email_pemilik || "",
             // Banking fields
-            nama_bank: (data as any).nama_bank || "",
-            nama_pemilik_akun: (data as any).nama_pemilik_akun || "",
-            nomor_rekening: (data as any).nomor_rekening || "",
-            jumlah_armada_pengiriman: (data as any).jumlah_armada_pengiriman || "",
+            nama_bank: (data as ExtendedDistributorProfile).nama_bank || "",
+            nama_pemilik_akun: (data as ExtendedDistributorProfile).nama_pemilik_akun || "",
+            nomor_rekening: (data as ExtendedDistributorProfile).nomor_rekening || "",
+            jumlah_armada_pengiriman: (data as ExtendedDistributorProfile).jumlah_armada_pengiriman || "",
+            metode_pembayaran: (data as ExtendedDistributorProfile).metode_pembayaran || "",
+            aplikasi_pencatatan: (data as ExtendedDistributorProfile).aplikasi_pencatatan || "",
+            area_distribusi: (data as ExtendedDistributorProfile).area_distribusi || "",
           });
         } else {
           // If no profile data yet but we have user data, prefill what we can
@@ -269,8 +323,9 @@ export default function Profil() {
   // Upload file to S3
   const uploadFileToS3 = async (file: File, folder: string): Promise<string | null> => {
     try {
-      const { uploadStorePhoto } = await import('@/lib/utils');
-      const fileUrl = await uploadStorePhoto(file, folder);
+      const { uploadFileToS3: s3Upload } = await import('@/lib/s3-upload');
+      const result = await s3Upload(file, folder);
+      const fileUrl = result.url;
       return fileUrl;
     } catch (error) {
       console.error('Error uploading file:', error);
@@ -318,7 +373,7 @@ export default function Profil() {
       const { supabase } = await import('@/integrations/supabase/client');
       
       // Upload files if they exist
-      const updateData: any = {
+      const updateData: Record<string, string | null | undefined> = {
         nama_bisnis: tempForm.nama_bisnis,
         email_perusahaan: tempForm.email_perusahaan,
         nomor_telp_perusahaan: tempForm.nomor_telp_perusahaan,
@@ -387,7 +442,7 @@ export default function Profil() {
       setUploadingFiles(true);
       const { supabase } = await import('@/integrations/supabase/client');
       
-      const updateData: any = {
+      const updateData: Record<string, string | null | undefined> = {
         nama_pic: tempForm.nama_pic,
         posisi_pic: tempForm.posisi_pic,
         nomor_kontak_pic: tempForm.nomor_kontak_pic,
@@ -519,20 +574,6 @@ export default function Profil() {
     setMapDialogOpen(false);
   };
   
-  // Initialize selected coordinates when dialog opens
-  useEffect(() => {
-    if (mapDialogOpen && form.koordinat) {
-      try {
-        const [lat, lng] = form.koordinat.split(',').map(coord => parseFloat(coord.trim()));
-        if (!isNaN(lat) && !isNaN(lng)) {
-          setSelectedCoordinates([lat, lng]);
-        }
-      } catch (error) {
-        console.error('Error parsing coordinates:', error);
-      }
-    }
-  }, [mapDialogOpen, form.koordinat]);
-
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   
@@ -541,6 +582,9 @@ export default function Profil() {
   const [editCompanyOpen, setEditCompanyOpen] = useState(false);
   const [editWarehouseOpen, setEditWarehouseOpen] = useState(false);
   const [editBankingOpen, setEditBankingOpen] = useState(false);
+  const [editMapDialogOpen, setEditMapDialogOpen] = useState(false);
+  const [editSelectedCoordinates, setEditSelectedCoordinates] = useState<[number, number] | null>(null);
+  const [areaSearch, setAreaSearch] = useState("");
   
   // Temporary form state for editing
   const [tempForm, setTempForm] = useState(form);
@@ -558,6 +602,47 @@ export default function Profil() {
     ktp_file: null,
     foto_gudang: null,
   });
+  
+  // Initialize selected coordinates when dialog opens
+  useEffect(() => {
+    if (mapDialogOpen && form.koordinat) {
+      try {
+        const [lat, lng] = form.koordinat.split(',').map(coord => parseFloat(coord.trim()));
+        if (!isNaN(lat) && !isNaN(lng)) {
+          setSelectedCoordinates([lat, lng]);
+        }
+      } catch (error) {
+        console.error('Error parsing coordinates:', error);
+      }
+    }
+  }, [mapDialogOpen, form.koordinat]);
+
+  // Handle edit map location selection
+  const handleEditMapPinSelection = (lat: number, lng: number) => {
+    // Update tempForm with selected coordinates
+    setTempForm(prev => ({
+      ...prev,
+      koordinat: `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+    }));
+    
+    // Reset and close
+    setEditSelectedCoordinates(null);
+    setEditMapDialogOpen(false);
+  };
+  
+  // Initialize edit coordinates when dialog opens
+  useEffect(() => {
+    if (editMapDialogOpen && tempForm.koordinat) {
+      try {
+        const [lat, lng] = tempForm.koordinat.split(',').map(coord => parseFloat(coord.trim()));
+        if (!isNaN(lat) && !isNaN(lng)) {
+          setEditSelectedCoordinates([lat, lng]);
+        }
+      } catch (error) {
+        console.error('Error parsing edit coordinates:', error);
+      }
+    }
+  }, [editMapDialogOpen, tempForm.koordinat]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1057,15 +1142,15 @@ export default function Profil() {
                 </div>
                 <div className="sm:col-span-2">
                   <p className="text-gray-500 mb-1">Metode Pembayaran</p>
-                  <p className="font-medium text-gray-900">-</p>
+                  <p className="font-medium text-gray-900">{form.metode_pembayaran || '-'}</p>
                 </div>
                 <div>
                   <p className="text-gray-500 mb-1">Aplikasi Pencatatan</p>
-                  <p className="font-medium text-gray-900">-</p>
+                  <p className="font-medium text-gray-900">{form.aplikasi_pencatatan || '-'}</p>
                 </div>
                 <div>
                   <p className="text-gray-500 mb-1">Area Distribusi</p>
-                  <p className="font-medium text-gray-900">-</p>
+                  <p className="font-medium text-gray-900">{form.area_distribusi || '-'}</p>
                 </div>
               </div>
             </div>
@@ -1452,13 +1537,32 @@ export default function Profil() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       {lang === 'id' ? 'Koordinat' : 'Coordinates'}
                     </label>
-                    <input
-                      type="text"
-                      value={tempForm.koordinat}
-                      onChange={setTemp('koordinat')}
-                      placeholder="Latitude, Longitude"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
-                    />
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={tempForm.koordinat}
+                        onChange={setTemp('koordinat')}
+                        placeholder="Latitude, Longitude"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditMapDialogOpen(true)}
+                          className="flex-1"
+                        >
+                          <MapPin className="w-4 h-4 mr-2" />
+                          {lang === 'id' ? 'Pilih dari Peta' : 'Select from Map'}
+                        </Button>
+                      </div>
+                      {tempForm.koordinat && (
+                        <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
+                          📍 {tempForm.koordinat}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1591,6 +1695,155 @@ export default function Profil() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
                     />
                   </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {lang === 'id' ? 'Metode Pembayaran' : 'Payment Methods'}
+                    </label>
+                    <input
+                      type="text"
+                      value={tempForm.metode_pembayaran}
+                      onChange={setTemp('metode_pembayaran')}
+                      placeholder={lang === 'id' ? 'Contoh: Tunai, Transfer, Tempo 30 hari' : 'Example: Cash, Transfer, 30 days credit'}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {lang === 'id' ? 'Aplikasi Pencatatan' : 'Recording Application'}
+                    </label>
+                    <select
+                      onChange={(e) => {
+                        const selectedApp = e.target.value;
+                        if (selectedApp) {
+                          const currentApps = tempForm.aplikasi_pencatatan ? tempForm.aplikasi_pencatatan.split(', ').filter(a => a) : [];
+                          if (!currentApps.includes(selectedApp)) {
+                            setTempForm(prev => ({ ...prev, aplikasi_pencatatan: [...currentApps, selectedApp].join(', ') }));
+                          }
+                        }
+                        e.target.value = "";
+                      }}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none bg-white"
+                    >
+                      <option value="">{lang === 'id' ? 'Pilih aplikasi...' : 'Select application...'}</option>
+                      {[
+                        'Zahir Accounting',
+                        'MYOB',
+                        'Kledo',
+                        'BukuWarung',
+                        'BukuKas',
+                        'Olsera',
+                        'Pawoon',
+                        'Moka POS',
+                        'Jurnal',
+                        'Accurate',
+                        'SAP',
+                        'Oracle',
+                        'Microsoft Excel',
+                        'Google Sheets',
+                        lang === 'id' ? 'Lainnya' : 'Other'
+                      ].map((app) => (
+                        <option key={app} value={app}>{app}</option>
+                      ))}
+                    </select>
+                    {tempForm.aplikasi_pencatatan && tempForm.aplikasi_pencatatan.split(', ').filter(a => a).length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {tempForm.aplikasi_pencatatan.split(', ').filter(a => a).map((app) => (
+                          <div
+                            key={app}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 text-orange-700 text-sm rounded-md border border-orange-200"
+                          >
+                            <span>{app}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const apps = tempForm.aplikasi_pencatatan.split(', ').filter(a => a !== app);
+                                setTempForm(prev => ({ ...prev, aplikasi_pencatatan: apps.join(', ') }));
+                              }}
+                              className="hover:bg-orange-200 rounded-full p-0.5 transition-colors"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      {lang === 'id' ? 'Pilih satu atau lebih aplikasi yang digunakan' : 'Select one or more applications used'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {lang === 'id' ? 'Area Distribusi' : 'Distribution Area'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={areaSearch}
+                        onChange={(e) => setAreaSearch(e.target.value)}
+                        placeholder={lang === 'id' ? 'Cari kota/kabupaten...' : 'Search city/regency...'}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                      />
+                      {areaSearch && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                          {INDONESIAN_AREAS
+                            .filter(area => area.toLowerCase().includes(areaSearch.toLowerCase()))
+                            .slice(0, 50)
+                            .map((area) => {
+                              const currentAreas = tempForm.area_distribusi ? tempForm.area_distribusi.split(', ').filter(a => a) : [];
+                              return (
+                                <button
+                                  key={area}
+                                  type="button"
+                                  onClick={() => {
+                                    if (!currentAreas.includes(area)) {
+                                      setTempForm(prev => ({ ...prev, area_distribusi: [...currentAreas, area].join(', ') }));
+                                    }
+                                    setAreaSearch("");
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-orange-50 transition-colors"
+                                >
+                                  {area}
+                                </button>
+                              );
+                            })}
+                          {INDONESIAN_AREAS.filter(area => area.toLowerCase().includes(areaSearch.toLowerCase())).length === 0 && (
+                            <div className="px-3 py-2 text-sm text-gray-500">
+                              {lang === 'id' ? 'Tidak ada hasil' : 'No results'}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {tempForm.area_distribusi && tempForm.area_distribusi.split(', ').filter(a => a).length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {tempForm.area_distribusi.split(', ').filter(a => a).map((area) => (
+                          <div
+                            key={area}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 text-orange-700 text-sm rounded-md border border-orange-200"
+                          >
+                            <span>{area}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const areas = tempForm.area_distribusi.split(', ').filter(a => a !== area);
+                                setTempForm(prev => ({ ...prev, area_distribusi: areas.join(', ') }));
+                              }}
+                              className="hover:bg-orange-200 rounded-full p-0.5 transition-colors"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      {lang === 'id' ? 'Ketik untuk mencari dan pilih kota/kabupaten' : 'Type to search and select cities/regencies'}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1610,6 +1863,39 @@ export default function Profil() {
                 className="bg-orange-500 hover:bg-orange-600"
               >
                 {isSubmitting ? (lang === 'id' ? 'Menyimpan...' : 'Saving...') : (lang === 'id' ? 'Simpan' : 'Save')}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Map Dialog for Warehouse Coordinates */}
+        <Dialog open={editMapDialogOpen} onOpenChange={setEditMapDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>{lang === 'id' ? 'Pilih Lokasi Gudang' : 'Select Warehouse Location'}</DialogTitle>
+              <DialogDescription>
+                {lang === 'id' 
+                  ? 'Klik pada peta untuk memilih lokasi gudang Anda' 
+                  : 'Click on the map to select your warehouse location'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="h-[500px] w-full">
+              <MapSelector
+                onLocationSelected={handleEditMapPinSelection}
+                initialPosition={tempForm.koordinat || undefined}
+                onAddressFound={(address) => {
+                  // Optionally update alamat_gudang
+                  setTempForm(prev => ({ ...prev, alamat_gudang: address }));
+                }}
+              />
+            </div>
+            <div className="flex justify-end gap-3 mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditMapDialogOpen(false)}
+              >
+                {lang === 'id' ? 'Batal' : 'Cancel'}
               </Button>
             </div>
           </DialogContent>

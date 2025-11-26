@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import AdminSidebar from "@/components/layout/AdminSidebar";
-import UserManager from "@/components/admin/UserManager";
+import UserManagementRevamped from "@/components/admin/UserManagementRevamped";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/use-auth";
 import { useNavigate } from "react-router-dom";
@@ -80,7 +80,7 @@ export default function AdminUsers() {
       <div className="flex">
         <AdminSidebar lang={lang} />
         <main className="flex-1 py-8 px-4 lg:px-8">
-          <UserManager />
+          <UserManagementRevamped />
         </main>
       </div>
     </div>

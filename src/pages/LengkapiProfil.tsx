@@ -346,15 +346,17 @@ export default function LengkapiProfil() {
       const { supabase } = await import('@/integrations/supabase/client');
       
       // Update profile data
+      const updateData = {
+        nama_pemilik: form.nama_pemilik,
+        kontak_pemilik: form.kontak_pemilik,
+        nama_bisnis: form.nama_perusahaan,
+        alamat_lengkap: form.alamat_perusahaan,
+      };
+      
       const { error } = await supabase
         .from('distributor_profiles')
-        .update({
-          nama_pemilik: form.nama_pemilik,
-          kontak_pemilik: form.kontak_pemilik,
-          nama_bisnis: form.nama_perusahaan,
-          alamat_lengkap: form.alamat_perusahaan,
-          // Add other fields as needed
-        })
+        // @ts-expect-error - Type mismatch with Supabase generated types
+        .update(updateData)
         .eq('user_id', user!.id);
         
       if (error) throw error;
