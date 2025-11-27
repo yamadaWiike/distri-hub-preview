@@ -22,7 +22,7 @@ import MapSelector from "@/components/ui/map-selector";
 import 'leaflet/dist/leaflet.css';
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
-import { uploadFileToS3 } from '@/lib/s3-upload';
+import { uploadFileToS3, getImageUrl } from '@/lib/s3-upload';
 
 // Indonesian Cities and Regencies
 const INDONESIAN_AREAS = [
@@ -157,6 +157,7 @@ export default function Profil() {
   const [isLoading, setIsLoading] = useState(true);
   const [userStatus, setUserStatus] = useState<'pending' | 'active' | 'incomplete'>('pending');
   const [profileCompletion, setProfileCompletion] = useState(0);
+  const [documentPreview, setDocumentPreview] = useState<{ url: string; title: string } | null>(null);
   
   // Calculate profile completion percentage
   const calculateProfileCompletion = useCallback(() => {
@@ -258,6 +259,12 @@ export default function Profil() {
             metode_pembayaran: (data as ExtendedDistributorProfile).metode_pembayaran || "",
             aplikasi_pencatatan: (data as ExtendedDistributorProfile).aplikasi_pencatatan || "",
             area_distribusi: (data as ExtendedDistributorProfile).area_distribusi || "",
+          });
+          
+          console.log('Loaded operational fields from DB:', {
+            metode_pembayaran: (data as ExtendedDistributorProfile).metode_pembayaran,
+            aplikasi_pencatatan: (data as ExtendedDistributorProfile).aplikasi_pencatatan,
+            area_distribusi: (data as ExtendedDistributorProfile).area_distribusi,
           });
         } else {
           // If no profile data yet but we have user data, prefill what we can
@@ -384,6 +391,7 @@ export default function Profil() {
         bentuk_usaha: tempForm.bentuk_usaha,
         npwp_number: tempForm.npwp_number,
         nib_number: tempForm.nib_number,
+        website_perusahaan: tempForm.website_perusahaan,
       };
       
       // Upload NPWP file
@@ -488,19 +496,31 @@ export default function Profil() {
       setIsSubmitting(true);
       const { supabase } = await import('@/integrations/supabase/client');
       
+      const updateData = {
+        nama_bank: tempForm.nama_bank,
+        nama_pemilik_akun: tempForm.nama_pemilik_akun,
+        nomor_rekening: tempForm.nomor_rekening,
+        jumlah_karyawan: tempForm.jumlah_karyawan ? parseInt(tempForm.jumlah_karyawan, 10) : null,
+        jumlah_armada_pengiriman: tempForm.jumlah_armada_pengiriman,
+        metode_pembayaran: tempForm.metode_pembayaran,
+        aplikasi_pencatatan: tempForm.aplikasi_pencatatan,
+        area_distribusi: tempForm.area_distribusi,
+      };
+
+      console.log('Saving banking info:', updateData);
+      
       const { error } = await supabase
         .from('distributor_profiles')
         // @ts-expect-error - Bypassing type check
-        .update({
-          nama_bank: tempForm.nama_bank,
-          nama_pemilik_akun: tempForm.nama_pemilik_akun,
-          nomor_rekening: tempForm.nomor_rekening,
-          jumlah_karyawan: tempForm.jumlah_karyawan ? parseInt(tempForm.jumlah_karyawan, 10) : null,
-          jumlah_armada_pengiriman: tempForm.jumlah_armada_pengiriman,
-        })
+        .update(updateData)
         .eq('user_id', user.id);
       
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
+
+      console.log('Banking info saved successfully');
       
       setForm(tempForm);
       setEditBankingOpen(false);
@@ -970,6 +990,10 @@ export default function Profil() {
                   <p className="text-gray-500 mb-1">NIB</p>
                   <p className="font-medium text-gray-900">{form.nib_number || '-'}</p>
                 </div>
+                <div>
+                  <p className="text-gray-500 mb-1">Website</p>
+                  <p className="font-medium text-gray-900">{form.website_perusahaan || '-'}</p>
+                </div>
                 
                 {/* Legal Documents */}
                 <div className="sm:col-span-2 mt-4 pt-4 border-t border-gray-200">
@@ -978,17 +1002,38 @@ export default function Profil() {
                     <div>
                       <p className="text-xs text-gray-500 mb-2">Dokumen NPWP</p>
                       {form.npwp_file_url ? (
-                        <a 
-                          href={form.npwp_file_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-md text-xs hover:bg-blue-100 transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          Lihat Dokumen
-                        </a>
+                        <div className="space-y-2">
+                          <div 
+                            className="relative w-full h-32 bg-gray-100 rounded-md overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => setDocumentPreview({ url: getImageUrl(form.npwp_file_url) || '', title: 'Dokumen NPWP' })}
+                          >
+                            <img 
+                              src={getImageUrl(form.npwp_file_url) || ''} 
+                              alt="NPWP Preview"
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                target.nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                            <div className="absolute inset-0 hidden items-center justify-center text-gray-400 bg-gray-100">
+                              <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              </svg>
+                            </div>
+                          </div>
+                          <a 
+                            href={getImageUrl(form.npwp_file_url) || '#'}
+                            download="dokumen-npwp"
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-md text-xs hover:bg-blue-100 transition-colors w-full justify-center"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Download
+                          </a>
+                        </div>
                       ) : (
                         <p className="text-xs text-gray-400">Belum diunggah</p>
                       )}
@@ -996,17 +1041,38 @@ export default function Profil() {
                     <div>
                       <p className="text-xs text-gray-500 mb-2">Dokumen NIB</p>
                       {form.nib_file_url ? (
-                        <a 
-                          href={form.nib_file_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-md text-xs hover:bg-blue-100 transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          Lihat Dokumen
-                        </a>
+                        <div className="space-y-2">
+                          <div 
+                            className="relative w-full h-32 bg-gray-100 rounded-md overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => setDocumentPreview({ url: getImageUrl(form.nib_file_url) || '', title: 'Dokumen NIB' })}
+                          >
+                            <img 
+                              src={getImageUrl(form.nib_file_url) || ''} 
+                              alt="NIB Preview"
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                target.nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                            <div className="absolute inset-0 hidden items-center justify-center text-gray-400 bg-gray-100">
+                              <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              </svg>
+                            </div>
+                          </div>
+                          <a 
+                            href={getImageUrl(form.nib_file_url) || '#'}
+                            download="dokumen-nib"
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-md text-xs hover:bg-blue-100 transition-colors w-full justify-center"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Download
+                          </a>
+                        </div>
                       ) : (
                         <p className="text-xs text-gray-400">Belum diunggah</p>
                       )}
@@ -1014,17 +1080,38 @@ export default function Profil() {
                     <div>
                       <p className="text-xs text-gray-500 mb-2">Dokumen KTP Pemilik</p>
                       {form.ktp_file_url ? (
-                        <a 
-                          href={form.ktp_file_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-md text-xs hover:bg-blue-100 transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          Lihat Dokumen
-                        </a>
+                        <div className="space-y-2">
+                          <div 
+                            className="relative w-full h-32 bg-gray-100 rounded-md overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => setDocumentPreview({ url: getImageUrl(form.ktp_file_url) || '', title: 'Dokumen KTP Pemilik' })}
+                          >
+                            <img 
+                              src={getImageUrl(form.ktp_file_url) || ''} 
+                              alt="KTP Preview"
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                target.nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                            <div className="absolute inset-0 hidden items-center justify-center text-gray-400 bg-gray-100">
+                              <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              </svg>
+                            </div>
+                          </div>
+                          <a 
+                            href={getImageUrl(form.ktp_file_url) || '#'}
+                            download="dokumen-ktp"
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-md text-xs hover:bg-blue-100 transition-colors w-full justify-center"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Download
+                          </a>
+                        </div>
                       ) : (
                         <p className="text-xs text-gray-400">Belum diunggah</p>
                       )}
@@ -1370,6 +1457,18 @@ export default function Profil() {
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Website
+                  </label>
+                  <input
+                    type="url"
+                    value={tempForm.website_perusahaan}
+                    onChange={setTemp('website_perusahaan')}
+                    placeholder="https://"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                  />
+                </div>
               </div>
               
               {/* Document Uploads */}
@@ -1387,7 +1486,7 @@ export default function Profil() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
                     />
                     {tempForm.npwp_file_url && (
-                      <a href={tempForm.npwp_file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
+                      <a href={getImageUrl(tempForm.npwp_file_url) || '#'} download="dokumen-npwp" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
                         Lihat dokumen saat ini
                       </a>
                     )}
@@ -1403,7 +1502,7 @@ export default function Profil() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
                     />
                     {tempForm.nib_file_url && (
-                      <a href={tempForm.nib_file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
+                      <a href={getImageUrl(tempForm.nib_file_url) || '#'} download="dokumen-nib" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
                         Lihat dokumen saat ini
                       </a>
                     )}
@@ -1419,7 +1518,7 @@ export default function Profil() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
                     />
                     {tempForm.ktp_file_url && (
-                      <a href={tempForm.ktp_file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
+                      <a href={getImageUrl(tempForm.ktp_file_url) || '#'} download="dokumen-ktp" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
                         Lihat dokumen saat ini
                       </a>
                     )}
@@ -1897,6 +1996,84 @@ export default function Profil() {
               >
                 {lang === 'id' ? 'Batal' : 'Cancel'}
               </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Document Preview Modal */}
+        <Dialog open={!!documentPreview} onOpenChange={() => setDocumentPreview(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>{documentPreview?.title}</DialogTitle>
+            </DialogHeader>
+            <div className="relative w-full h-[70vh] bg-gray-100 rounded-lg overflow-hidden">
+              {documentPreview?.url && (
+                <img 
+                  src={documentPreview.url} 
+                  alt={documentPreview.title}
+                  className="w-full h-full object-contain"
+                />
+              )}
+            </div>
+            <div className="flex justify-end gap-3 mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDocumentPreview(null)}
+              >
+                {lang === 'id' ? 'Tutup' : 'Close'}
+              </Button>
+              {documentPreview?.url && (
+                <a 
+                  href={documentPreview.url}
+                  download={documentPreview.title}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download
+                </a>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Document Preview Modal */}
+        <Dialog open={!!documentPreview} onOpenChange={() => setDocumentPreview(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>{documentPreview?.title}</DialogTitle>
+            </DialogHeader>
+            <div className="relative w-full h-[70vh] bg-gray-100 rounded-lg overflow-hidden">
+              {documentPreview?.url && (
+                <img 
+                  src={documentPreview.url} 
+                  alt={documentPreview.title}
+                  className="w-full h-full object-contain"
+                />
+              )}
+            </div>
+            <div className="flex justify-end gap-3 mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDocumentPreview(null)}
+              >
+                {lang === 'id' ? 'Tutup' : 'Close'}
+              </Button>
+              {documentPreview?.url && (
+                <a 
+                  href={documentPreview.url}
+                  download={documentPreview.title}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download
+                </a>
+              )}
             </div>
           </DialogContent>
         </Dialog>

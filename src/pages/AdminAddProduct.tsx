@@ -946,16 +946,7 @@ export default function AdminAddProduct() {
                         placeholder="0"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="base_distributor_price">{t.distributorPrice} Dasar</Label>
-                      <Input
-                        id="base_distributor_price"
-                        type="number"
-                        value={formData.base_distributor_price || ''}
-                        onChange={(e) => setFormData({...formData, base_distributor_price: parseFloat(e.target.value) || 0})}
-                        placeholder="0"
-                      />
-                    </div>
+                    {/* Removed base_distributor_price field, only using distributor_price */}
                   </div>
 
                   <div className="grid grid-cols-3 gap-4">
@@ -978,16 +969,7 @@ export default function AdminAddProduct() {
                         placeholder="1"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="base_moq">{t.moq} Dasar</Label>
-                      <Input
-                        id="base_moq"
-                        type="number"
-                        value={formData.base_moq || ''}
-                        onChange={(e) => setFormData({...formData, base_moq: parseInt(e.target.value) || 1})}
-                        placeholder="1"
-                      />
-                    </div>
+                    {/* Removed base_moq field, only using moq */}
                   </div>
 
                   <div className="space-y-2">

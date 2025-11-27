@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
-import { Eye, Edit, Trash2, Search, Loader2, Calendar, Phone, Mail, MapPin } from 'lucide-react';
+import { Eye, Edit, Trash2, Search, Loader2, Calendar } from 'lucide-react';
 import { useLanguage } from '@/hooks/use-language';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { provinces, getCitiesByProvince, City } from '@/data/indonesia';
+import { createCustomer } from '@/lib/baskitApiCustomer';
 
 // Define distributor profile type based on actual database schema
 type DistributorProfile = {
@@ -30,16 +28,12 @@ type DistributorProfile = {
 const DistributorManager = () => {
   const { toast } = useToast();
   const { lang } = useLanguage();
+  const navigate = useNavigate();
   const t = lang === 'id' ? translations.id : translations.en;
   
   const [distributors, setDistributors] = useState<DistributorProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDistributor, setSelectedDistributor] = useState<DistributorProfile | null>(null);
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editForm, setEditForm] = useState<Partial<DistributorProfile>>({});
-  const [availableCities, setAvailableCities] = useState<City[]>([]);
 
   // Fetch distributors from database
   const fetchDistributors = async () => {
@@ -70,54 +64,6 @@ const DistributorManager = () => {
     fetchDistributors();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update available cities when province changes in edit form
-  useEffect(() => {
-    // Province field does not exist in distributor profile, so skip updating available cities
-    setAvailableCities([]);
-  }, [editForm]);
-
-  // Save distributor changes
-  const saveDistributor = async () => {
-    if (!selectedDistributor) return;
-
-    try {
-      // Use correct field names matching database schema
-      const updateData = {
-        nama_bisnis: editForm.nama_bisnis,
-        nama_pemilik: editForm.nama_pemilik,
-        email: editForm.email,
-        kontak_pemilik: editForm.kontak_pemilik,
-        alamat_lengkap: editForm.alamat_lengkap,
-        kota: editForm.kota,
-        status: editForm.status
-      };
-
-      // Use a direct approach without type assertion
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any)
-        .from('distributor_profiles')
-        .update(updateData)
-        .eq('id', selectedDistributor.id);
-
-      if (error) throw error;
-
-      toast({
-        title: t.distributorUpdated,
-        description: t.distributorUpdatedDesc,
-      });
-
-      setIsEditDialogOpen(false);
-      fetchDistributors();
-    } catch (error) {
-      console.error('Error updating distributor:', error);
-      toast({
-        title: t.errorUpdating,
-        description: error instanceof Error ? error.message : String(error),
-        variant: "destructive"
-      });
-    }
-  };
-
   // Delete distributor
   const deleteDistributor = async (distributorId: string) => {
     if (!confirm(t.confirmDelete)) return;
@@ -146,20 +92,14 @@ const DistributorManager = () => {
     }
   };
 
-  // Open edit dialog
-  const openEditDialog = (distributor: DistributorProfile) => {
-    setSelectedDistributor(distributor);
-    setEditForm({
-      nama_bisnis: distributor.nama_bisnis,
-      nama_pemilik: distributor.nama_pemilik,
-      email: distributor.email,
-      kontak_pemilik: distributor.kontak_pemilik,
-      alamat_lengkap: distributor.alamat_lengkap,
-      kota: distributor.kota,
-      status: distributor.status,
-    });
-    
-    setIsEditDialogOpen(true);
+  // Navigate to view distributor page
+  const handleViewDistributor = (distributor: DistributorProfile) => {
+    navigate(`/admin/distributors/view/${distributor.user_id}`);
+  };
+
+  // Navigate to edit distributor page
+  const handleEditDistributor = (distributor: DistributorProfile) => {
+    navigate(`/admin/distributors/edit/${distributor.user_id}`);
   };
 
   // Filter distributors based on search query
@@ -180,6 +120,90 @@ const DistributorManager = () => {
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  // Add this function to handle status change and API call
+  const handleStatusChange = async (distributor: DistributorProfile, newStatus: string) => {
+    try {
+      // Normalize status value
+      const statusMap = {
+        'aktif': 'active',
+        'active': 'active',
+        'approved': 'active',
+        'disetujui': 'active',
+        'menunggu': 'pending',
+        'waiting': 'pending',
+      };
+      const normalizedStatus = statusMap[newStatus] || newStatus;
+      // Get previous status before update
+      const previousStatus = distributor.status;
+      const { error } = await supabase
+        .from('distributor_profiles')
+        .update({ status: normalizedStatus } as any)
+        .eq('id', distributor.id);
+      if (error) throw error;
+      toast({ title: 'Status updated', variant: 'default' });
+      // Always call API and log when status is set to 'active'
+      if (normalizedStatus === 'active') {
+        console.log('[DistributorManager] Registering distributor in Baskit API:', {
+          distributorId: distributor.id,
+          previousStatus,
+          newStatus: normalizedStatus,
+          payload: {
+            companyName: distributor.nama_bisnis,
+            phone: distributor.kontak_pemilik,
+            email: distributor.email || '',
+            companyWebsite: '',
+            notes: '',
+            detailAddress: distributor.alamat_lengkap,
+            postalCode: '',
+            districtName: distributor.kota,
+            primaryContact: {
+              name: distributor.nama_pemilik,
+              email: distributor.email || '',
+              phone: distributor.kontak_pemilik,
+              jobTitle: 'Owner',
+            },
+          }
+        });
+        const payload = {
+          companyName: distributor.nama_bisnis,
+          phone: distributor.kontak_pemilik,
+          email: distributor.email || '',
+          companyWebsite: '',
+          notes: '',
+          detailAddress: distributor.alamat_lengkap,
+          postalCode: '',
+          districtName: distributor.kota,
+          primaryContact: {
+            name: distributor.nama_pemilik,
+            email: distributor.email || '',
+            phone: distributor.kontak_pemilik,
+            jobTitle: 'Owner',
+          },
+        };
+        try {
+          const response = await createCustomer(payload);
+          console.log('createCustomer API response:', response);
+          // If response is an object, check statusCode property
+          const statusCode = (response && typeof response === 'object' && 'statusCode' in response)
+            ? (response as { statusCode?: number }).statusCode
+            : undefined;
+          if (statusCode === 200) {
+            toast({ title: 'Customer created in Baskit API', variant: 'default' });
+          } else {
+            toast({ title: 'Failed to create customer in Baskit API', variant: 'destructive' });
+          }
+        } catch (apiError) {
+          console.error('createCustomer API error:', apiError);
+          toast({ title: 'API error', description: apiError instanceof Error ? apiError.message : String(apiError), variant: 'destructive' });
+        }
+      }
+      fetchDistributors();
+    } catch (err) {
+      console.error('Status update error:', err);
+      toast({ title: 'Error', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
+    }
   };
 
   return (
@@ -300,17 +324,14 @@ const DistributorManager = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            setSelectedDistributor(distributor);
-                            setIsViewDialogOpen(true);
-                          }}
+                          onClick={() => handleViewDistributor(distributor)}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => openEditDialog(distributor)}
+                          onClick={() => handleEditDistributor(distributor)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -330,166 +351,11 @@ const DistributorManager = () => {
           )}
         </CardContent>
       </Card>
-
-      {/* View Details Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{t.distributorDetails}</DialogTitle>
-            <DialogDescription>
-              View detailed information about the selected distributor including business details and contact information.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedDistributor && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    {t.registeredOn}: {formatDate(selectedDistributor.created_at)}
-                  </span>
-                </div>
-                
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-sm font-medium">{t.businessName}</Label>
-                    <p className="text-sm">{selectedDistributor.nama_bisnis}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">{t.contactPerson}</Label>
-                    <p className="text-sm">{selectedDistributor.nama_pemilik}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm">{selectedDistributor.email}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm">{selectedDistributor.kontak_pemilik}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm">{selectedDistributor.alamat_lengkap}, {selectedDistributor.kota}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <div>
-                  <Label className="text-sm font-medium">{t.status}</Label>
-                  <p className="text-sm">{selectedDistributor.status}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">{t.businessType}</Label>
-                  <p className="text-sm text-muted-foreground">Not Available</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">{t.distributorLicense}</Label>
-                  <p className="text-sm text-muted-foreground">Not Available</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">{t.taxId}</Label>
-                  <p className="text-sm text-muted-foreground">Not Available</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">{t.bankInfo}</Label>
-                  <p className="text-sm text-muted-foreground">Not Available</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{t.editDistributor}</DialogTitle>
-            <DialogDescription>
-              Edit distributor information including business details, contact information, and location settings.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="nama_bisnis">{t.businessName}</Label>
-              <Input
-                id="nama_bisnis"
-                value={editForm.nama_bisnis || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, nama_bisnis: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="nama_pemilik">{t.contactPerson}</Label>
-              <Input
-                id="nama_pemilik"
-                value={editForm.nama_pemilik || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, nama_pemilik: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">{t.email}</Label>
-              <Input
-                id="email"
-                type="email"
-                value={editForm.email || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="kontak_pemilik">{t.phone}</Label>
-              <Input
-                id="kontak_pemilik"
-                value={editForm.kontak_pemilik || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, kontak_pemilik: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="alamat_lengkap">{t.address}</Label>
-              <Input
-                id="alamat_lengkap"
-                value={editForm.alamat_lengkap || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, alamat_lengkap: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="kota">{t.city}</Label>
-              <Input
-                id="kota"
-                value={editForm.kota || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, kota: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">{t.status}</Label>
-              <Select 
-                value={editForm.status || ''} 
-                onValueChange={(value) => setEditForm(prev => ({ ...prev, status: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              {t.cancel}
-            </Button>
-            <Button onClick={saveDistributor}>
-              {t.saveChanges}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
+
+export default DistributorManager;
 
 // Translations
 const translations = {
@@ -572,5 +438,3 @@ const translations = {
     errorDeleting: "Failed to Delete"
   }
 };
-
-export default DistributorManager;

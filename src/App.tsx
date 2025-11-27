@@ -38,6 +38,8 @@ import AdminProducts from "./pages/AdminProducts";
 import AdminSKUManager from "./pages/AdminSKUManager";
 import AdminAddProduct from "./pages/AdminAddProduct";
 import AdminEditProduct from "./pages/AdminEditProduct";
+import AdminViewDistributor from "./pages/AdminViewDistributor";
+import AdminEditDistributor from "./pages/AdminEditDistributor";
 import AdminOrders from "./pages/AdminOrders";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminReports from "./pages/AdminReports";
@@ -119,6 +121,8 @@ const App: React.FC = () => (
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/admin/activities" element={<AllActivities />} />
                   <Route path="/admin/distributors" element={<AdminDistributors />} />
+                  <Route path="/admin/distributors/view/:id" element={<AdminViewDistributor />} />
+                  <Route path="/admin/distributors/edit/:id" element={<AdminEditDistributor />} />
                   <Route path="/admin/users" element={<AdminUsers />} />
                   <Route path="/admin/products" element={<AdminProducts />} />
                   <Route path="/admin/products/add" element={<AdminAddProduct />} />

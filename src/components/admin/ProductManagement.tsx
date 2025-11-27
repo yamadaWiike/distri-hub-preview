@@ -62,6 +62,7 @@ interface Product {
   image_url?: string;
   allow_negative_stock?: boolean;
   created_at?: string;
+  images?: string[];
 }
 
 export default function ProductManagement() {
@@ -1425,7 +1426,7 @@ export default function ProductManagement() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">{t.category}</p>
-                  <p className="text-sm">{selectedProduct.category || selectedProduct.brand || '-'}</p>
+                  <p className="text-sm">{selectedProduct.category_name || '-'}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">{t.unitPerPackage}</p>

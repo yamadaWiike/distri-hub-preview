@@ -201,37 +201,28 @@ export default function Checkout() {
       return;
     }
     
-    // Include address type in order data
-    const orderData = {
-      ...deliveryDetails,
-      addressType: deliveryDetails.addressType,
-      items: items,
-      totalAmount
-    };
-
-
     try {
-      // Import supabase client
+      // Import supabase client and createOrder API
       const { supabase } = await import('@/integrations/supabase/client');
-      
-      // First, get the distributor profile ID
+      const { createOrder } = await import('@/lib/baskitApiOrder');
+
+      // Get distributor profile ID
       const { data: distributorProfile, error: profileError } = await supabase
         .from('distributor_profiles')
-        .select('id')
+        .select('id, company_id')
         .eq('user_id', user?.id)
         .single();
-        
+
       if (profileError || !distributorProfile) {
         throw new Error('Distributor profile not found. Please complete your profile first.');
       }
 
-      const typedDistributorProfile = distributorProfile as DbDistributorProfile;
+      const typedDistributorProfile = distributorProfile as DbDistributorProfile & { company_id?: string };
 
-      // Generate unique order number with retry logic
+      // Generate unique order number
       let orderNumber: string;
       let attempts = 0;
       const maxAttempts = 5;
-      
       do {
         const now = new Date();
         const dateStr = now.getFullYear().toString() + 
@@ -239,23 +230,53 @@ export default function Checkout() {
                       now.getDate().toString().padStart(2, '0');
         const randomNum = Math.floor(Math.random() * 99999).toString().padStart(5, '0');
         orderNumber = `ORD-${dateStr}-${randomNum}`;
-        
-        // Check if order number already exists
         const { data: existingOrder } = await supabase
           .from('orders')
           .select('id')
           .eq('order_number', orderNumber)
           .single();
-          
         if (!existingOrder) {
-          break; // Order number is unique, we can use it
+          break;
         }
-        
         attempts++;
       } while (attempts < maxAttempts);
-      
       if (attempts >= maxAttempts) {
         throw new Error('Unable to generate unique order number. Please try again.');
+      }
+
+      // Build external API payload
+      const orderPayload = {
+        customerId: user?.id,
+        companyId: typedDistributorProfile.company_id || '',
+        paymentTypeId: '', // You may need to map this from your payment selection
+        orderType: 'SHOP',
+        wareHouse: 1, // You may want to map this from your form
+        shippingCost: 0, // You may want to map this from your form
+        tax: 11, // Set tax to 11%
+        refCode: orderNumber,
+        paymentNotes: deliveryDetails.notes,
+        notes: deliveryDetails.notes,
+        deliveryType: 'REGULAR',
+        expeditionName: '', // You may want to map this from your form
+        product: items.map(item => ({
+          productId: item.id,
+          companyId: typedDistributorProfile.company_id || '',
+          inventoryId: item.inventoryId || '',
+          qty: item.qty,
+          neededQty: item.qty,
+          price: item.unitPrice,
+          inventoryPriceTierId: item.inventoryPriceTierId || undefined
+        }))
+      };
+
+      // Call external order API
+      const apiResponse = await createOrder(orderPayload);
+      const statusCode = (apiResponse && typeof apiResponse === 'object' && 'statusCode' in apiResponse)
+        ? (apiResponse as { statusCode?: number }).statusCode
+        : undefined;
+
+      if (statusCode !== 200) {
+        throw new Error('Order API failed. Please try again.');
       }
 
       // Calculate shipping address based on address type
@@ -263,7 +284,7 @@ export default function Checkout() {
       const shippingCity = deliveryDetails.city;
       const shippingNotes = deliveryDetails.notes || null;
 
-      // Insert order into database with type assertion
+      // Insert order into database
       const { data: orderData, error: orderError } = await (supabase
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from('orders') as any)

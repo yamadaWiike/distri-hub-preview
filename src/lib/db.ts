@@ -309,6 +309,21 @@ export async function fetchProductBySku(skuOrId: string): Promise<Product | null
 
     const regions = regionPricing ? regionPricing as RegionPricingRecord[] : [];
 
+    // Fetch all images for this product
+    const { data: imagesData, error: imagesError } = await supabase
+      .from('product_images')
+      .select('image_url, is_primary, display_order')
+      .eq('product_id', productId)
+      .order('display_order', { ascending: true });
+    let images: string[] = [];
+    if (imagesData && imagesData.length > 0) {
+      images = (imagesData as { image_url: string | null }[])
+        .map((img) => img.image_url)
+        .filter((url) => !!url && url !== 'null' && url.trim() !== '');
+    } else if (product.image_url) {
+      images = [product.image_url].filter((url) => !!url && url !== 'null' && url.trim() !== '');
+    }
+
     // Map database product to frontend Product format
     return {
       id: product.sku, // Use SKU as the ID for frontend
@@ -335,7 +350,8 @@ export async function fetchProductBySku(skuOrId: string): Promise<Product | null
         moq_uom: rp.moq_uom,
         price_uom: rp.price_uom
       })),
-      image: product.image_url || '/placeholder.svg'
+      image: images[0] || '/placeholder.svg',
+      images,
     };
   } catch (error) {
     console.error('Unexpected error fetching product:', error);

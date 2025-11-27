@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/use-auth";
+import { uploadFileToS3, getImageUrl } from "@/lib/s3-upload";
 import { ArrowLeft, Plus, Trash2, X, Save, AlertCircle, Upload, Link } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -41,10 +42,10 @@ export default function AdminEditProduct() {
     consumer_price: 0,               // products.consumer_price
     retail_price: 0,                 // products.retail_price
     distributor_price: 0,            // products.distributor_price
-    base_distributor_price: 0,       // products.base_distributor_price
+    // base_distributor_price removed
     stock_quantity: 0,               // products.stock_quantity
     moq: 1,                          // products.moq
-    base_moq: 1,                     // products.base_moq
+    // base_moq removed
     unit_per_package: 1,             // products.unit_per_package
     is_active: true,                 // products.is_active
     allow_negative_stock: false,     // products.allow_negative_stock
@@ -69,6 +70,8 @@ export default function AdminEditProduct() {
   const [productImages, setProductImages] = useState<string[]>([]);
   const [imageUploadMode, setImageUploadMode] = useState<'url' | 'upload'>('upload');
   const [tempImageUrl, setTempImageUrl] = useState('');
+  const [mainImageIndex, setMainImageIndex] = useState(0);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // Product variants state - mapped to product_variants table
   const [productVariants, setProductVariants] = useState<{
@@ -133,7 +136,7 @@ export default function AdminEditProduct() {
   }, [id]);
 
   // Image upload handlers
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
@@ -141,38 +144,44 @@ export default function AdminEditProduct() {
     const remainingSlots = 5 - productImages.length;
     const filesToProcess = fileArray.slice(0, remainingSlots);
 
-    filesToProcess.forEach(file => {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        toast({
-          title: "Error",
-          description: "Please upload only image files",
-          variant: "destructive",
-        });
-        return;
+    setIsUploadingImage(true);
+
+    try {
+      for (const file of filesToProcess) {
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          toast({
+            title: "Error",
+            description: "Please upload only image files",
+            variant: "destructive",
+          });
+          continue;
+        }
+
+        // Upload to S3 (with automatic compression to max 2MB)
+        const result = await uploadFileToS3(file, 'products');
+        
+        if (result.success && result.url) {
+          setProductImages(prev => [...prev, result.url!]);
+        } else {
+          toast({
+            title: "Error",
+            description: result.error || "Failed to upload image",
+            variant: "destructive",
+          });
+        }
       }
-
-      // Validate file size (5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: "Error",
-          description: `${file.name} is too large. Maximum size is 5MB`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Convert to base64
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setProductImages(prev => [...prev, base64String]);
-      };
-      reader.readAsDataURL(file);
-    });
-
-    // Clear input
-    e.target.value = '';
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to upload images",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploadingImage(false);
+      // Clear input
+      e.target.value = '';
+    }
   };
 
   const addImageFromUrl = () => {
@@ -194,8 +203,12 @@ export default function AdminEditProduct() {
       return;
     }
 
-    setProductImages(prev => [...prev, tempImageUrl.trim()]);
-    setTempImageUrl('');
+    // Always store full S3 URL if relative path is entered
+    const S3_BASE_URL = "https://your-bucket.s3.amazonaws.com/"; // TODO: Replace with your actual S3/public base URL
+    const url = tempImageUrl.trim();
+    const finalUrl = url.startsWith('http') || url.startsWith('https') ? url : S3_BASE_URL + url;
+    setProductImages(prev => [...prev, finalUrl]);
+    setTempImageUrl("");
   };
 
   const removeImage = (index: number) => {
@@ -203,11 +216,7 @@ export default function AdminEditProduct() {
   };
 
   const setAsPrimaryImage = (index: number) => {
-    setProductImages(prev => {
-      const newImages = [...prev];
-      const [primaryImage] = newImages.splice(index, 1);
-      return [primaryImage, ...newImages];
-    });
+    setMainImageIndex(index);
   };
 
   const loadProduct = async () => {
@@ -253,9 +262,21 @@ export default function AdminEditProduct() {
           enable_uom_conversions: (product as any).enable_uom_conversions ?? false,
         });
 
-        // Load existing image into productImages array
-        if ((product as any).image_url) {
+        // Load existing images from product_images table
+        const { data: imagesData } = await supabase
+          .from('product_images')
+          .select('*')
+          .eq('product_id', id)
+          .order('display_order', { ascending: true });
+        
+        if (imagesData && imagesData.length > 0) {
+          setProductImages(imagesData.map((img: any) => img.image_url));
+          const primaryIndex = imagesData.findIndex((img: any) => img.is_primary);
+          setMainImageIndex(primaryIndex >= 0 ? primaryIndex : 0);
+        } else if ((product as any).image_url) {
+          // Fallback to old single image_url field
           setProductImages([(product as any).image_url]);
+          setMainImageIndex(0);
         }
       }
 
@@ -620,6 +641,22 @@ export default function AdminEditProduct() {
 
       if (result.error) throw result.error;
 
+      // Delete and re-insert product_images
+      await supabase.from('product_images').delete().eq('product_id', id);
+      
+      if (productImages.length > 0) {
+        const imagesToInsert = productImages.map((imageUrl, index) => ({
+          product_id: id,
+          image_url: imageUrl,
+          is_primary: index === mainImageIndex,
+          display_order: index,
+        }));
+        
+        await (supabase as any)
+          .from('product_images')
+          .insert(imagesToInsert);
+      }
+
       // Delete and re-insert product_variants
       if (productVariants.length > 0) {
         await supabase.from('product_variants').delete().eq('product_id', id);
@@ -867,14 +904,17 @@ export default function AdminEditProduct() {
                             accept="image/*"
                             multiple
                             onChange={handleImageUpload}
-                            disabled={productImages.length >= 5}
+                            disabled={productImages.length >= 5 || isUploadingImage}
                             className="cursor-pointer"
                           />
                           <p className="text-xs text-muted-foreground">
                             {lang === 'id' 
-                              ? `Maksimal 5 gambar, ukuran maksimal 5MB per gambar. ${productImages.length}/5 gambar`
-                              : `Maximum 5 images, max 5MB each. ${productImages.length}/5 images`}
+                              ? `Maksimal 5 gambar, akan dikompres otomatis maks 2MB per gambar. ${productImages.length}/5 gambar`
+                              : `Maximum 5 images, automatically compressed to max 2MB each. ${productImages.length}/5 images`}
                           </p>
+                          {isUploadingImage && (
+                            <p className="text-sm text-orange-500">{lang === 'id' ? 'Mengunggah...' : 'Uploading...'}</p>
+                          )}
                         </div>
                       )}
 
@@ -907,17 +947,17 @@ export default function AdminEditProduct() {
                               className="relative group aspect-square border rounded-lg overflow-hidden bg-muted"
                             >
                               <img 
-                                src={image} 
+                                src={getImageUrl(image) || image} 
                                 alt={`Product ${index + 1}`}
                                 className="w-full h-full object-cover"
                               />
-                              {index === 0 && (
-                                <div className="absolute top-1 left-1 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded">
-                                  {lang === 'id' ? 'Utama' : 'Primary'}
+                              {index === mainImageIndex && (
+                                <div className="absolute top-1 left-1 bg-orange-500 text-white text-xs px-2 py-0.5 rounded font-semibold">
+                                  {lang === 'id' ? 'Gambar Utama' : 'Main Image'}
                                 </div>
                               )}
                               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                {index !== 0 && (
+                                {index !== mainImageIndex && (
                                   <Button
                                     type="button"
                                     size="sm"
@@ -925,7 +965,7 @@ export default function AdminEditProduct() {
                                     onClick={() => setAsPrimaryImage(index)}
                                     className="h-8 text-xs"
                                   >
-                                    {lang === 'id' ? 'Jadikan Utama' : 'Set Primary'}
+                                    {lang === 'id' ? 'Jadikan Utama' : 'Set as Main'}
                                   </Button>
                                 )}
                                 <Button
@@ -1090,16 +1130,7 @@ export default function AdminEditProduct() {
                         placeholder="0"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="base_distributor_price">{t.distributorPrice} Dasar</Label>
-                      <Input
-                        id="base_distributor_price"
-                        type="number"
-                        value={formData.base_distributor_price || ''}
-                        onChange={(e) => setFormData({...formData, base_distributor_price: parseFloat(e.target.value) || 0})}
-                        placeholder="0"
-                      />
-                    </div>
+                    {/* Removed base_distributor_price field, only using distributor_price */}
                   </div>
 
                   <div className="grid grid-cols-3 gap-4">
@@ -1122,16 +1153,7 @@ export default function AdminEditProduct() {
                         placeholder="1"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="base_moq">{t.moq} Dasar</Label>
-                      <Input
-                        id="base_moq"
-                        type="number"
-                        value={formData.base_moq || ''}
-                        onChange={(e) => setFormData({...formData, base_moq: parseInt(e.target.value) || 1})}
-                        placeholder="1"
-                      />
-                    </div>
+                    {/* Removed base_moq field, only using moq */}
                   </div>
 
                   <div className="space-y-2">

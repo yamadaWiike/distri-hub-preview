@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import {
   Table,
@@ -15,49 +15,23 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Search,
-  Plus,
   Eye,
   Edit,
-  RotateCcw,
   Shield,
-  ShieldOff,
-  Upload,
-  FileText,
-  Building2,
   User,
-  MapPin,
-  Phone,
-  Mail,
-  Briefcase,
-  CreditCard,
-  Warehouse,
   FileCheck,
-  X,
-  Download,
 } from 'lucide-react';
 import { useLanguage } from '@/hooks/use-language';
+import { createCustomer } from '@/lib/baskitApiCustomer';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -119,33 +93,18 @@ interface User {
 export default function UserManagementRevamped() {
   const { toast } = useToast();
   const { lang } = useLanguage();
+  const navigate = useNavigate();
   const t = lang === 'id' ? id : en;
 
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [currentTab, setCurrentTab] = useState('overview');
   
   // Filter states
   const [statusFilter, setStatusFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-
-  // Edit form state
-  const [editForm, setEditForm] = useState<Partial<UserProfile>>({});
-  
-  // File upload states
-  const [uploadingFile, setUploadingFile] = useState<string | null>(null);
-  const [fileUploads, setFileUploads] = useState<{
-    npwp_file?: File;
-    nib_file?: File;
-    ktp_file?: File;
-    foto_gudang?: File;
-  }>({});
 
   useEffect(() => {
     fetchUsers();
@@ -232,128 +191,66 @@ export default function UserManagementRevamped() {
   };
 
   const handleViewUser = (user: User) => {
-    setSelectedUser(user);
-    setEditForm(user.profile || {});
-    setIsEditing(false);
-    setCurrentTab('overview');
-    setIsDetailDialogOpen(true);
+    navigate(`/admin/distributors/view/${user.id}`);
   };
 
-  const handleEditToggle = () => {
-    setIsEditing(!isEditing);
-    if (!isEditing) {
-      setEditForm(selectedUser?.profile || {});
-    }
+  const handleEditUser = (user: User) => {
+    navigate(`/admin/distributors/edit/${user.id}`);
   };
 
-  const handleSaveChanges = async () => {
-    if (!selectedUser?.profile) return;
-
+  // Add this function to handle status change and API call
+  const handleStatusChange = async (user: User, newStatus: string) => {
+    // Update status in Supabase
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('distributor_profiles')
-        .update(editForm)
-        .eq('user_id', selectedUser.profile.user_id);
-
+        .update({ status: newStatus } as any)
+        .eq('user_id', user.id);
       if (error) throw error;
-
-      toast({
-        title: t.success,
-        description: t.userUpdated,
-      });
-
-      // Update local state
-      const updatedUsers = users.map((u) =>
-        u.id === selectedUser.id && u.profile
-          ? { ...u, profile: { ...u.profile, ...editForm } }
-          : u
-      );
-      setUsers(updatedUsers);
-      setSelectedUser({
-        ...selectedUser,
-        profile: { ...selectedUser.profile, ...editForm },
-      });
-      setIsEditing(false);
-    } catch (error: any) {
-      toast({
-        title: t.error,
-        description: error.message,
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleFileUpload = async (fileType: string, file: File) => {
-    if (!selectedUser?.profile) return;
-
-    setUploadingFile(fileType);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${selectedUser.profile.user_id}/${fileType}_${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName);
-
-      const fileUrl = urlData.publicUrl;
-      const fieldName = `${fileType}_url` as keyof UserProfile;
-
-      const { error: updateError } = await (supabase as any)
-        .from('distributor_profiles')
-        .update({ [fieldName]: fileUrl })
-        .eq('user_id', selectedUser.profile.user_id);
-
-      if (updateError) throw updateError;
-
-      setEditForm({ ...editForm, [fieldName]: fileUrl });
-      
-      toast({
-        title: t.success,
-        description: t.fileUploaded,
-      });
-    } catch (error: any) {
-      toast({
-        title: t.error,
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setUploadingFile(null);
-    }
-  };
-
-  const handleStatusChange = async (userId: string, newStatus: string) => {
-    try {
-      const { error } = await (supabase as any)
-        .from('distributor_profiles')
-        .update({ status: newStatus })
-        .eq('user_id', userId);
-
-      if (error) throw error;
-
-      const updatedUsers = users.map((u) =>
-        u.id === userId && u.profile
-          ? { ...u, profile: { ...u.profile, status: newStatus } }
-          : u
-      );
-      setUsers(updatedUsers);
-
-      toast({
-        title: t.success,
-        description: t.statusUpdated,
-      });
-    } catch (error: any) {
-      toast({
-        title: t.error,
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: t.statusUpdated, variant: 'default' });
+      // If status is 'active' or 'approved', call createCustomer API
+      if (['active', 'approved'].includes(newStatus)) {
+        const profile = user.profile;
+        if (profile) {
+          // Build payload for createCustomer
+          const payload = {
+            companyName: profile.nama_bisnis,
+            phone: profile.kontak_pemilik,
+            email: profile.email_pemilik,
+            companyWebsite: profile.website_perusahaan,
+            notes: '',
+            detailAddress: profile.alamat_lengkap,
+            postalCode: '',
+            districtName: profile.kota,
+            primaryContact: {
+              name: profile.nama_pemilik,
+              email: profile.email_pemilik,
+              phone: profile.kontak_pemilik,
+              jobTitle: 'Owner',
+            },
+          };
+          try {
+            const response = await createCustomer(payload);
+            console.log('createCustomer API response:', response);
+            const statusCode = (response && typeof response === 'object' && 'statusCode' in response)
+              ? (response as { statusCode?: number }).statusCode
+              : undefined;
+            if (statusCode === 200) {
+              toast({ title: t.success, description: 'Customer created in Baskit API', variant: 'default' });
+            } else {
+              toast({ title: t.error, description: 'Failed to create customer in Baskit API', variant: 'destructive' });
+            }
+          } catch (apiError) {
+            console.error('createCustomer API error:', apiError);
+            toast({ title: t.error, description: apiError instanceof Error ? apiError.message : String(apiError), variant: 'destructive' });
+          }
+        }
+      }
+      // Refresh users list
+      fetchUsers();
+    } catch (err) {
+      console.error('Status update error:', err);
+      toast({ title: t.error, description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
     }
   };
 
@@ -531,14 +428,24 @@ export default function UserManagementRevamped() {
                       : '-'}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewUser(user)}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      {t.view}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewUser(user)}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        {t.view}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditUser(user)}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        {t.edit}
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -546,760 +453,6 @@ export default function UserManagementRevamped() {
           </TableBody>
         </Table>
       </Card>
-
-      {/* Detail Dialog with Tabs */}
-      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <DialogTitle>{selectedUser?.profile?.nama_bisnis}</DialogTitle>
-                <DialogDescription>
-                  {t.userDetails} - {selectedUser?.email}
-                </DialogDescription>
-              </div>
-              <div className="flex gap-2">
-                {isEditing ? (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsEditing(false)}
-                    >
-                      {t.cancel}
-                    </Button>
-                    <Button size="sm" onClick={handleSaveChanges}>
-                      {t.save}
-                    </Button>
-                  </>
-                ) : (
-                  <Button size="sm" onClick={handleEditToggle}>
-                    <Edit className="h-4 w-4 mr-1" />
-                    {t.edit}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </DialogHeader>
-
-          <Tabs value={currentTab} onValueChange={setCurrentTab} className="mt-4">
-            <TabsList className="grid w-full grid-cols-6">
-              <TabsTrigger value="overview">
-                <User className="h-4 w-4 mr-1" />
-                {t.overview}
-              </TabsTrigger>
-              <TabsTrigger value="company">
-                <Building2 className="h-4 w-4 mr-1" />
-                {t.company}
-              </TabsTrigger>
-              <TabsTrigger value="warehouse">
-                <Warehouse className="h-4 w-4 mr-1" />
-                {t.warehouse}
-              </TabsTrigger>
-              <TabsTrigger value="banking">
-                <CreditCard className="h-4 w-4 mr-1" />
-                {t.banking}
-              </TabsTrigger>
-              <TabsTrigger value="pic">
-                <Briefcase className="h-4 w-4 mr-1" />
-                PIC
-              </TabsTrigger>
-              <TabsTrigger value="documents">
-                <FileText className="h-4 w-4 mr-1" />
-                {t.documents}
-              </TabsTrigger>
-            </TabsList>
-
-            {/* Overview Tab */}
-            <TabsContent value="overview" className="space-y-4 mt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>{t.businessName}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.nama_bisnis || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, nama_bisnis: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.nama_bisnis || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.ownerName}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.nama_pemilik || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, nama_pemilik: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.nama_pemilik || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.email}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.email_pemilik || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, email_pemilik: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.email_pemilik || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.contact}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.kontak_pemilik || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, kontak_pemilik: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.kontak_pemilik || '-'}
-                    </p>
-                  )}
-                </div>
-                <div className="col-span-2">
-                  <Label>{t.address}</Label>
-                  {isEditing ? (
-                    <Textarea
-                      value={editForm.alamat_lengkap || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, alamat_lengkap: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.alamat_lengkap || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.location}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.kota || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, kota: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.kota || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.status}</Label>
-                  {isEditing ? (
-                    <Select
-                      value={editForm.status || ''}
-                      onValueChange={(value) =>
-                        setEditForm({ ...editForm, status: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">{t.active}</SelectItem>
-                        <SelectItem value="pending">{t.pending}</SelectItem>
-                        <SelectItem value="approved">{t.approved}</SelectItem>
-                        <SelectItem value="rejected">{t.rejected}</SelectItem>
-                        <SelectItem value="suspended">{t.suspended}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <div className="mt-1">
-                      {selectedUser?.profile?.status
-                        ? getStatusBadge(selectedUser.profile.status)
-                        : '-'}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Company Tab */}
-            <TabsContent value="company" className="space-y-4 mt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>{t.companyEmail}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.email_perusahaan || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, email_perusahaan: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.email_perusahaan || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.companyPhone}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.nomor_telp_perusahaan || ''}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          nomor_telp_perusahaan: e.target.value,
-                        })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.nomor_telp_perusahaan || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.directorName}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.nama_direktur || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, nama_direktur: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.nama_direktur || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.businessType}</Label>
-                  {isEditing ? (
-                    <Select
-                      value={editForm.bentuk_usaha || ''}
-                      onValueChange={(value) =>
-                        setEditForm({ ...editForm, bentuk_usaha: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t.selectBusinessType} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="PT">PT</SelectItem>
-                        <SelectItem value="CV">CV</SelectItem>
-                        <SelectItem value="UD">UD</SelectItem>
-                        <SelectItem value="Perorangan">Perorangan</SelectItem>
-                        <SelectItem value="Koperasi">Koperasi</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.bentuk_usaha || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.pkpStatus}</Label>
-                  {isEditing ? (
-                    <Select
-                      value={editForm.status_pkp || ''}
-                      onValueChange={(value) =>
-                        setEditForm({ ...editForm, status_pkp: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="PKP">PKP</SelectItem>
-                        <SelectItem value="Non-PKP">Non-PKP</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.status_pkp || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.npwpNumber}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.npwp_number || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, npwp_number: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.npwp_number || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.nibNumber}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.nib_number || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, nib_number: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.nib_number || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.website}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.website_perusahaan || ''}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          website_perusahaan: e.target.value,
-                        })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.website_perusahaan || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.revenue}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.omzet || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, omzet: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.omzet || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.employees}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.jumlah_karyawan || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, jumlah_karyawan: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.jumlah_karyawan || '-'}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Warehouse Tab */}
-            <TabsContent value="warehouse" className="space-y-4 mt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <Label>{t.officeAddress}</Label>
-                  {isEditing ? (
-                    <Textarea
-                      value={editForm.alamat_kantor || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, alamat_kantor: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.alamat_kantor || '-'}
-                    </p>
-                  )}
-                </div>
-                <div className="col-span-2">
-                  <Label>{t.warehouseAddress}</Label>
-                  {isEditing ? (
-                    <Textarea
-                      value={editForm.alamat_gudang || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, alamat_gudang: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.alamat_gudang || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.coordinates}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.koordinat || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, koordinat: e.target.value })
-                      }
-                      placeholder="lat, lng"
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.koordinat || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.warehousePhoto}</Label>
-                  {selectedUser?.profile?.foto_gudang ? (
-                    <div className="mt-1">
-                      <img
-                        src={selectedUser.profile.foto_gudang}
-                        alt="Warehouse"
-                        className="h-20 w-20 object-cover rounded border"
-                      />
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">-</p>
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Banking Tab */}
-            <TabsContent value="banking" className="space-y-4 mt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>{t.bankName}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.nama_bank || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, nama_bank: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.nama_bank || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.accountOwner}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.nama_pemilik_akun || ''}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          nama_pemilik_akun: e.target.value,
-                        })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.nama_pemilik_akun || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.accountNumber}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.nomor_rekening || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, nomor_rekening: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.nomor_rekening || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.deliveryFleet}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.jumlah_armada_pengiriman || ''}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          jumlah_armada_pengiriman: e.target.value,
-                        })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.jumlah_armada_pengiriman || '-'}
-                    </p>
-                  )}
-                </div>
-                <div className="col-span-2">
-                  <Label>{t.paymentMethods}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.metode_pembayaran || ''}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          metode_pembayaran: e.target.value,
-                        })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.metode_pembayaran || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.recordingApp}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.aplikasi_pencatatan || ''}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          aplikasi_pencatatan: e.target.value,
-                        })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.aplikasi_pencatatan || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.distributionArea}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.area_distribusi || ''}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          area_distribusi: e.target.value,
-                        })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.area_distribusi || '-'}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* PIC Tab */}
-            <TabsContent value="pic" className="space-y-4 mt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>{t.picName}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.nama_pic || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, nama_pic: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.nama_pic || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.picPosition}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.posisi_pic || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, posisi_pic: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.posisi_pic || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.picContact}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.nomor_kontak_pic || ''}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          nomor_kontak_pic: e.target.value,
-                        })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.nomor_kontak_pic || '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t.picEmail}</Label>
-                  {isEditing ? (
-                    <Input
-                      value={editForm.email_pic || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, email_pic: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedUser?.profile?.email_pic || '-'}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Documents Tab */}
-            <TabsContent value="documents" className="space-y-4 mt-4">
-              <div className="grid grid-cols-1 gap-6">
-                {/* NPWP Document */}
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <Label className="text-base font-semibold">{t.npwpDocument}</Label>
-                    {selectedUser?.profile?.npwp_file_url && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          window.open(selectedUser.profile?.npwp_file_url, '_blank')
-                        }
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        {t.download}
-                      </Button>
-                    )}
-                  </div>
-                  {isEditing ? (
-                    <div className="space-y-2">
-                      <Input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleFileUpload('npwp_file', file);
-                        }}
-                        disabled={uploadingFile === 'npwp_file'}
-                      />
-                      {uploadingFile === 'npwp_file' && (
-                        <p className="text-sm text-muted-foreground">{t.uploading}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      {selectedUser?.profile?.npwp_file_url ? t.uploaded : t.notUploaded}
-                    </p>
-                  )}
-                </div>
-
-                {/* NIB Document */}
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <Label className="text-base font-semibold">{t.nibDocument}</Label>
-                    {selectedUser?.profile?.nib_file_url && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          window.open(selectedUser.profile?.nib_file_url, '_blank')
-                        }
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        {t.download}
-                      </Button>
-                    )}
-                  </div>
-                  {isEditing ? (
-                    <div className="space-y-2">
-                      <Input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleFileUpload('nib_file', file);
-                        }}
-                        disabled={uploadingFile === 'nib_file'}
-                      />
-                      {uploadingFile === 'nib_file' && (
-                        <p className="text-sm text-muted-foreground">{t.uploading}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      {selectedUser?.profile?.nib_file_url ? t.uploaded : t.notUploaded}
-                    </p>
-                  )}
-                </div>
-
-                {/* KTP Document */}
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <Label className="text-base font-semibold">{t.ktpDocument}</Label>
-                    {selectedUser?.profile?.ktp_file_url && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          window.open(selectedUser.profile?.ktp_file_url, '_blank')
-                        }
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        {t.download}
-                      </Button>
-                    )}
-                  </div>
-                  {isEditing ? (
-                    <div className="space-y-2">
-                      <Input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleFileUpload('ktp_file', file);
-                        }}
-                        disabled={uploadingFile === 'ktp_file'}
-                      />
-                      {uploadingFile === 'ktp_file' && (
-                        <p className="text-sm text-muted-foreground">{t.uploading}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      {selectedUser?.profile?.ktp_file_url ? t.uploaded : t.notUploaded}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -1336,6 +489,7 @@ const id = {
   warehouse: 'Gudang',
   banking: 'Perbankan',
   documents: 'Dokumen',
+  basicInformation: 'Informasi Dasar',
   contact: 'Kontak',
   address: 'Alamat',
   companyEmail: 'Email Perusahaan',
@@ -1417,6 +571,7 @@ const en = {
   warehouse: 'Warehouse',
   banking: 'Banking',
   documents: 'Documents',
+  basicInformation: 'Basic Information',
   contact: 'Contact',
   address: 'Address',
   companyEmail: 'Company Email',

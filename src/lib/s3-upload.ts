@@ -8,6 +8,8 @@
  * - No AWS credentials needed in development
  * - No CORS configuration needed for local testing
  * - Seamless transition to S3 in production
+ * 
+ * Files are automatically compressed to max 2MB while maintaining quality
  */
 
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
@@ -23,11 +25,95 @@ const s3Client = !isDevelopment ? new S3Client({
 }) : null;
 
 const BUCKET_NAME = import.meta.env.VITE_AWS_BUCKET;
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB in bytes
 
 export interface UploadResult {
   success: boolean;
   url?: string;
   error?: string;
+}
+
+/**
+ * Compress image file to target size while maintaining quality
+ * @param file - The image file to compress
+ * @param maxSizeInBytes - Maximum file size in bytes (default 2MB)
+ * @returns Compressed file
+ */
+async function compressImage(file: File, maxSizeInBytes: number = MAX_FILE_SIZE): Promise<File> {
+  // If file is already smaller than max size, return as-is
+  if (file.size <= maxSizeInBytes) {
+    return file;
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // Calculate initial scale to get close to target size
+        const scaleFactor = Math.sqrt(maxSizeInBytes / file.size);
+        width *= scaleFactor;
+        height *= scaleFactor;
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Try different quality levels to hit target size
+        let quality = 0.9;
+        let compressedBlob: Blob | null = null;
+        
+        const tryCompress = (q: number) => {
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                if (blob.size <= maxSizeInBytes || q <= 0.1) {
+                  // Successfully compressed or reached minimum quality
+                  const compressedFile = new File([blob], file.name, {
+                    type: file.type,
+                    lastModified: Date.now(),
+                  });
+                  resolve(compressedFile);
+                } else {
+                  // Try lower quality
+                  tryCompress(q - 0.1);
+                }
+              } else {
+                reject(new Error('Failed to compress image'));
+              }
+            },
+            file.type,
+            q
+          );
+        };
+        
+        tryCompress(quality);
+      };
+      
+      img.onerror = () => {
+        reject(new Error('Failed to load image'));
+      };
+    };
+    
+    reader.onerror = () => {
+      reject(new Error('Failed to read file'));
+    };
+  });
 }
 
 /**
@@ -68,6 +154,7 @@ async function fileToArrayBuffer(file: File): Promise<ArrayBuffer> {
 
 /**
  * Upload a file to S3 (production) or save to localStorage (development)
+ * Files are automatically compressed if they exceed MAX_FILE_SIZE (2MB)
  * @param file - The file to upload
  * @param folder - Optional folder path in S3 bucket (e.g., 'store-photos', 'products')
  * @returns Upload result with URL or error
@@ -77,12 +164,20 @@ export async function uploadFileToS3(
   folder: string = 'uploads'
 ): Promise<UploadResult> {
   try {
+    // Compress image if it's an image file
+    let processedFile = file;
+    if (file.type.startsWith('image/')) {
+      console.log(`Original file size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+      processedFile = await compressImage(file);
+      console.log(`Compressed file size: ${(processedFile.size / 1024 / 1024).toFixed(2)}MB`);
+    }
+
     // Development mode - use localStorage
     if (isDevelopment) {
-      const dataURL = await fileToDataURL(file);
+      const dataURL = await fileToDataURL(processedFile);
       const timestamp = Date.now();
       const randomString = Math.random().toString(36).substring(2, 15);
-      const fileExtension = file.name.split('.').pop();
+      const fileExtension = processedFile.name.split('.').pop();
       const storageKey = `${folder}/${timestamp}-${randomString}.${fileExtension}`;
       
       // Store in localStorage
@@ -102,13 +197,13 @@ export async function uploadFileToS3(
     }
 
     // Convert file to ArrayBuffer
-    const arrayBuffer = await fileToArrayBuffer(file);
+    const arrayBuffer = await fileToArrayBuffer(processedFile);
     const buffer = new Uint8Array(arrayBuffer);
 
     // Generate unique filename
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 15);
-    const fileExtension = file.name.split('.').pop();
+    const fileExtension = processedFile.name.split('.').pop();
     const fileName = `${folder}/${timestamp}-${randomString}.${fileExtension}`;
 
     // Prepare upload parameters
@@ -116,7 +211,7 @@ export async function uploadFileToS3(
       Bucket: BUCKET_NAME,
       Key: fileName,
       Body: buffer,
-      ContentType: file.type,
+      ContentType: processedFile.type,
       ACL: 'public-read' as const,
     };
 

@@ -16,8 +16,11 @@ import { checkMixedVariantsMOQ } from "@/utils/mixVariants";
 import { getAllProducts } from "@/services/product-service";
 import useEmblaCarousel from "embla-carousel-react";
 import { generateProductSlug } from "@/lib/utils";
+import { CartItem } from "@/contexts/CartContextDefinition";
+import { getImageUrl } from "@/lib/s3-upload";
 
 export default function ProdukDetail() {
+    const [failedImages, setFailedImages] = useState<number[]>([]);
   const { category, slug } = useParams();
   const { user } = useAuth();
   const { addItem, items } = useCart();
@@ -144,12 +147,26 @@ export default function ProdukDetail() {
     }
   }, [product]);
   
-  // Create product images array - if product has image, use it (could be extended to support multiple images)
-  const productImages = product ? [
-    product.image?.startsWith('http') || product.image?.startsWith('https') ? product.image : product.image || '/placeholder.svg'
-    // Add more images here if product data structure supports it
-    // Example: ...(product.images || [])
-  ].filter(Boolean) : [];
+  // Create product images array - use product.images if available, fallback to single image
+  // Use S3 bucket and region from environment variables for relative image paths
+  const envBucket = import.meta.env.VITE_AWS_BUCKET;
+  const envRegion = import.meta.env.VITE_AWS_DEFAULT_REGION;
+  const S3_BASE_URL = envBucket && envRegion
+    ? `https://${envBucket}.s3.${envRegion}.amazonaws.com/`
+    : '';
+  const productImages = product && product.images && product.images.length > 0
+    ? product.images.map(img =>
+        img.startsWith('http') || img.startsWith('https') || !S3_BASE_URL
+          ? img
+          : S3_BASE_URL + img
+      )
+    : [product && product.image
+        ? (product.image.startsWith('http') || product.image.startsWith('https') || !S3_BASE_URL
+            ? product.image
+            : S3_BASE_URL + product.image)
+        : '/placeholder.svg'];
+  // Debug: log productImages array to check image URLs
+  console.log('ProdukDetail productImages:', productImages);
   
   const hasMultipleImages = productImages.length > 1;
   
@@ -278,9 +295,10 @@ export default function ProdukDetail() {
                     onClick={() => setCurrentImageIndex(idx)}
                   >
                     <img 
-                      src={img} 
-                      alt={`Thumbnail ${idx + 1}`} 
-                      className="w-full h-full object-contain hover:opacity-75 transition"
+                      src={getImageUrl(img) || img}
+                      alt={`Thumbnail ${idx + 1}`}
+                      className="w-full h-full object-cover hover:opacity-75 transition"
+                      onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = '/placeholder.svg'; }}
                     />
                   </div>
                 ))}
@@ -509,426 +527,178 @@ export default function ProdukDetail() {
                         −
                       </button>
                       <input 
-                        type="number" 
-                        min={canMixVariants ? 1 : usedMoq} 
-                        value={qty} 
-                        onChange={(e) => {
-                          const minQty = canMixVariants ? 1 : usedMoq;
-                          setQty(Math.max(minQty, parseInt(e.target.value || String(minQty))));
-                        }} 
-                        className="w-20 text-center py-2 border-x focus:outline-none font-semibold" 
+                        type="number"
+                        value={qty}
+                        onChange={(e) => setQty(Math.max(1, Number(e.target.value)))}
+                        className="w-16 h-10 border-transparent text-center rounded-md bg-gray-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition"
+                        min={1}
+                        readOnly={!canMixVariants}
                       />
                       <button 
-                        onClick={() => setQty(qty + 1)}
+                        onClick={() => {
+                          const newQty = qty + 1;
+                          if (canMixVariants) {
+                            setQty(newQty);
+                          } else {
+                            // For non-mix variants, set to MOQ
+                            setQty(usedMoq);
+                          }
+                        }}
                         className="px-4 py-2 bg-gray-100 hover:bg-gray-200 transition text-gray-700 font-semibold"
                       >
                         +
                       </button>
                     </div>
-                    <span className="text-sm text-gray-600">{lang === 'id' ? 'karton' : 'cartons'}</span>
-                  </div>
-                </div>
-
-                {/* Total */}
-                <div className="bg-gray-50 rounded-md p-4 border">
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm font-medium text-gray-700">{lang === 'id' ? 'Total' : 'Total'}</p>
-                    <p className="text-2xl font-bold text-gray-900">{formatIDR(usedPrice * qty)}</p>
                   </div>
                 </div>
 
                 {/* Add to Cart Button */}
-                <Button 
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white py-6 text-base font-semibold rounded-md shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
-                  onClick={() => {
-                    let finalQty = qty;
-                    let moqMessage = '';
-                    
-                    if (allowMixVariants && skuLevelMoq > 0 && product.hasVariants) {
-                      const { hasEnoughItems, currentTotal } = checkMixedVariantsMOQ(
-                        items,
-                        product.id,
-                        selectedArea,
-                        skuLevelMoq
-                      );
-                      
-                      const newTotal = currentTotal + qty;
-                      
-                      if (hasEnoughItems || newTotal >= skuLevelMoq) {
-                        moqMessage = lang === 'id'
-                          ? ` (Total varian: ${newTotal}/${skuLevelMoq})`
-                          : ` (Total variants: ${newTotal}/${skuLevelMoq})`;
-                      } else {
-                        const stillNeeded = skuLevelMoq - newTotal;
-                        moqMessage = lang === 'id'
-                          ? ` (${newTotal}/${skuLevelMoq}, perlu ${stillNeeded} lagi)`
-                          : ` (${newTotal}/${skuLevelMoq}, need ${stillNeeded} more)`;
+                <div>
+                  <Button 
+                    onClick={() => {
+                      if (!user) {
+                        toast({
+                          title: lang === 'id' ? 'Silakan masuk untuk melanjutkan' : 'Please log in to continue',
+                          description: lang === 'id' ? 'Anda perlu masuk ke akun Anda untuk menambahkan produk ke keranjang.' : 'You need to log in to your account to add products to the cart.',
+                          variant: 'default',
+                        });
+                        return;
                       }
                       
-                      finalQty = qty;
-                    } else if (qty < usedMoq) {
-                      finalQty = usedMoq;
-                    }
-                    
-                    addItem({
-                      id: product.id, 
-                      name: product.name, 
-                      size: product.size, 
-                      image: product.image, 
-                      province: selectedArea, 
-                      unitPrice: usedPrice, 
-                      moq: usedMoq, 
-                      qty: finalQty,
-                      consumerPrice: product.consumerPrice,
-                      allowMixVariants: allowMixVariants,
-                      skuLevelMoq: allowMixVariants ? skuLevelMoq : undefined,
-                    });
-                    
-                    toast({
-                      title: `${product.name} ${product.size}`,
-                      description: lang === 'id' 
-                        ? `${finalQty} karton ditambahkan ke keranjang${moqMessage}` 
-                        : `${finalQty} cartons added to cart${moqMessage}`,
-                      duration: 3000,
-                      action: (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => navigate('/checkout')}
-                        >
-                          {lang === 'id' ? "Checkout" : "Checkout"}
-                        </Button>
-                      ),
-                    });
-                  }}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                  {lang === 'id' ? 'Tambahkan ke Keranjang' : 'Add to Cart'}
-                </Button>
+                      // Check if product is already in cart
+                      const existingItem = items.find(item => item.id === product.id);
+
+                      // Build CartItem
+                      const cartItem: CartItem = {
+                        id: product.id,
+                        name: product.name,
+                        size: product.size,
+                        image: productImages[0],
+                        province: selectedArea,
+                        unitPrice: usedPrice,
+                        moq: product.moq,
+                        qty: canMixVariants ? qty : usedMoq,
+                        consumerPrice: product.consumerPrice,
+                        // add other fields as needed
+                      };
+
+                      addItem(cartItem);
+                      toast({
+                        title: lang === 'id' ? (canMixVariants ? 'Produk ditambahkan ke keranjang' : (existingItem ? 'Keranjang diperbarui' : 'Produk ditambahkan ke keranjang')) : (canMixVariants ? 'Product added to cart' : (existingItem ? 'Cart updated' : 'Product added to cart')),
+                        description: lang === 'id' ? (canMixVariants ? 'Anda telah menambahkan varian produk ke keranjang.' : (existingItem ? 'Jumlah produk dalam keranjang telah diperbarui.' : 'Anda telah menambahkan produk ke keranjang.')) : (canMixVariants ? 'You have added the product variant to the cart.' : (existingItem ? 'The product quantity in the cart has been updated.' : 'You have added the product to the cart.')),
+                        variant: 'default',
+                      });
+                    }}
+                    className="w-full h-12 text-sm font-semibold"
+                  >
+                    {lang === 'id' ? 'Tambahkan ke Keranjang' : 'Add to Cart'}
+                  </Button>
+                </div>
               </div>
             ) : (
-              <div className="bg-orange-50 border border-orange-200 rounded-md p-4">
-                <p className="text-sm text-orange-800 text-center font-medium mb-3">
-                  {lang === 'id' 
-                    ? 'Silakan login untuk mengakses harga dan melakukan pemesanan.' 
-                    : 'Please login to access prices and place orders.'}
+              <div className="text-center">
+                <p className="text-sm text-gray-500 mb-4">
+                  {lang === 'id' ? 'Anda perlu masuk untuk melihat harga dan menambahkan produk ke keranjang.' : 'You need to log in to view prices and add products to the cart.'}
                 </p>
-                <Button 
-                  className="w-full bg-orange-500 hover:bg-orange-600"
-                  onClick={() => navigate('/masuk')}
-                >
-                  {lang === 'id' ? 'Login' : 'Login'}
+                <Button variant="default" onClick={() => navigate('/masuk')}>
+                  {lang === 'id' ? 'Masuk ke Akun' : 'Log In'}
                 </Button>
               </div>
             )}
           </div>
         </div>
 
-        {/* Similar Products Section */}
+        {/* Similar Products Carousel - Only show if there are similar products */}
         {similarProducts.length > 0 && (
-          <div className="mt-12">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
-                {lang === 'id' ? 'Produk Sejenis Lainnya' : 'Similar Products'}
-              </h2>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => emblaApi?.scrollPrev()}
-                  className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label="Previous"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <button 
-                  onClick={() => emblaApi?.scrollNext()}
-                  className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label="Next"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div className="overflow-hidden" ref={emblaRef}>
-              <div className="flex gap-4">
-              {similarProducts.map((similar) => {
-                const similarRegional = similar.regions[0];
-                const similarPrice = similarRegional?.distributorPrice ?? similar.distributorPrice;
-                const similarMoq = similarRegional?.moq ?? similar.moq;
-                const unitMargin = similar.retailPrice && similar.retailPrice > 0 && similarPrice > 0
-                  ? ((similar.retailPrice - similarPrice) / similarPrice) * 100
-                  : 0;
-                
-                return (
-                  <article 
-                    key={similar.id} 
-                    className="flex-shrink-0 w-[calc(100%-16px)] md:w-[calc(50%-16px)] lg:w-[calc(25%-16px)] border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow h-full flex flex-col"
-                  >
-                    {/* Product Image with Area Badge */}
-                    <div className="relative w-full h-48">
+          <div className="mt-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              {lang === 'id' ? 'Produk Serupa' : 'Similar Products'}
+            </h2>
+            
+            <div className="embla" ref={emblaRef}>
+              <div className="embla__container">
+                {similarProducts.map((similarProduct) => (
+                  <div className="embla__slide" key={similarProduct.id}>
+                    <div className="bg-white rounded-lg border overflow-hidden">
                       <img 
-                        src={similar.image?.startsWith('http') || similar.image?.startsWith('https') ? similar.image : similar.image || '/placeholder.svg'} 
-                        alt={`${similar.name} ${similar.size}`} 
-                        loading="lazy"
-                        className="w-full h-48 object-cover"
+                        src={similarProduct.image} 
+                        alt={similarProduct.name} 
+                        className="w-full h-40 object-cover" 
+                        onClick={() => navigate(`/${similarProduct.category}/${generateProductSlug(similarProduct)}`)}
                       />
-                      {/* Area Badge - top right corner */}
-                      <div className="absolute top-2 right-2 bg-gray-600 text-white rounded px-2 py-1 text-xs font-medium">
-                        {similarRegional?.area ?? '-'}
-                      </div>
-                    </div>
-                    
-                    {/* Product Info Section */}
-                    <div className="p-3 flex-1 flex flex-col">
-                      {/* Brand Name */}
-                      {similar.brand && similar.brand !== 'unknown' && similar.brand !== 'Unknown Brand' && similar.brand !== 'Unknown' && (
-                        <div className="text-xs text-gray-600 mb-1">{similar.brand}</div>
-                      )}
-
-                      {/* Product Name */}
-                      <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2">
-                        {similar.name}
-                      </h3>
-
-                      {/* Category */}
-                      <div className="text-xs text-gray-500 mb-3">
-                        {similar.category && similar.category !== 'unknown' && similar.category !== 'Uncategorized' && similar.category}
-                      </div>
-
-                      {/* Price Section */}
-                      {user ? (
-                        <>
-                          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
-                            <div className="text-xs text-gray-600 mb-2">
-                              {lang === 'id' ? "Harga per karton" : "Price per carton"}
-                            </div>
-                            
-                            {/* Distributor Price with Orange Background */}
-                            <div className="mb-1 -mx-3 px-3 py-1.5 bg-orange-50">
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs text-gray-600">{lang === 'id' ? 'Distributor' : 'Distributor'}</span>
-                                <span className="text-sm font-bold text-orange-600">{formatIDR(similarPrice)}</span>
-                              </div>
-                            </div>
-
-                            {/* Retail Price */}
-                            <div className="mb-1">
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs text-gray-600">{lang === 'id' ? 'Retail' : 'Retail'}</span>
-                                <span className="text-sm font-semibold text-gray-900">
-                                  {similar.retailPrice && similar.retailPrice > 0 ? formatIDR(similar.retailPrice) : formatIDR(Math.round(similar.consumerPrice * 0.9))}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Konsumen Price */}
-                            <div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs text-gray-600">{lang === 'id' ? 'Konsumen' : 'Consumer'}</span>
-                                <span className="text-sm font-normal text-gray-900">
-                                  {similar.consumerPrice && similar.consumerPrice > 0 ? formatIDR(similar.consumerPrice) : '-'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Margin Display */}
-                          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs text-gray-600">
-                                Margin (Distributor — Retail)
-                              </span>
-                              <span className="text-sm font-bold text-teal-600">
-                                {unitMargin.toFixed(0)}%
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* MOQ Info */}
-                          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
-                            <div className="flex justify-between text-xs">
-                              <span className="text-gray-600">MOQ</span>
-                              <span className="font-medium text-gray-900">{similarMoq} karton</span>
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
-                            <div className="text-xs text-gray-600 mb-2">
-                              {lang === 'id' ? "Harga per karton" : "Price per carton"}
-                            </div>
-                            
-                            {/* Distributor Price with Orange Background - Blurred */}
-                            <div className="mb-1 -mx-3 px-3 py-1.5 bg-orange-50">
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs text-gray-600">{lang === 'id' ? 'Distributor' : 'Distributor'}</span>
-                                <span className="text-sm font-bold text-orange-600 blur-sm select-none">{formatIDR(similarPrice)}</span>
-                              </div>
-                            </div>
-
-                            {/* Retail Price - Blurred */}
-                            <div className="mb-1">
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs text-gray-600">{lang === 'id' ? 'Retail' : 'Retail'}</span>
-                                <span className="text-sm font-semibold text-gray-900 blur-sm select-none">
-                                  {formatIDR(similar.retailPrice || Math.round(similar.consumerPrice * 0.9))}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Konsumen Price - Blurred */}
-                            <div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs text-gray-600">{lang === 'id' ? 'Konsumen' : 'Consumer'}</span>
-                                <span className="text-sm font-normal text-gray-900 blur-sm select-none">
-                                  {formatIDR(similar.consumerPrice)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Margin Display - Blurred */}
-                          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs text-gray-600">
-                                Margin (Distributor — Retail)
-                              </span>
-                              <span className="text-sm font-bold text-teal-600 blur-sm select-none">
-                                {unitMargin.toFixed(0)}%
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* MOQ Info */}
-                          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
-                            <div className="flex justify-between text-xs">
-                              <span className="text-gray-600">MOQ</span>
-                              <span className="font-medium text-gray-900">{similarMoq} karton</span>
-                            </div>
-                          </div>
-                        </>
-                      )}
-
-                      {/* Action Buttons */}
-                      <div className="mt-auto grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            window.location.href = `/produk/${generateProductSlug(similar)}`;
-                          }}
-                          className="w-full py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-                        >
-                          {lang === 'id' ? 'Lihat Detail' : 'View Details'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            
-                            if (user) {
-                              const allowMixVariants = Boolean(similarRegional?.allowMixVariants === true || similar.allowMixVariants === true);
-                              const skuLevelMoq = Number(similarRegional?.skuLevelMoq || similar.singleSkuMoq || 0);
-                              
-                              addItem({
-                                id: similar.id,
-                                name: similar.name,
-                                size: similar.size,
-                                image: similar.image,
-                                province: similarRegional?.area || '',
-                                unitPrice: similarPrice,
-                                moq: similarMoq,
-                                qty: similarMoq,
-                                consumerPrice: similar.consumerPrice,
-                                allowMixVariants: allowMixVariants,
-                                skuLevelMoq: skuLevelMoq,
-                              });
-                              
+                      <div className="p-4">
+                        <h3 className="text-sm font-semibold text-gray-900 truncate">
+                          {similarProduct.name}
+                        </h3>
+                        <p className="text-xs text-gray-500 mb-2">
+                          {similarProduct.brand} • {lang === 'id' ? 'Rasa Sapi Panggang' : 'Beef Flavor'}
+                        </p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-bold text-gray-900">
+                            {formatIDR(similarProduct.distributorPrice)}
+                          </p>
+                          <Button 
+                            variant="default" 
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const cartItem: CartItem = {
+                                id: similarProduct.id,
+                                name: similarProduct.name,
+                                size: similarProduct.size,
+                                image: similarProduct.image,
+                                province: selectedArea,
+                                unitPrice: similarProduct.distributorPrice,
+                                moq: similarProduct.moq,
+                                qty: similarProduct.moq,
+                                consumerPrice: similarProduct.consumerPrice,
+                              };
+                              addItem(cartItem);
                               toast({
-                                title: `${similar.name} ${similar.size}`,
-                                description: lang === 'id' 
-                                  ? `${similarMoq} karton ditambahkan ke keranjang` 
-                                  : `${similarMoq} cartons added to cart`,
-                                duration: 3000,
+                                title: lang === 'id' ? 'Produk ditambahkan ke keranjang' : 'Product added to cart',
+                                description: lang === 'id' ? 'Anda telah menambahkan produk serupa ke keranjang.' : 'You have added the similar product to the cart.',
+                                variant: 'default',
                               });
-                            } else {
-                              navigate('/masuk');
-                            }
-                          }}
-                          disabled={!user}
-                          className={`w-full py-2.5 text-sm font-medium text-white rounded-md transition-colors flex items-center justify-center gap-2 ${
-                            user 
-                              ? 'bg-orange-500 hover:bg-orange-600' 
-                              : 'bg-gray-300 cursor-not-allowed'
-                          }`}
-                        >
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                          </svg>
-                        </button>
+                            }}
+                          >
+                            {lang === 'id' ? 'Tambah' : 'Add'}
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </article>
-                );
-              })}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         )}
-      </main>
 
-      {/* Image Dialog */}
-      <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
-        <DialogContent className="max-w-4xl p-2 border-none">
-          <DialogDescription className="sr-only">
-            Product image preview for {product.name}
-          </DialogDescription>
-          <div className="relative">
-            <img 
-              src={productImages[currentImageIndex]} 
-              alt={`${product.name} ${product.size}`} 
-              className="w-full h-auto object-contain max-h-[85vh] rounded-lg"
-            />
-            
-            {/* Navigation in Dialog - Only show if multiple images */}
-            {hasMultipleImages && (
-              <>
-                <button
-                  onClick={goToPreviousImage}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full"
-                  aria-label="Previous image"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <button
-                  onClick={goToNextImage}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full"
-                  aria-label="Next image"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
+        {/* Image Dialog - Fullscreen Product Image */}
+        <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
+          <DialogContent className="max-w-3xl p-0">
+            <DialogDescription>
+              <div className="relative">
+                <img 
+                  src={productImages[currentImageIndex]} 
+                  alt={`${product.name} ${product.size}`} 
+                  className="w-full h-auto"
+                />
                 
-                {/* Image Counter in Dialog */}
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-3 py-2 rounded">
-                  {currentImageIndex + 1} / {productImages.length}
-                </div>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+                {/* Close Button */}
+                <button
+                  onClick={() => setImageDialogOpen(false)}
+                  className="absolute top-4 right-4 bg-white rounded-full p-2 shadow-md hover:shadow-lg transition"
+                  aria-label="Close"
+                >
+                  <svg className="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </DialogDescription>
+          </DialogContent>
+        </Dialog>
+      </main>
     </div>
   );
 }
