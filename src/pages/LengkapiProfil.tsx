@@ -167,6 +167,7 @@ export default function LengkapiProfil() {
     nama_perusahaan: "",
     email_perusahaan: "",
     alamat_perusahaan: "",
+    kota: "", // City field - required for profile completion
     nomor_kontak_perusahaan: "",
     nama_direktur: "",
     status_pkp: "",
@@ -240,6 +241,7 @@ export default function LengkapiProfil() {
             nama_perusahaan: data.nama_bisnis || "",
             email_perusahaan: extendedData.email_perusahaan || "",
             alamat_perusahaan: data.alamat_lengkap || "",
+            kota: data.kota || "", // Load existing city data
             nomor_kontak_perusahaan: extendedData.nomor_telp_perusahaan || "",
             nama_direktur: extendedData.nama_direktur || "",
             status_pkp: extendedData.status_pkp || "",
@@ -304,7 +306,7 @@ export default function LengkapiProfil() {
     
     // Validate step 1
     if (currentStep === 1) {
-      if (!form.nama_pemilik || !form.kontak_pemilik || !form.email_pemilik) {
+      if (!form.nama_pemilik || !form.kontak_pemilik || !form.email_pemilik || !form.nama_perusahaan || !form.alamat_perusahaan || !form.kota) {
         toast({
           title: lang === 'id' ? "Data Belum Lengkap" : "Incomplete Data",
           description: lang === 'id' 
@@ -345,12 +347,14 @@ export default function LengkapiProfil() {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
-      // Update profile data
+      // Update profile data - include all 6 required fields for profile completion
       const updateData = {
-        nama_pemilik: form.nama_pemilik,
-        kontak_pemilik: form.kontak_pemilik,
         nama_bisnis: form.nama_perusahaan,
         alamat_lengkap: form.alamat_perusahaan,
+        kota: form.kota,
+        nama_pemilik: form.nama_pemilik,
+        kontak_pemilik: form.kontak_pemilik,
+        email_pemilik: form.email_pemilik,
       };
       
       const { error } = await supabase
@@ -599,6 +603,23 @@ export default function LengkapiProfil() {
                     placeholder="Jl. Pahlawan No. 123, Kel. Sukajadi"
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {lang === 'id' ? 'Kota/Kabupaten' : 'City/Regency'} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={form.kota}
+                    onChange={set('kota')}
+                    placeholder={lang === 'id' ? 'Contoh: Jakarta Selatan, Bandung, Surabaya' : 'Example: Jakarta Selatan, Bandung, Surabaya'}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {lang === 'id' ? 'Masukkan nama kota atau kabupaten tempat perusahaan berada' : 'Enter the city or regency where the company is located'}
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1261,12 +1282,7 @@ export default function LengkapiProfil() {
               </Button>
             ) : (
               <Button
-                type="button"
-                onClick={(e) => {
-                  console.log('Submit button clicked manually');
-                  const formEvent = new Event('submit', { bubbles: true, cancelable: true });
-                  e.currentTarget.closest('form')?.dispatchEvent(formEvent);
-                }}
+                type="submit"
                 className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 text-sm rounded-md"
               >
                 {lang === 'id' ? 'Submit Formulir' : 'Submit Form'}

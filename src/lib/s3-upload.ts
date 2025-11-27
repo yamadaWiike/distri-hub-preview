@@ -26,6 +26,8 @@ const s3Client = !isDevelopment ? new S3Client({
 
 const BUCKET_NAME = import.meta.env.VITE_AWS_BUCKET;
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB in bytes
+const MAX_UNCOMPRESSED_SIZE = 10 * 1024 * 1024; // 10MB - reject files larger than this even before compression
+const MAX_STORAGE_SIZE = 4 * 1024 * 1024; // 4MB - maximum size for localStorage (base64 increases size by ~33%)
 
 export interface UploadResult {
   success: boolean;
@@ -164,15 +166,29 @@ export async function uploadFileToS3(
   folder: string = 'uploads'
 ): Promise<UploadResult> {
   try {
+    // Check if file is too large (before compression)
+    if (file.size > MAX_UNCOMPRESSED_SIZE) {
+      const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+      const maxSizeMB = (MAX_UNCOMPRESSED_SIZE / 1024 / 1024).toFixed(0);
+      throw new Error(`File size (${sizeMB}MB) exceeds maximum allowed size of ${maxSizeMB}MB. Please choose a smaller image.`);
+    }
+    
     // Compress image if it's an image file
     let processedFile = file;
     if (file.type.startsWith('image/')) {
       console.log(`Original file size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
       processedFile = await compressImage(file);
       console.log(`Compressed file size: ${(processedFile.size / 1024 / 1024).toFixed(2)}MB`);
+      
+      // Check if compressed file is still too large for localStorage (in development)
+      if (isDevelopment && processedFile.size > MAX_STORAGE_SIZE) {
+        const sizeMB = (processedFile.size / 1024 / 1024).toFixed(2);
+        const maxSizeMB = (MAX_STORAGE_SIZE / 1024 / 1024).toFixed(0);
+        throw new Error(`Compressed image (${sizeMB}MB) is still too large for storage (max ${maxSizeMB}MB). Please choose a smaller or lower quality image.`);
+      }
     }
 
-    // Development mode - use localStorage
+    // Development mode - use localStorage with cleanup
     if (isDevelopment) {
       const dataURL = await fileToDataURL(processedFile);
       const timestamp = Date.now();
@@ -180,10 +196,37 @@ export async function uploadFileToS3(
       const fileExtension = processedFile.name.split('.').pop();
       const storageKey = `${folder}/${timestamp}-${randomString}.${fileExtension}`;
       
-      // Store in localStorage
-      localStorage.setItem(storageKey, dataURL);
-      
-      console.log(`[DEV] File stored in localStorage: ${storageKey}`);
+      try {
+        // Clean up old images if storage is getting full
+        const storageKeys = Object.keys(localStorage).filter(key => key.startsWith(folder));
+        
+        // If we have more than 10 images in this folder, remove the oldest ones
+        if (storageKeys.length > 10) {
+          const sortedKeys = storageKeys.sort();
+          const keysToRemove = sortedKeys.slice(0, storageKeys.length - 10);
+          keysToRemove.forEach(key => localStorage.removeItem(key));
+          console.log(`[DEV] Cleaned up ${keysToRemove.length} old images from localStorage`);
+        }
+        
+        // Store in localStorage
+        localStorage.setItem(storageKey, dataURL);
+        console.log(`[DEV] File stored in localStorage: ${storageKey}`);
+      } catch (error) {
+        // If quota exceeded, clear all images from this folder and try again
+        console.warn('[DEV] localStorage quota exceeded, clearing old images...');
+        const storageKeys = Object.keys(localStorage).filter(key => key.startsWith(folder));
+        storageKeys.forEach(key => localStorage.removeItem(key));
+        
+        // Try storing again after cleanup
+        try {
+          localStorage.setItem(storageKey, dataURL);
+          console.log(`[DEV] File stored in localStorage after cleanup: ${storageKey}`);
+        } catch (retryError) {
+          console.error('[DEV] Failed to store file even after cleanup:', retryError);
+          // Image is too large even after cleanup
+          throw new Error('Failed to upload image: File is too large for storage. Please use a smaller image (recommended: under 2MB).');
+        }
+      }
       
       return {
         success: true,
