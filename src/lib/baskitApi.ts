@@ -1,24 +1,27 @@
 // src/lib/baskitApi.ts
 
 const API_KEY = import.meta.env.VITE_BASKIT_API_KEY;
-const API_PROD = import.meta.env.VITE_BASKIT_API_PROD;
-const API_DEV = import.meta.env.VITE_BASKIT_API_DEV;
+const API_URL = import.meta.env.VITE_BASKIT_API_URL;
+const API_USERNAME = import.meta.env.VITE_BASKIT_API_USERNAME;
+const API_PASSWORD = import.meta.env.VITE_BASKIT_API_PASSWORD;
 
-export type BaskitApiEnv = 'prod' | 'dev';
-
-function getBaseUrl(env: BaskitApiEnv = 'prod') {
-  return env === 'prod' ? API_PROD : API_DEV;
+function getBaseUrl() {
+  return API_URL;
 }
 
 export async function baskitApiRequest<T>(
   endpoint: string,
-  options: RequestInit = {},
-  env: BaskitApiEnv = 'prod'
+  options: RequestInit = {}
 ): Promise<T> {
-  const url = getBaseUrl(env) + endpoint;
+  const url = getBaseUrl() + endpoint;
+  
+  // Create Basic Auth credentials
+  const credentials = btoa(`${API_USERNAME}:${API_PASSWORD}`);
+  
   const headers = {
     ...(options.headers || {}),
     'x-api-key': API_KEY,
+    'Authorization': `Basic ${credentials}`,
     'Content-Type': 'application/json',
   };
   const response = await fetch(url, {

@@ -36,8 +36,7 @@ export async function createCustomer(payload: CustomerPayload) {
     {
       method: "POST",
       body: JSON.stringify(payload),
-    },
-    "dev"
+    }
   );
 }
 
