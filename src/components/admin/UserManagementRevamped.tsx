@@ -204,7 +204,8 @@ export default function UserManagementRevamped() {
     try {
       const { error } = await supabase
         .from('distributor_profiles')
-        .update({ status: newStatus } as any)
+        // @ts-expect-error - Type mismatch with Supabase generated types
+        .update({ status: newStatus })
         .eq('user_id', user.id);
       if (error) throw error;
       toast({ title: t.statusUpdated, variant: 'default' });

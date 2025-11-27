@@ -139,7 +139,8 @@ const DistributorManager = () => {
       const previousStatus = distributor.status;
       const { error } = await supabase
         .from('distributor_profiles')
-        .update({ status: normalizedStatus } as any)
+        // @ts-expect-error - Type mismatch with Supabase generated types
+        .update({ status: normalizedStatus })
         .eq('id', distributor.id);
       if (error) throw error;
       toast({ title: 'Status updated', variant: 'default' });

@@ -119,17 +119,14 @@ export default function ProdukDetail() {
   const [selectedArea, setSelectedArea] = useState('');
   const [qty, setQty] = useState(0);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  // Embla carousel for similar products
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
   // Embla carousel for similar products
   const [emblaRef, emblaApi] = useEmblaCarousel({ 
     loop: false, 
     align: 'start',
-    slidesToScroll: 1,
-    breakpoints: {
-      '(min-width: 768px)': { slidesToScroll: 2 },
-      '(min-width: 1024px)': { slidesToScroll: 4 }
-    }
+    slidesToScroll: 1
   });
   
   // Initialize the state values when product changes
@@ -614,24 +611,22 @@ export default function ProdukDetail() {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               {lang === 'id' ? 'Produk Serupa' : 'Similar Products'}
             </h2>
-            
-            <div className="embla" ref={emblaRef}>
-              <div className="embla__container">
+            <div className="overflow-hidden" ref={emblaRef}>
+              <div className="flex -ml-4">
                 {similarProducts.map((similarProduct) => (
-                  <div className="embla__slide" key={similarProduct.id}>
-                    <div className="bg-white rounded-lg border overflow-hidden">
+                  <div className="flex-[0_0_100%] min-w-0 sm:flex-[0_0_50%] md:flex-[0_0_33.33%] lg:flex-[0_0_25%] pl-4" key={similarProduct.id}>
+                    <div className="bg-white rounded-lg border overflow-hidden shadow hover:shadow-lg transition cursor-pointer" onClick={() => navigate(`/${similarProduct.category}/${generateProductSlug(similarProduct)}`)}>
                       <img 
                         src={similarProduct.image} 
                         alt={similarProduct.name} 
                         className="w-full h-40 object-cover" 
-                        onClick={() => navigate(`/${similarProduct.category}/${generateProductSlug(similarProduct)}`)}
                       />
                       <div className="p-4">
                         <h3 className="text-sm font-semibold text-gray-900 truncate">
                           {similarProduct.name}
                         </h3>
                         <p className="text-xs text-gray-500 mb-2">
-                          {similarProduct.brand} • {lang === 'id' ? 'Rasa Sapi Panggang' : 'Beef Flavor'}
+                          {similarProduct.brand}
                         </p>
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-bold text-gray-900">
