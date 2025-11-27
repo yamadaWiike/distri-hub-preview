@@ -33,7 +33,7 @@ export interface CustomerPayload {
   assignedUsersId: string[];
   parentCompanyId: string;
   childType: string;
-  districtId: 0;
+  districtId: number;
   detailAddress: string;
   companyWebsite: string;
   notes: string;

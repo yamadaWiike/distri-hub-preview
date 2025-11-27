@@ -218,16 +218,35 @@ export default function UserManagementRevamped() {
             companyName: profile.nama_bisnis,
             phone: profile.kontak_pemilik,
             email: profile.email_pemilik,
-            companyWebsite: profile.website_perusahaan,
-            notes: '',
+            companyTypeId: '1', // Default company type
+            assignedUsersId: [], // Empty array for now
+            parentCompanyId: '', // Empty for independent distributors
+            childType: 'distributor',
+            districtId: 0,
             detailAddress: profile.alamat_lengkap,
+            companyWebsite: profile.website_perusahaan || '',
+            notes: `Auto-created from user approval`,
             postalCode: '',
-            districtName: profile.kota,
+            billingAddress: {
+              address: profile.alamat_lengkap,
+              district: profile.kota,
+              city: profile.kota,
+              province: '',
+              zipcode: ''
+            },
+            shippingAddress: {
+              address: profile.alamat_lengkap,
+              district: profile.kota,
+              city: profile.kota,
+              province: '',
+              zipcode: ''
+            },
             primaryContact: {
               name: profile.nama_pemilik,
               email: profile.email_pemilik,
               phone: profile.kontak_pemilik,
               jobTitle: 'Owner',
+              leadSource: 'distributor-hub'
             },
           };
           try {

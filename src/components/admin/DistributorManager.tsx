@@ -152,43 +152,48 @@ const DistributorManager = () => {
       toast({ title: 'Status updated', variant: 'default' });
       // Always call API and log when status is set to 'active'
       if (normalizedStatus === 'active') {
-        console.log('[DistributorManager] Registering distributor in Baskit API:', {
-          distributorId: distributor.id,
-          previousStatus,
-          newStatus: normalizedStatus,
-          payload: {
-            companyName: distributor.nama_bisnis,
-            phone: distributor.kontak_pemilik,
-            email: distributor.email || '',
-            companyWebsite: '',
-            notes: '',
-            detailAddress: distributor.alamat_lengkap,
-            postalCode: '',
-            districtName: distributor.kota,
-            primaryContact: {
-              name: distributor.nama_pemilik,
-              email: distributor.email || '',
-              phone: distributor.kontak_pemilik,
-              jobTitle: 'Owner',
-            },
-          }
-        });
         const payload = {
           companyName: distributor.nama_bisnis,
           phone: distributor.kontak_pemilik,
           email: distributor.email || '',
-          companyWebsite: '',
-          notes: '',
+          companyTypeId: '1', // Default company type
+          assignedUsersId: [], // Empty array for now
+          parentCompanyId: '', // Empty for independent distributors
+          childType: 'distributor',
+          districtId: 0,
           detailAddress: distributor.alamat_lengkap,
+          companyWebsite: '',
+          notes: `Auto-created from distributor profile approval`,
           postalCode: '',
-          districtName: distributor.kota,
+          billingAddress: {
+            address: distributor.alamat_lengkap,
+            district: distributor.kota,
+            city: distributor.kota,
+            province: '',
+            zipcode: ''
+          },
+          shippingAddress: {
+            address: distributor.alamat_lengkap,
+            district: distributor.kota,
+            city: distributor.kota,
+            province: '',
+            zipcode: ''
+          },
           primaryContact: {
             name: distributor.nama_pemilik,
             email: distributor.email || '',
             phone: distributor.kontak_pemilik,
             jobTitle: 'Owner',
+            leadSource: 'distributor-hub'
           },
         };
+        
+        console.log('[DistributorManager] Registering distributor in Baskit API:', {
+          distributorId: distributor.id,
+          previousStatus,
+          newStatus: normalizedStatus
+        });
+        
         try {
           const response = await createCustomer(payload);
           console.log('createCustomer API response:', response);
