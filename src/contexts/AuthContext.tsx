@@ -148,12 +148,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Enhance user data with profile info if available
           if (profile) {
             const profileStatus = profile.status as 'pending' | 'active' | 'inactive' | 'rejected' || 'pending';
+            
+            // Check if profile is complete (required fields filled)
+            const profileComplete = Boolean(
+              profile.nama_bisnis &&
+              profile.alamat_lengkap &&
+              profile.kota &&
+              profile.nama_pemilik &&
+              profile.kontak_pemilik &&
+              profile.email_pemilik
+            );
+            
             userData = {
               ...userData,
               namaBisnis: profile.nama_bisnis,
               kota: profile.kota,
               status: profileStatus,
-              isApproved: profileStatus === 'active'
+              isApproved: profileStatus === 'active',
+              profileComplete: profileComplete
             };
           }
         } catch (err) {

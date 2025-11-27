@@ -5,7 +5,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Eye, Edit, Trash2, Search, Loader2, Calendar } from 'lucide-react';
+import { Eye, Edit, Trash2, Search, Loader2, Calendar, MoreVertical } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useLanguage } from '@/hooks/use-language';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { createCustomer } from '@/lib/baskitApiCustomer';
@@ -321,29 +327,27 @@ const DistributorManager = () => {
                     </TableCell>
                     <TableCell>{formatDate(distributor.created_at || '')}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewDistributor(distributor)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditDistributor(distributor)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteDistributor(distributor.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditDistributor(distributor)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            {t.edit}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewDistributor(distributor)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            {t.viewDetails}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600" onClick={() => deleteDistributor(distributor.id)}>
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            {t.delete}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -378,6 +382,9 @@ const translations = {
     city: "Kota",
     registrationDate: "Tanggal Daftar",
     actions: "Aksi",
+    edit: "Edit",
+    viewDetails: "Lihat Detail",
+    delete: "Hapus",
     distributorDetails: "Detail Distributor",
     registeredOn: "Terdaftar pada",
     address: "Alamat",
@@ -417,6 +424,9 @@ const translations = {
     city: "City",
     registrationDate: "Registration Date",
     actions: "Actions",
+    edit: "Edit",
+    viewDetails: "View Details",
+    delete: "Delete",
     distributorDetails: "Distributor Details",
     registeredOn: "Registered on",
     address: "Address",
