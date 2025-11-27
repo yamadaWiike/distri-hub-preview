@@ -17,6 +17,7 @@ export type User = {
   role: 'user' | 'admin';
   status?: 'pending' | 'active' | 'inactive' | 'rejected';
   isApproved?: boolean; // Computed field for easy access
+  profileComplete?: boolean; // Profile completion status
 };
 
 /**

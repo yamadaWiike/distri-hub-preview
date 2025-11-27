@@ -15,13 +15,9 @@ export async function baskitApiRequest<T>(
 ): Promise<T> {
   const url = getBaseUrl() + endpoint;
   
-  // Create Basic Auth credentials
-  const credentials = btoa(`${API_USERNAME}:${API_PASSWORD}`);
-  
   const headers = {
     ...(options.headers || {}),
     'x-api-key': API_KEY,
-    'Authorization': `Basic ${credentials}`,
     'Content-Type': 'application/json',
   };
   const response = await fetch(url, {

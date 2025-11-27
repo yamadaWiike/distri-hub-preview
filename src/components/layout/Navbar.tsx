@@ -179,7 +179,7 @@ export default function Navbar() {
           )}
           
           <Link to="/" className="flex items-center gap-2">
-            <span className="font-bold text-xl text-gray-900">baskit</span>
+            <img src="/assets/baskit-logo.png" alt="Baskit" className="h-8" />
           </Link>
         </div>
         

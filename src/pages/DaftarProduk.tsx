@@ -13,7 +13,7 @@ import {
   TooltipTrigger 
 } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { Link } from "react-router-dom";
@@ -37,7 +37,7 @@ import { trackCatalogExport, trackDeniedCatalogExport } from "@/utils/analytics"
 // Cache duration constant
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 
-function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: ProductWithVariant; loggedIn: boolean; selectedFilterArea?: string }) {
+const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = '' }: { product: ProductWithVariant; loggedIn: boolean; user: any; selectedFilterArea?: string }) => {
   
   // Get cart functions and items
   const { addItem, items } = useCart();
@@ -200,7 +200,7 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
     });
   };
 
-  const canAddToCart = distributorAccess.canPlaceOrders && basePrice > 0 && regional;
+  const canAddToCart = distributorAccess.canPlaceOrders && basePrice > 0 && regional && user?.profileComplete === true;
   
   // Calculate margin and profit for a single unit to avoid qty-related issues
   const unitProfit = Math.max(0, product.consumerPrice - basePrice);
@@ -312,6 +312,115 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
                     : 'Waiting for admin approval to access prices and place orders.')
               }
             </p>
+          </div>
+        </div>
+      </article>
+    );
+  }
+  
+  // Card for active users with incomplete profile - show prices but can't order
+  if (loggedIn && distributorAccess.canSeePrices && !user?.profileComplete) {
+    return (
+      <article className="border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow h-full flex flex-col">
+        {/* Product Image with Area Badge */}
+        <div className="relative w-full h-48">
+          <img
+            src={product.image || '/placeholder.svg'}
+            alt={`${product.displayName} — ${product.size}`}
+            loading="lazy"
+            className="w-full h-48 object-cover"
+          />
+          {/* Area Badge - top right corner */}
+          <div className="absolute top-2 right-2 bg-gray-600 text-white rounded px-2 py-1 text-xs font-medium">
+            {regional?.area ?? '-'}
+          </div>
+        </div>
+
+        {/* Product Info Section */}
+        <div className="p-3 flex-1 flex flex-col">
+          {/* Brand Name */}
+          {product.brand && product.brand !== 'unknown' && product.brand !== 'Unknown Brand' && product.brand !== 'Unknown' && (
+            <div className="text-xs text-gray-600 mb-1">{product.brand}</div>
+          )}
+
+          {/* Product Name with Variant */}
+          <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2">
+            {product.name}
+            {product.isVariant && product.variantInfo && ` ${product.variantInfo.variantName}`}
+          </h3>
+
+          {/* Category - SKU Variant */}
+          <div className="text-xs text-gray-500 mb-3">
+            {product.category && product.category !== 'unknown' && product.category !== 'Uncategorized' && product.category}
+            {product.isVariant && product.variantInfo && (
+              <> - {product.variantInfo.variantName}</>
+            )}
+          </div>
+
+          {/* Price Section - Visible for active users */}
+          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
+            <div className="text-xs text-gray-600 mb-2">
+              {lang === 'id' ? "Harga per karton" : "Price per carton"}
+            </div>
+            
+            {/* Distributor Price with Orange Background */}
+            <div className="mb-1 -mx-3 px-3 py-1.5 bg-orange-50">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-600">{lang === 'id' ? 'Distributor' : 'Distributor'}</span>
+                <span className="text-sm font-bold text-orange-600">{formatIDR(basePrice)}</span>
+              </div>
+            </div>
+
+            {/* Retail Price */}
+            <div className="mb-1">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-600">{lang === 'id' ? 'Retail' : 'Retail'}</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {product.retailPrice && product.retailPrice > 0 ? formatIDR(product.retailPrice) : '-'}
+                </span>
+              </div>
+            </div>
+
+            {/* Konsumen Price */}
+            <div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-600">{lang === 'id' ? 'Konsumen' : 'Consumer'}</span>
+                <span className="text-sm font-normal text-gray-900">{formatIDR(product.consumerPrice)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Margin Display */}
+          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-600">
+                {lang === 'id' ? 'Margin (Distributor — Retail)' : 'Margin (Distributor — Retail)'}
+              </span>
+              <span className="text-sm font-bold text-teal-600">{unitMargin.toFixed(1)}%</span>
+            </div>
+          </div>
+
+          {/* MOQ Info */}
+          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
+            <div className="flex justify-between text-xs">
+              <span className="text-gray-600">MOQ</span>
+              <span className="font-medium text-gray-900">{displayMoq} karton</span>
+            </div>
+          </div>
+
+          {/* Complete Profile Message */}
+          <div className="mt-auto mb-3 p-3 bg-blue-50 border border-blue-300 rounded-md">
+            <p className="text-xs text-blue-800 text-center font-medium mb-2">
+              {lang === 'id' 
+                ? 'Lengkapi profil Anda untuk dapat memesan barang.' 
+                : 'Complete your profile to place orders.'}
+            </p>
+            <Link 
+              to="/profil" 
+              className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-2 px-4 rounded transition"
+            >
+              {lang === 'id' ? 'Lengkapi Profil Disini' : 'Complete Profile Here'}
+            </Link>
           </div>
         </div>
       </article>
@@ -435,7 +544,21 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
       </div>
     </article>
   );
-}
+});
+
+// Loading skeleton component
+const ProductCardSkeleton = () => (
+  <div className="border rounded-lg overflow-hidden bg-white shadow-sm h-full flex flex-col animate-pulse">
+    <div className="w-full h-48 bg-gray-200" />
+    <div className="p-3 flex-1 flex flex-col space-y-3">
+      <div className="h-3 bg-gray-200 rounded w-1/3" />
+      <div className="h-4 bg-gray-200 rounded w-3/4" />
+      <div className="h-3 bg-gray-200 rounded w-1/2" />
+      <div className="flex-1" />
+      <div className="h-8 bg-gray-200 rounded" />
+    </div>
+  </div>
+);
 
 export default function DaftarProduk() {
   const { user } = useAuth();
@@ -1592,17 +1715,43 @@ export default function DaftarProduk() {
           </p>
         )}
         
+        {/* Alert for active users with incomplete profile */}
+        {user && distributorAccess.isActive && !user.profileComplete && (
+          <Alert className="bg-orange-50 border-orange-300">
+            <AlertDescription className="flex items-center justify-between">
+              <span className="text-orange-800 font-medium">
+                {lang === 'id'
+                  ? "Lengkapi profil Anda untuk dapat memesan produk."
+                  : "Complete your profile to be able to order products."}
+              </span>
+              <Link to="/lengkapi-profil">
+                <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white ml-4">
+                  {lang === 'id' ? 'Lengkapi Profil Disini' : 'Complete Profile Here'}
+                </Button>
+              </Link>
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <div ref={ref} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {currentProducts.map((p) => (
-              <div key={p.id} className="h-full flex">
-                <ProductCard
-                  product={p}
-                  loggedIn={!!user}
-                  selectedFilterArea={area}
-                />
-              </div>
-            ))}
+            {loading ? (
+              // Show skeleton loading cards
+              Array.from({ length: 12 }).map((_, index) => (
+                <ProductCardSkeleton key={`skeleton-${index}`} />
+              ))
+            ) : (
+              currentProducts.map((p) => (
+                <div key={p.id} className="h-full flex">
+                  <ProductCard
+                    product={p}
+                    loggedIn={!!user}
+                    user={user}
+                    selectedFilterArea={area}
+                  />
+                </div>
+              ))
+            )}
           </div>
 
           {/* Pagination Controls */}

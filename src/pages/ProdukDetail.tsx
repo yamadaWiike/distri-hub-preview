@@ -1,6 +1,6 @@
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { PRODUCTS, Product } from "@/data/products";
 import { useAuth } from "@/hooks/use-auth";
 import React, { useState, useEffect } from "react";
@@ -18,6 +18,8 @@ import useEmblaCarousel from "embla-carousel-react";
 import { generateProductSlug } from "@/lib/utils";
 import { CartItem } from "@/contexts/CartContextDefinition";
 import { getImageUrl } from "@/lib/s3-upload";
+import { useDistributorApproval } from "@/hooks/use-distributor-approval";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function ProdukDetail() {
     const [failedImages, setFailedImages] = useState<number[]>([]);
@@ -28,6 +30,7 @@ export default function ProdukDetail() {
   const { lang } = useLanguage();
   const t = translations[lang];
   const navigate = useNavigate();
+  const distributorAccess = useDistributorApproval();
   
   // Reconstruct the full slug from category and slug params
   const fullSlug = category && slug ? `${category}/${slug}` : '';
@@ -506,7 +509,7 @@ export default function ProdukDetail() {
             </div>
 
             {/* Quantity Selector & Add to Cart */}
-            {user ? (
+            {user && distributorAccess.canPlaceOrders && user.profileComplete ? (
               <div className="space-y-4">
                 <div>
                   <label className="text-sm font-medium text-gray-900 block mb-2">
@@ -592,6 +595,21 @@ export default function ProdukDetail() {
                   </Button>
                 </div>
               </div>
+            ) : user && distributorAccess.isActive && !user.profileComplete ? (
+              <Alert className="bg-orange-50 border-orange-300">
+                <AlertDescription className="space-y-3">
+                  <p className="text-orange-800 font-medium text-center">
+                    {lang === 'id'
+                      ? 'Lengkapi profil Anda untuk dapat memesan produk.'
+                      : 'Complete your profile to be able to order products.'}
+                  </p>
+                  <Link to="/lengkapi-profil" className="block">
+                    <Button className="w-full bg-orange-600 hover:bg-orange-700 text-white">
+                      {lang === 'id' ? 'Lengkapi Profil Disini' : 'Complete Profile Here'}
+                    </Button>
+                  </Link>
+                </AlertDescription>
+              </Alert>
             ) : (
               <div className="text-center">
                 <p className="text-sm text-gray-500 mb-4">

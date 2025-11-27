@@ -693,22 +693,45 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
   await requireAuthForViewing();
   
   try {
-    // First get all base products
-    const baseProducts = await fetchProductsWithVariants();
+    // Fetch all base products and all variants in parallel
+    const [baseProducts, allVariantsData] = await Promise.all([
+      fetchProductsWithVariants(),
+      supabase
+        .from('product_variants')
+        .select('*')
+        .eq('is_active', true)
+    ]);
+    
+    // Create a map of variants by product_id for O(1) lookup
+    const variantsByProduct = new Map<string, ProductVariantFromDB[]>();
+    if (allVariantsData.data) {
+      allVariantsData.data.forEach((variant: ProductVariantFromDB) => {
+        if (!variantsByProduct.has(variant.product_id)) {
+          variantsByProduct.set(variant.product_id, []);
+        }
+        variantsByProduct.get(variant.product_id)!.push(variant);
+      });
+    }
+    
     const expandedProducts: ProductWithVariant[] = [];
     
     for (const product of baseProducts) {
       if (product.hasVariants) {
-        // Fetch variants for this product
-        const variants = await fetchProductVariants(product.id);
+        const variants = variantsByProduct.get(product.id) || [];
         
-        // For testing - only add real variants, no test data
         if (variants.length > 0) {
           // Create a separate product entry for each variant
-          for (const variant of variants) {
+          for (const variantData of variants) {
+            const variant = {
+              id: variantData.id,
+              variantName: variantData.variant_name || 'Unnamed Variant',
+              variantDescription: variantData.variant_description || '',
+              additionalPrice: variantData.additional_price || 0,
+              isActive: variantData.is_active
+            };
+            
             const variantProduct: ProductWithVariant = {
               ...product,
-              // Create a unique ID for the variant product entry
               id: `${product.id}_variant_${variant.id}`,
               baseProductId: product.id,
               isVariant: true,
@@ -719,20 +742,15 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
                 variantDescription: variant.variantDescription,
                 additionalPrice: variant.additionalPrice
               },
-              // Update pricing to include variant additional price
               distributorPrice: product.distributorPrice + variant.additionalPrice,
               consumerPrice: product.consumerPrice + variant.additionalPrice,
-              // Mix variant fields - inherit from base product
               singleSkuMoq: product.singleSkuMoq || 0,
               allowMixVariants: product.allowMixVariants || false,
-              // Update regional pricing to include variant additional price while preserving UOM
               regions: product.regions.map(region => ({
                 ...region,
                 distributorPrice: region.distributorPrice + variant.additionalPrice,
-                // Ensure UOM fields are preserved from parent product's regional pricing
                 moq_uom: region.moq_uom || product.moq_uom,
                 price_uom: region.price_uom || product.pricing_uom,
-                // Mix variant fields for regions - inherit from base region
                 skuLevelMoq: region.skuLevelMoq || 0,
                 allowMixVariants: region.allowMixVariants || false
               }))
@@ -740,7 +758,6 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
             expandedProducts.push(variantProduct);
           }
         } else {
-          // If product has variants flag but no actual variants, show as regular product
           const regularProduct: ProductWithVariant = {
             ...product,
             baseProductId: product.id,
@@ -750,7 +767,6 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
           expandedProducts.push(regularProduct);
         }
       } else {
-        // For products without variants, add as regular product
         const regularProduct: ProductWithVariant = {
           ...product,
           baseProductId: product.id,

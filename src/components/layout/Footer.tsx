@@ -40,9 +40,7 @@ export default function Footer() {
           {/* Brand Section */}
           <div className="col-span-1">
             <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="text-2xl font-bold">
-                <span className="text-white">baskit</span>
-              </div>
+              <img src="/assets/baskit-logo.png" alt="Baskit" className="h-8 brightness-0 invert" />
             </Link>
             <p className="text-sm text-gray-400 leading-relaxed">
               {lang === 'id' 

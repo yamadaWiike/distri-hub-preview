@@ -126,6 +126,19 @@ export default function Checkout() {
       return;
     }
     
+    // Check if profile is complete
+    if (user.profileComplete === false) {
+      toast({
+        title: lang === 'id' ? "Profil Belum Lengkap" : "Profile Incomplete",
+        description: lang === 'id' 
+          ? "Anda perlu melengkapi profil terlebih dahulu untuk dapat memesan barang." 
+          : "You need to complete your profile first to place orders.",
+        variant: "destructive",
+      });
+      navigate("/profil", { replace: true });
+      return;
+    }
+    
     if (items.length === 0) {
       navigate("/daftar-produk", { replace: true });
       return;
