@@ -14,19 +14,22 @@ export async function baskitApiRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = getBaseUrl() + endpoint;
-  
+
   const headers = {
     ...(options.headers || {}),
-    'x-api-key': API_KEY,
-    'Content-Type': 'application/json',
+    "x-api-key": API_KEY,
+    "Content-Type": "application/json",
   };
+
   const response = await fetch(url, {
     ...options,
     headers,
   });
+
   if (!response.ok) {
     throw new Error(`API error: ${response.status} ${response.statusText}`);
   }
+
   return response.json();
 }
 

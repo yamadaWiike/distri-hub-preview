@@ -1,43 +1,53 @@
 // src/lib/baskitApiCustomer.ts
 import { baskitApiRequest } from "./baskitApi";
 
-export interface PrimaryContact {
+export interface primaryContact {
   name: string;
   email: string;
   phone: string;
   jobTitle: string;
+  leadSource: string;
 }
 
-export interface Address {
+export interface billingAddress {
   address: string;
-  provinceId: number;
-  regencyId: number;
-  districtName: string;
-  postalCode: string;
+  district: string;
+  city: string;
+  province: string;
+  zipcode: string;
+}
+
+export interface shippingAddress {
+  address: string;
+  district: string;
+  city: string;
+  province: string;
+  zipcode: string;
 }
 
 export interface CustomerPayload {
   companyName: string;
   phone: string;
   email: string;
-  companyWebsite?: string;
-  notes?: string;
+  companyTypeId: string;
+  assignedUsersId: string[];
+  parentCompanyId: string;
+  childType: string;
+  districtId: 0;
   detailAddress: string;
+  companyWebsite: string;
+  notes: string;
   postalCode: string;
-  districtName?: string;
-  primaryContact: PrimaryContact;
-  billingAddress?: Address;
-  shippingAddress?: Address;
+  billingAddress: billingAddress;
+  shippingAddress: shippingAddress;
+  primaryContact: primaryContact;
 }
 
 export async function createCustomer(payload: CustomerPayload) {
-  return baskitApiRequest(
-    "baskit-core/distributor-hub/customer",
-    {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }
-  );
+  return baskitApiRequest("/distributor-hub/customer", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 // Example usage:

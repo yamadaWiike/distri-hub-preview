@@ -1,44 +1,58 @@
 // src/lib/baskitApiOrder.ts
+import { baskitApiRequest } from "./baskitApi";
 
-export interface OrderProduct {
+export interface orderProduct {
+  inventoryId: string;
   productId: string;
   companyId: string;
-  inventoryId: string;
   qty: number;
-  neededQty: number;
   price: number;
-  inventoryPriceTierId?: string;
+  neededQty: number;
+  discount: number;
+  discountAmount: number;
+  tax: number;
+  notes: string;
+  inventoryPriceTierId: string;
+  unitFactor: number;
+  memberLevel: string;
+  memberDiscountAmount: number;
+  orderAccount: string;
 }
 
-export interface OrderPayload {
+export interface orderPayload {
   customerId: string;
-  companyId: string;
   paymentTypeId: string;
-  orderType: string;
-  wareHouse: number;
+  subTotal: number;
   shippingCost: number;
   tax: number;
-  refCode: string;
-  paymentNotes: string;
+  total: number;
+  orderType: string;
+  companyId: string;
+  wareHouse: 1;
   notes: string;
+  description: string;
+  refCode: string;
+  salesmanId: string;
   deliveryType: string;
+  paymentNotes: string;
   expeditionName: string;
-  product: OrderProduct[];
+  salesOrderId: string;
+  linkedOrderId: string;
+  thirdPartyDelivery: string;
+  deliveryNotes: string;
+  supplierNotes: string;
+  products: orderProduct[];
 }
 
-export async function createOrder(payload: OrderPayload): Promise<any> {
-  const apiKey = process.env.NEXT_PUBLIC_BASKIT_API_KEY || process.env.BASKIT_API_KEY;
-  const endpoint = process.env.NEXT_PUBLIC_BASKIT_ORDER_API || "https://api-dev.baskit.app/baskit-core/distributor-hub/order";
+export interface OrderResponse {
+  orderCode: string;
+}
 
-  const response = await fetch(endpoint, {
+export async function createOrder(
+  payload: orderPayload
+): Promise<OrderResponse> {
+  return baskitApiRequest("/distributor-hub/order", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey ?? "",
-    },
     body: JSON.stringify(payload),
   });
-
-  const data = await response.json();
-  return data;
 }
