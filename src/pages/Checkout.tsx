@@ -190,6 +190,7 @@ export default function Checkout() {
     
     fetchProfileData();
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, items, navigate]);
 
   // Update delivery details
@@ -215,9 +216,79 @@ export default function Checkout() {
     }
     
     try {
-      // Import supabase client and createOrder API
+      // Import supabase client, createOrder API, and getInventory
       const { supabase } = await import('@/integrations/supabase/client');
       const { createOrder } = await import('@/lib/baskitApiOrder');
+      const { getInventory } = await import('@/lib/baskitApiInventory');
+
+      // Fetch inventory data for all cart items
+      console.log('Fetching inventory data for cart items...');
+      const productIds = items.map(item => item.id);
+      
+      // Start with original items, will be enriched if inventory data is available
+      let enrichedItems = items;
+      
+      try {
+        const inventoryResponse = await getInventory({
+          inventoryId: productIds,
+          active: true,
+          $limit: 100 // Get up to 100 items
+        });
+
+        console.log('Inventory response:', inventoryResponse);
+
+        if (inventoryResponse.statusCode === 200 && inventoryResponse.data) {
+          // Create a map of product ID to inventory data
+          const inventoryMap = new Map(
+            inventoryResponse.data.map(inv => [inv.inventoryId, inv])
+          );
+
+          // Validate stock and enrich cart items with inventory data
+          const itemsWithInventory = items.map(item => {
+            const inventoryData = inventoryMap.get(item.id);
+            
+            if (!inventoryData) {
+              console.warn(`No inventory data found for product ${item.id}`);
+              return {
+                ...item,
+                inventoryId: item.id, // Fallback to product ID
+              };
+            }
+
+            // Check stock availability
+            if (inventoryData.qtyOnHand < item.qty) {
+              throw new Error(
+                lang === 'id'
+                  ? `Stok tidak cukup untuk ${item.name}. Tersedia: ${inventoryData.qtyOnHand}, Diminta: ${item.qty}`
+                  : `Insufficient stock for ${item.name}. Available: ${inventoryData.qtyOnHand}, Requested: ${item.qty}`
+              );
+            }
+
+            return {
+              ...item,
+              inventoryId: inventoryData.id, // Use the inventory record ID
+              sku: inventoryData.sku,
+              qtyOnHand: inventoryData.qtyOnHand,
+              inventoryPriceTierId: inventoryData.id, // Use inventory ID as price tier ID
+            };
+          });
+
+          console.log('Items enriched with inventory data:', itemsWithInventory);
+
+          // Use enriched items for order creation
+          enrichedItems = itemsWithInventory;
+        } else {
+          console.warn('Inventory API returned non-200 status or no data, proceeding with fallback');
+        }
+      } catch (inventoryError) {
+        console.error('Error fetching inventory:', inventoryError);
+        // If it's a stock validation error, re-throw it
+        if (inventoryError instanceof Error && inventoryError.message.includes('Stok tidak cukup')) {
+          throw inventoryError;
+        }
+        // Otherwise, log and continue with fallback (product IDs)
+        console.warn('Continuing with product IDs as fallback for inventoryId');
+      }
 
       // Get distributor profile ID
       const { data: distributorProfile, error: profileError } = await supabase
@@ -257,39 +328,49 @@ export default function Checkout() {
         throw new Error('Unable to generate unique order number. Please try again.');
       }
 
+      // Calculate order totals
+      const subTotal = totalAmount;
+      const taxRate = 0.11; // 11% tax
+      const taxAmount = Math.round(subTotal * taxRate);
+      const shippingCost = 0; // Can be updated based on shipping selection
+      const orderTotal = subTotal + taxAmount + shippingCost;
+
       // Build external API payload
       const orderPayload = {
-        customerId: user?.id,
+        customerId: user?.id || '',
         companyId: typedDistributorProfile.company_id || '',
-        paymentTypeId: '', // You may need to map this from your payment selection
+        paymentTypeId: '', // Optional - can be added later
         orderType: 'SHOP',
-        wareHouse: 1, // You may want to map this from your form
-        shippingCost: 0, // You may want to map this from your form
-        tax: 11, // Set tax to 11%
+        wareHouse: 1,
+        shippingCost: shippingCost,
+        tax: taxAmount,
+        subTotal: subTotal,
+        total: orderTotal,
         refCode: orderNumber,
-        paymentNotes: deliveryDetails.notes,
-        notes: deliveryDetails.notes,
+        paymentNotes: deliveryDetails.notes || '',
+        notes: deliveryDetails.notes || '',
         deliveryType: 'REGULAR',
-        expeditionName: '', // You may want to map this from your form
-        product: items.map(item => ({
+        expeditionName: '', // Optional - can be added later
+        products: enrichedItems.map(item => ({
           productId: item.id,
           companyId: typedDistributorProfile.company_id || '',
-          inventoryId: item.inventoryId || '',
+          inventoryId: item.inventoryId || item.id, // Fallback to product ID if inventoryId not available
           qty: item.qty,
           neededQty: item.qty,
           price: item.unitPrice,
-          inventoryPriceTierId: item.inventoryPriceTierId || undefined
+          inventoryPriceTierId: item.inventoryPriceTierId,
+          discount: 0,
+          discountAmount: 0,
+          tax: Math.round(item.unitPrice * item.qty * taxRate),
         }))
       };
 
       // Call external order API
       const apiResponse = await createOrder(orderPayload);
-      const statusCode = (apiResponse && typeof apiResponse === 'object' && 'statusCode' in apiResponse)
-        ? (apiResponse as { statusCode?: number }).statusCode
-        : undefined;
+      const statusCode = apiResponse?.statusCode;
 
-      if (statusCode !== 200) {
-        throw new Error('Order API failed. Please try again.');
+      if (statusCode && statusCode !== 200) {
+        throw new Error(apiResponse?.message || 'Order API failed. Please try again.');
       }
 
       // Calculate shipping address based on address type
