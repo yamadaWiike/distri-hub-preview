@@ -22,4 +22,4 @@ export async function getInventory(payload: InventoryPayload) {
 }
 
 // Example usage:
-// await createCustomer({ ... });
+// await getInventory({ ... });
