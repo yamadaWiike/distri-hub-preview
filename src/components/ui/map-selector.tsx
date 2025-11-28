@@ -166,9 +166,10 @@ interface MapSelectorProps {
   onLocationSelected: (lat: number, lng: number) => void;
   onAddressFound?: (address: string) => void;
   initialPosition?: string | null;
+  readOnly?: boolean;
 }
 
-export default function MapSelector({ onLocationSelected, onAddressFound, initialPosition }: MapSelectorProps) {
+export default function MapSelector({ onLocationSelected, onAddressFound, initialPosition, readOnly = false }: MapSelectorProps) {
   const [mapPosition, setMapPosition] = useState<[number, number]>([-6.200000, 106.816666]); // Default to Jakarta
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showResults, setShowResults] = useState(false);
@@ -270,59 +271,61 @@ export default function MapSelector({ onLocationSelected, onAddressFound, initia
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-2 bg-background border-b relative z-10">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchTerm}
-              onChange={handleSearchInput}
-              onKeyDown={(e) => {
-                handleKeyDown(e);
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  searchAddress(searchTerm);
-                }
+      {!readOnly && (
+        <div className="p-2 bg-background border-b relative z-10">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchTerm}
+                onChange={handleSearchInput}
+                onKeyDown={(e) => {
+                  handleKeyDown(e);
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchAddress(searchTerm);
+                  }
+                }}
+                onFocus={() => setShowResults(true)}
+                placeholder="Cari alamat..."
+                className="w-full px-3 py-2 rounded-md border text-sm"
+              />
+              {showResults && searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 bg-background border rounded-md shadow-lg mt-1 max-h-60 overflow-auto z-20 search-results-dropdown">
+                  {searchResults.map(result => (
+                    <button
+                      key={result.place_id}
+                      type="button"
+                      onClick={(e) => handleResultClick(result, e)}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 border-b last:border-0"
+                    >
+                      {result.display_name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                searchAddress(searchTerm);
               }}
-              onFocus={() => setShowResults(true)}
-              placeholder="Cari alamat..."
-              className="w-full px-3 py-2 rounded-md border text-sm"
-            />
-            {showResults && searchResults.length > 0 && (
-              <div className="absolute top-full left-0 right-0 bg-background border rounded-md shadow-lg mt-1 max-h-60 overflow-auto z-20 search-results-dropdown">
-                {searchResults.map(result => (
-                  <button
-                    key={result.place_id}
-                    type="button"
-                    onClick={(e) => handleResultClick(result, e)}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 border-b last:border-0"
-                  >
-                    {result.display_name}
-                  </button>
-                ))}
-              </div>
-            )}
+              className="px-3 py-2 rounded-md bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/90 transition-colors"
+              disabled={isSearching || !searchTerm.trim()}
+            >
+              {isSearching ? 'Mencari...' : 'Cari'}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              searchAddress(searchTerm);
-            }}
-            className="px-3 py-2 rounded-md bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/90 transition-colors"
-            disabled={isSearching || !searchTerm.trim()}
-          >
-            {isSearching ? 'Mencari...' : 'Cari'}
-          </button>
+          {error && (
+            <p className="text-xs text-destructive mt-1">{error}</p>
+          )}
+          <p className="text-xs text-muted-foreground mt-1">
+            Cari alamat, klik hasil pencarian, atau langsung klik pada peta untuk memilih lokasi.
+          </p>
         </div>
-        {error && (
-          <p className="text-xs text-destructive mt-1">{error}</p>
-        )}
-        <p className="text-xs text-muted-foreground mt-1">
-          Cari alamat, klik hasil pencarian, atau langsung klik pada peta untuk memilih lokasi.
-        </p>
-      </div>
+      )}
       <div className="flex-1 relative">
         <div 
           className="h-[310px] rounded-md"
@@ -331,22 +334,34 @@ export default function MapSelector({ onLocationSelected, onAddressFound, initia
           <MapContainer 
             center={mapPosition} 
             zoom={13} 
-            scrollWheelZoom={true} 
+            scrollWheelZoom={!readOnly} 
             className="h-full w-full"
+            dragging={!readOnly}
+            touchZoom={!readOnly}
+            doubleClickZoom={!readOnly}
+            boxZoom={!readOnly}
+            keyboard={!readOnly}
           >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <MapClickHandler 
-              onLocationSelected={(lat, lng) => {
-                setMapPosition([lat, lng]);
-                onLocationSelected(lat, lng);
-              }} 
-              onAddressFetched={handleAddressFetched}
-              getAddressFromCoords={getAddressFromCoords}
-              initialPosition={mapPosition} 
-            />
+            <Marker position={mapPosition}>
+              <Popup>
+                {readOnly ? 'Lokasi Gudang' : 'Lokasi yang dipilih'}
+              </Popup>
+            </Marker>
+            {!readOnly && (
+              <MapClickHandler 
+                onLocationSelected={(lat, lng) => {
+                  setMapPosition([lat, lng]);
+                  onLocationSelected(lat, lng);
+                }} 
+                onAddressFetched={handleAddressFetched}
+                getAddressFromCoords={getAddressFromCoords}
+                initialPosition={mapPosition} 
+              />
+            )}
             <MapRecenter position={mapPosition} />
           </MapContainer>
         </div>

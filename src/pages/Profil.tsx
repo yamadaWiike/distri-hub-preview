@@ -637,13 +637,22 @@ export default function Profil() {
     }
   }, [mapDialogOpen, form.koordinat]);
 
-  // Handle edit map location selection
+  // Handle edit map location selection (temporarily store coordinates)
   const handleEditMapPinSelection = (lat: number, lng: number) => {
-    // Update tempForm with selected coordinates
-    setTempForm(prev => ({
-      ...prev,
-      koordinat: `${lat.toFixed(6)}, ${lng.toFixed(6)}`
-    }));
+    // Store coordinates temporarily without closing the dialog
+    setEditSelectedCoordinates([lat, lng]);
+  };
+  
+  // Confirm and save the selected coordinates
+  const confirmEditMapLocation = () => {
+    if (editSelectedCoordinates) {
+      const [lat, lng] = editSelectedCoordinates;
+      // Update tempForm with selected coordinates in JSON format
+      setTempForm(prev => ({
+        ...prev,
+        koordinat: JSON.stringify({ lat, lng })
+      }));
+    }
     
     // Reset and close
     setEditSelectedCoordinates(null);
@@ -1170,6 +1179,34 @@ export default function Profil() {
                   <p className="font-medium text-gray-900">{form.koordinat || '-'}</p>
                 </div>
                 
+                {/* Map Display */}
+                {form.koordinat && (() => {
+                  try {
+                    const coords = JSON.parse(form.koordinat);
+                    if (coords.lat && coords.lng) {
+                      return (
+                        <div className="sm:col-span-2 mt-4 pt-4 border-t border-gray-200">
+                          <p className="text-gray-700 font-medium mb-3">📍 Lokasi Gudang</p>
+                          <div className="rounded-lg overflow-hidden border border-gray-300 shadow-sm" style={{ height: '300px' }}>
+                            <MapSelector
+                              onLocationSelected={() => {}}
+                              onAddressFound={() => {}}
+                              initialPosition={`${coords.lat},${coords.lng}`}
+                              readOnly={true}
+                            />
+                          </div>
+                          <p className="text-xs text-gray-500 mt-2">
+                            📍 {coords.lat.toFixed(6)}, {coords.lng.toFixed(6)}
+                          </p>
+                        </div>
+                      );
+                    }
+                  } catch (e) {
+                    console.error('Error parsing coordinates:', e);
+                  }
+                  return null;
+                })()}
+                
                 {/* Warehouse Photo */}
                 {form.foto_gudang && (
                   <div className="sm:col-span-2 mt-4 pt-4 border-t border-gray-200">
@@ -1479,49 +1516,118 @@ export default function Profil() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Dokumen NPWP {tempForm.npwp_file_url && <span className="text-green-600 text-xs">(Sudah ada)</span>}
                     </label>
+                    {tempForm.npwp_file_url && (
+                      <div className="mb-2 flex items-center gap-3">
+                        <div 
+                          className="relative w-16 h-16 bg-gray-100 rounded-md overflow-hidden cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0"
+                          onClick={() => setDocumentPreview({ url: getImageUrl(tempForm.npwp_file_url) || '', title: 'Dokumen NPWP' })}
+                        >
+                          <img 
+                            src={getImageUrl(tempForm.npwp_file_url) || ''} 
+                            alt="NPWP Preview"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              target.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                          <div className="absolute inset-0 hidden items-center justify-center text-gray-400 bg-gray-100">
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-medium">Dokumen saat ini</p>
+                          <p className="text-xs text-gray-500">Klik untuk melihat</p>
+                        </div>
+                      </div>
+                    )}
                     <input
                       type="file"
                       accept="image/*,.pdf"
                       onChange={handleFileChange('npwp_file')}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
                     />
-                    {tempForm.npwp_file_url && (
-                      <a href={getImageUrl(tempForm.npwp_file_url) || '#'} download="dokumen-npwp" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
-                        Lihat dokumen saat ini
-                      </a>
-                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Dokumen NIB {tempForm.nib_file_url && <span className="text-green-600 text-xs">(Sudah ada)</span>}
                     </label>
+                    {tempForm.nib_file_url && (
+                      <div className="mb-2 flex items-center gap-3">
+                        <div 
+                          className="relative w-16 h-16 bg-gray-100 rounded-md overflow-hidden cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0"
+                          onClick={() => setDocumentPreview({ url: getImageUrl(tempForm.nib_file_url) || '', title: 'Dokumen NIB' })}
+                        >
+                          <img 
+                            src={getImageUrl(tempForm.nib_file_url) || ''} 
+                            alt="NIB Preview"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              target.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                          <div className="absolute inset-0 hidden items-center justify-center text-gray-400 bg-gray-100">
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-medium">Dokumen saat ini</p>
+                          <p className="text-xs text-gray-500">Klik untuk melihat</p>
+                        </div>
+                      </div>
+                    )}
                     <input
                       type="file"
                       accept="image/*,.pdf"
                       onChange={handleFileChange('nib_file')}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
                     />
-                    {tempForm.nib_file_url && (
-                      <a href={getImageUrl(tempForm.nib_file_url) || '#'} download="dokumen-nib" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
-                        Lihat dokumen saat ini
-                      </a>
-                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Dokumen KTP Pemilik {tempForm.ktp_file_url && <span className="text-green-600 text-xs">(Sudah ada)</span>}
                     </label>
+                    {tempForm.ktp_file_url && (
+                      <div className="mb-2 flex items-center gap-3">
+                        <div 
+                          className="relative w-16 h-16 bg-gray-100 rounded-md overflow-hidden cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0"
+                          onClick={() => setDocumentPreview({ url: getImageUrl(tempForm.ktp_file_url) || '', title: 'Dokumen KTP Pemilik' })}
+                        >
+                          <img 
+                            src={getImageUrl(tempForm.ktp_file_url) || ''} 
+                            alt="KTP Preview"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              target.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                          <div className="absolute inset-0 hidden items-center justify-center text-gray-400 bg-gray-100">
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-medium">Dokumen saat ini</p>
+                          <p className="text-xs text-gray-500">Klik untuk melihat</p>
+                        </div>
+                      </div>
+                    )}
                     <input
                       type="file"
                       accept="image/*,.pdf"
                       onChange={handleFileChange('ktp_file')}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none"
                     />
-                    {tempForm.ktp_file_url && (
-                      <a href={getImageUrl(tempForm.ktp_file_url) || '#'} download="dokumen-ktp" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
-                        Lihat dokumen saat ini
-                      </a>
-                    )}
                   </div>
                   {uploadingFiles && (
                     <p className="text-xs text-orange-600">📤 Mengupload dokumen...</p>
@@ -1656,11 +1762,55 @@ export default function Profil() {
                           {lang === 'id' ? 'Pilih dari Peta' : 'Select from Map'}
                         </Button>
                       </div>
-                      {tempForm.koordinat && (
-                        <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
-                          📍 {tempForm.koordinat}
-                        </div>
-                      )}
+                      {tempForm.koordinat && (() => {
+                        try {
+                          const coords = JSON.parse(tempForm.koordinat.includes('{') ? tempForm.koordinat : `{"lat":${tempForm.koordinat.split(',')[0].trim()},"lng":${tempForm.koordinat.split(',')[1].trim()}}`);
+                          if (coords.lat && coords.lng) {
+                            return (
+                              <div className="mt-3">
+                                <p className="text-xs text-gray-600 mb-2">Preview Lokasi:</p>
+                                <div className="rounded-lg overflow-hidden border border-gray-300 shadow-sm" style={{ height: '200px' }}>
+                                  <MapSelector
+                                    onLocationSelected={() => {}}
+                                    onAddressFound={() => {}}
+                                    initialPosition={`${coords.lat},${coords.lng}`}
+                                    readOnly={true}
+                                  />
+                                </div>
+                                <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
+                                  📍 {coords.lat.toFixed(6)}, {coords.lng.toFixed(6)}
+                                </div>
+                              </div>
+                            );
+                          }
+                        } catch (e) {
+                          // If not JSON format, try parsing as "lat, lng"
+                          try {
+                            const [lat, lng] = tempForm.koordinat.split(',').map(s => parseFloat(s.trim()));
+                            if (!isNaN(lat) && !isNaN(lng)) {
+                              return (
+                                <div className="mt-3">
+                                  <p className="text-xs text-gray-600 mb-2">Preview Lokasi:</p>
+                                  <div className="rounded-lg overflow-hidden border border-gray-300 shadow-sm" style={{ height: '200px' }}>
+                                    <MapSelector
+                                      onLocationSelected={() => {}}
+                                      onAddressFound={() => {}}
+                                      initialPosition={`${lat},${lng}`}
+                                      readOnly={true}
+                                    />
+                                  </div>
+                                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
+                                    📍 {lat.toFixed(6)}, {lng.toFixed(6)}
+                                  </div>
+                                </div>
+                              );
+                            }
+                          } catch (e2) {
+                            console.error('Error parsing coordinates:', e2);
+                          }
+                        }
+                        return null;
+                      })()}
                     </div>
                   </div>
                   <div>
@@ -1988,13 +2138,34 @@ export default function Profil() {
                 }}
               />
             </div>
+            {editSelectedCoordinates && (
+              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm font-medium text-green-800 mb-1">
+                  📍 {lang === 'id' ? 'Lokasi Terpilih:' : 'Selected Location:'}
+                </p>
+                <p className="text-xs text-green-700">
+                  Lat: {editSelectedCoordinates[0].toFixed(6)}, Lng: {editSelectedCoordinates[1].toFixed(6)}
+                </p>
+              </div>
+            )}
             <div className="flex justify-end gap-3 mt-4">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setEditMapDialogOpen(false)}
+                onClick={() => {
+                  setEditSelectedCoordinates(null);
+                  setEditMapDialogOpen(false);
+                }}
               >
                 {lang === 'id' ? 'Batal' : 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                onClick={confirmEditMapLocation}
+                disabled={!editSelectedCoordinates}
+                className="bg-orange-500 hover:bg-orange-600"
+              >
+                {lang === 'id' ? 'Konfirmasi Lokasi' : 'Confirm Location'}
               </Button>
             </div>
           </DialogContent>
