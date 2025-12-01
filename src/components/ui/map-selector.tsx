@@ -36,11 +36,8 @@ function useAddressSearch() {
           addressdetails: 1,
           limit: 5,
           countrycodes: 'id', // Limit to Indonesia
+          'accept-language': 'id', // Indonesian language results (as param to avoid CORS)
         },
-        headers: {
-          'Accept-Language': 'id', // Indonesian language results
-          'User-Agent': 'Baskit Distributor Hub App'
-        }
       });
       
       setSearchResults(response.data);
@@ -66,11 +63,8 @@ function useAddressSearch() {
           format: 'json',
           addressdetails: 1,
           zoom: 18,
+          'accept-language': 'id', // Indonesian language results (as param to avoid CORS)
         },
-        headers: {
-          'Accept-Language': 'id', // Indonesian language results
-          'User-Agent': 'Baskit Distributor Hub App'
-        }
       });
       
       if (response.data && response.data.display_name) {

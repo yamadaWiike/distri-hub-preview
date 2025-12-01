@@ -23,6 +23,8 @@ type ExtendedDistributorProfile =
     npwp_number?: string;
     nib_number?: string;
     alamat_gudang?: string;
+    companyWebsite?: string;
+    postal_code?: string;
   };
 
 // Indonesian Cities and Regencies
@@ -625,7 +627,7 @@ export default function LengkapiProfil() {
   const [isLocating, setIsLocating] = useState(false);
   const [areaSearch, setAreaSearch] = useState("");
 
-  const [existingData, setExistingData] = useState(null);
+  const [existingData, setExistingData] = useState<ExtendedDistributorProfile | null>(null);
 
   // Debug logging
   useEffect(() => {
@@ -740,7 +742,9 @@ export default function LengkapiProfil() {
       }
     };
 
-  const handleNext = () => {
+  const handleNext = (e?: React.MouseEvent<HTMLButtonElement>) => {
+    e?.preventDefault();
+    
     console.log("=== handleNext called ===");
     console.log("currentStep:", currentStep);
     console.log("Stack trace:", new Error().stack);
@@ -814,7 +818,7 @@ export default function LengkapiProfil() {
 
       if (error) throw error;
 
-      const companyTypeId = "9cd7553a-1e03-4ed1-86d2-967cdf185bdb"; // ID for Distributor on ERP
+      const companyTypeId = "9cd7553a-1e03-4ed1-86d2-967cdf185bdb"; // ID for Distributor Type on ERP
       const customerPayload: CustomerPayload = {
         companyName: form.nama_perusahaan,
         phone: form.nomor_kontak_perusahaan,
@@ -825,22 +829,22 @@ export default function LengkapiProfil() {
         childType: "", // Default to distributor
         districtId: 0, // TODO: Add district selection to form
         detailAddress: form.alamat_perusahaan,
-        companyWebsite: existingData.companyWebsite,
+        companyWebsite: existingData?.companyWebsite || "",
         notes: "",
-        postalCode: existingData.postal_code,
+        postalCode: existingData?.postal_code || "",
         billingAddress: {
           address: form.alamat_perusahaan,
           district: "", // TODO: Add district field to form
           city: "", // TODO: Add city field to form
           province: "", // TODO: Add province field to form
-          zipcode: existingData.postal_code,
+          zipcode: existingData?.postal_code || "",
         },
         shippingAddress: {
           address: form.alamat_gudang || form.alamat_perusahaan,
           district: "", // TODO: Add district field to form
           city: "", // TODO: Add city field to form
           province: "", // TODO: Add province field to form
-          zipcode: existingData.postal_code,
+          zipcode: existingData?.postal_code || "",
         },
         primaryContact: {
           name: form.nama_pic || form.nama_pemilik,
