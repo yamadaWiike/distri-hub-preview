@@ -204,6 +204,19 @@ export default function LengkapiProfil() {
         navigate("/masuk");
         return;
       }
+      
+      // Validate user ID is a proper UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(user.id)) {
+        console.error('Invalid user ID format:', user.id);
+        toast({
+          title: "Error",
+          description: "Invalid user session. Please log in again.",
+          variant: "destructive"
+        });
+        navigate("/masuk");
+        return;
+      }
 
       try {
         setIsLoading(true);
@@ -388,60 +401,28 @@ export default function LengkapiProfil() {
         district_name: form.districtName,
       };
 
+      // Update profile data and set status to waiting_activation (KYB completed)
+      const updateDataWithStatus = {
+        ...updateData,
+        status: 'waiting_activation' // KYB completed, waiting for admin activation
+      };
+
       const { error } = await supabase
         .from("distributor_profiles")
         // @ts-expect-error - Type mismatch with Supabase generated types
-        .update(updateData)
+        .update(updateDataWithStatus)
         .eq("user_id", user!.id);
 
       if (error) throw error;
 
-      const companyTypeId = "9cd7553a-1e03-4ed1-86d2-967cdf185bdb"; // ID for Distributor Type on ERP
-      const customerPayload: CustomerPayload = {
-        companyName: form.nama_perusahaan,
-        phone: form.nomor_kontak_perusahaan,
-        email: form.email_perusahaan,
-        companyTypeId: companyTypeId,
-        assignedUsersId: [], // TODO: Add assigned user
-        parentCompanyId: "", // TODO: Add parent company selection if needed
-        childType: "", // Default to distributor
-        districtId: parseInt(form.districtId), // Use actual district ID
-        detailAddress: form.alamat_perusahaan,
-        companyWebsite: existingData?.companyWebsite || "",
-        notes: "",
-        postalCode: existingData?.postal_code || "",
-        billingAddress: {
-          address: form.alamat_perusahaan,
-          district: form.districtName,
-          city: form.regencyName,
-          province: form.provinsiName,
-          zipcode: existingData?.postal_code || "",
-        },
-        shippingAddress: {
-          address: form.alamat_gudang || form.alamat_perusahaan,
-          district: form.districtName,
-          city: form.regencyName,
-          province: form.provinsiName,
-          zipcode: existingData?.postal_code || "",
-        },
-        primaryContact: {
-          name: form.nama_pic || form.nama_pemilik,
-          email: form.email_pic || form.email_pemilik,
-          phone: form.nomor_kontak_pic || form.kontak_pemilik,
-          jobTitle: form.posisi_pic || "Owner",
-          leadSource: "distributor-hub",
-        },
-      };
-
-      // Call the createCustomer API
-      await createCustomer(customerPayload);
+      // Note: Customer API will be called when admin activates the account (status = 'active')
 
       toast({
-        title: lang === "id" ? "Berhasil" : "Success",
+        title: lang === "id" ? "Profil Lengkap" : "Profile Complete",
         description:
           lang === "id"
-            ? "Profil berhasil diperbarui"
-            : "Profile updated successfully",
+            ? "Profil KYB telah lengkap. Menunggu aktivasi dari admin."
+            : "KYB profile is complete. Waiting for admin activation.",
       });
 
       navigate("/profil");

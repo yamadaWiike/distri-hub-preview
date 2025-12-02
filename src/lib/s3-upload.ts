@@ -27,7 +27,7 @@ const s3Client = !isDevelopment ? new S3Client({
 const BUCKET_NAME = import.meta.env.VITE_AWS_BUCKET;
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB in bytes
 const MAX_UNCOMPRESSED_SIZE = 10 * 1024 * 1024; // 10MB - reject files larger than this even before compression
-const MAX_STORAGE_SIZE = 4 * 1024 * 1024; // 4MB - maximum size for localStorage (base64 increases size by ~33%)
+const MAX_STORAGE_SIZE = 2 * 1024 * 1024; // 2MB - maximum size for localStorage (base64 increases size by ~33%, so this gives us ~2.7MB max in base64)
 
 export interface UploadResult {
   success: boolean;
@@ -42,8 +42,11 @@ export interface UploadResult {
  * @returns Compressed file
  */
 async function compressImage(file: File, maxSizeInBytes: number = MAX_FILE_SIZE): Promise<File> {
-  // If file is already smaller than max size, return as-is
-  if (file.size <= maxSizeInBytes) {
+  // For development localStorage, use more aggressive compression
+  const targetSize = isDevelopment ? Math.min(maxSizeInBytes, 1.5 * 1024 * 1024) : maxSizeInBytes; // 1.5MB max for dev
+  
+  // If file is already smaller than target size, return as-is
+  if (file.size <= targetSize) {
     return file;
   }
 
@@ -60,13 +63,35 @@ async function compressImage(file: File, maxSizeInBytes: number = MAX_FILE_SIZE)
         let width = img.width;
         let height = img.height;
         
-        // Calculate initial scale to get close to target size
-        const scaleFactor = Math.sqrt(maxSizeInBytes / file.size);
+        // More aggressive scaling for localStorage
+        let scaleFactor = Math.sqrt(targetSize / file.size);
+        
+        // Additional size reduction for very large images in development
+        if (isDevelopment && file.size > 3 * 1024 * 1024) {
+          scaleFactor *= 0.8; // Extra 20% reduction for localStorage
+        }
+        
         width *= scaleFactor;
         height *= scaleFactor;
         
-        canvas.width = width;
-        canvas.height = height;
+        // Ensure minimum reasonable dimensions
+        const minDimension = 200;
+        const maxDimension = isDevelopment ? 1200 : 1600;
+        
+        if (width < minDimension || height < minDimension) {
+          const scale = minDimension / Math.min(width, height);
+          width *= scale;
+          height *= scale;
+        }
+        
+        if (width > maxDimension || height > maxDimension) {
+          const scale = maxDimension / Math.max(width, height);
+          width *= scale;
+          height *= scale;
+        }
+        
+        canvas.width = Math.round(width);
+        canvas.height = Math.round(height);
         
         const ctx = canvas.getContext('2d');
         if (!ctx) {
@@ -74,37 +99,42 @@ async function compressImage(file: File, maxSizeInBytes: number = MAX_FILE_SIZE)
           return;
         }
         
-        ctx.drawImage(img, 0, 0, width, height);
+        // Enable image smoothing for better quality
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         
-        // Try different quality levels to hit target size
-        const quality = 0.9;
-        const compressedBlob: Blob | null = null;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        // Start with lower quality for development to save storage space
+        const startingQuality = isDevelopment ? 0.7 : 0.9;
         
         const tryCompress = (q: number) => {
           canvas.toBlob(
             (blob) => {
               if (blob) {
-                if (blob.size <= maxSizeInBytes || q <= 0.1) {
+                if (blob.size <= targetSize || q <= 0.1) {
                   // Successfully compressed or reached minimum quality
                   const compressedFile = new File([blob], file.name, {
-                    type: file.type,
+                    type: file.type === 'image/png' ? 'image/jpeg' : file.type, // Convert PNG to JPEG for better compression
                     lastModified: Date.now(),
                   });
+                  
+                  console.log(`Compression result: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB (${(compressedFile.size / file.size * 100).toFixed(1)}%)`);
                   resolve(compressedFile);
                 } else {
                   // Try lower quality
-                  tryCompress(q - 0.1);
+                  tryCompress(Math.max(0.1, q - 0.1));
                 }
               } else {
                 reject(new Error('Failed to compress image'));
               }
             },
-            file.type,
+            file.type === 'image/png' ? 'image/jpeg' : file.type, // Convert PNG to JPEG for better compression
             q
           );
         };
         
-        tryCompress(quality);
+        tryCompress(startingQuality);
       };
       
       img.onerror = () => {
@@ -173,10 +203,12 @@ export async function uploadFileToS3(
       throw new Error(`File size (${sizeMB}MB) exceeds maximum allowed size of ${maxSizeMB}MB. Please choose a smaller image.`);
     }
     
-    // Compress image if it's an image file
+    // Compress image if it's an image file BEFORE any localStorage operations
     let processedFile = file;
     if (file.type.startsWith('image/')) {
       console.log(`Original file size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+      
+      // Compress first to avoid localStorage quota issues
       processedFile = await compressImage(file);
       console.log(`Compressed file size: ${(processedFile.size / 1024 / 1024).toFixed(2)}MB`);
       
@@ -190,40 +222,80 @@ export async function uploadFileToS3(
 
     // Development mode - use localStorage with cleanup
     if (isDevelopment) {
-      const dataURL = await fileToDataURL(processedFile);
+      // Clean up old images BEFORE processing the new one
+      const storageKeys = Object.keys(localStorage).filter(key => key.startsWith(folder));
+      
+      // More aggressive cleanup - keep only 5 most recent images
+      if (storageKeys.length > 5) {
+        const sortedKeys = storageKeys.sort();
+        const keysToRemove = sortedKeys.slice(0, storageKeys.length - 5);
+        keysToRemove.forEach(key => {
+          try {
+            localStorage.removeItem(key);
+          } catch (e) {
+            console.warn(`Failed to remove key: ${key}`, e);
+          }
+        });
+        console.log(`[DEV] Cleaned up ${keysToRemove.length} old images from localStorage`);
+      }
+      
+      // Also clean up any non-folder specific old files to free space
+      const allKeys = Object.keys(localStorage);
+      const imageKeys = allKeys.filter(key => 
+        key.includes('-') && 
+        (key.endsWith('.jpg') || key.endsWith('.jpeg') || key.endsWith('.png') || key.endsWith('.webp'))
+      );
+      if (imageKeys.length > 20) {
+        const sortedImageKeys = imageKeys.sort();
+        const keysToRemove = sortedImageKeys.slice(0, imageKeys.length - 20);
+        keysToRemove.forEach(key => {
+          try {
+            localStorage.removeItem(key);
+          } catch (e) {
+            console.warn(`Failed to remove image key: ${key}`, e);
+          }
+        });
+        console.log(`[DEV] Cleaned up ${keysToRemove.length} old image files from localStorage`);
+      }
+      
       const timestamp = Date.now();
       const randomString = Math.random().toString(36).substring(2, 15);
       const fileExtension = processedFile.name.split('.').pop();
       const storageKey = `${folder}/${timestamp}-${randomString}.${fileExtension}`;
       
       try {
-        // Clean up old images if storage is getting full
-        const storageKeys = Object.keys(localStorage).filter(key => key.startsWith(folder));
-        
-        // If we have more than 10 images in this folder, remove the oldest ones
-        if (storageKeys.length > 10) {
-          const sortedKeys = storageKeys.sort();
-          const keysToRemove = sortedKeys.slice(0, storageKeys.length - 10);
-          keysToRemove.forEach(key => localStorage.removeItem(key));
-          console.log(`[DEV] Cleaned up ${keysToRemove.length} old images from localStorage`);
-        }
+        // Convert to data URL only AFTER compression and cleanup
+        const dataURL = await fileToDataURL(processedFile);
         
         // Store in localStorage
         localStorage.setItem(storageKey, dataURL);
         console.log(`[DEV] File stored in localStorage: ${storageKey}`);
       } catch (error) {
-        // If quota exceeded, clear all images from this folder and try again
-        console.warn('[DEV] localStorage quota exceeded, clearing old images...');
-        const storageKeys = Object.keys(localStorage).filter(key => key.startsWith(folder));
-        storageKeys.forEach(key => localStorage.removeItem(key));
+        console.error('[DEV] Failed to store file in localStorage:', error);
         
-        // Try storing again after cleanup
+        // If still fails, do emergency cleanup and try one more time
+        console.warn('[DEV] Doing emergency localStorage cleanup...');
         try {
+          // Clear all image-related items
+          const allStorageKeys = Object.keys(localStorage);
+          const imageStorageKeys = allStorageKeys.filter(key => 
+            key.includes('/') || key.includes('-') && 
+            (key.endsWith('.jpg') || key.endsWith('.jpeg') || key.endsWith('.png') || key.endsWith('.webp'))
+          );
+          imageStorageKeys.forEach(key => {
+            try {
+              localStorage.removeItem(key);
+            } catch (e) {
+              console.warn(`Failed to remove storage key: ${key}`, e);
+            }
+          });
+          
+          // Try one more time after emergency cleanup
+          const dataURL = await fileToDataURL(processedFile);
           localStorage.setItem(storageKey, dataURL);
-          console.log(`[DEV] File stored in localStorage after cleanup: ${storageKey}`);
+          console.log(`[DEV] File stored in localStorage after emergency cleanup: ${storageKey}`);
         } catch (retryError) {
-          console.error('[DEV] Failed to store file even after cleanup:', retryError);
-          // Image is too large even after cleanup
+          console.error('[DEV] Failed to store file even after emergency cleanup:', retryError);
           throw new Error('Failed to upload image: File is too large for storage. Please use a smaller image (recommended: under 2MB).');
         }
       }

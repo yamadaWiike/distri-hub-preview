@@ -12,9 +12,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { createCustomer, type CustomerPayload } from '@/lib/baskitApiCustomer';
 import { useLanguage } from '@/hooks/use-language';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { createCustomer } from '@/lib/baskitApiCustomer';
+
 
 // Define distributor profile type based on actual database schema
 type DistributorProfile = {
@@ -128,100 +137,111 @@ const DistributorManager = () => {
     });
   };
 
-  // Add this function to handle status change and API call
+  // Handle status change using actual database status values
   const handleStatusChange = async (distributor: DistributorProfile, newStatus: string) => {
     try {
-      // Normalize status value
-      const statusMap = {
-        'aktif': 'active',
-        'active': 'active',
-        'approved': 'active',
-        'disetujui': 'active',
-        'menunggu': 'pending',
-        'waiting': 'pending',
-      };
-      const normalizedStatus = statusMap[newStatus] || newStatus;
-      // Get previous status before update
-      const previousStatus = distributor.status;
+      // Update status in Supabase directly
       const { error } = await supabase
         .from('distributor_profiles')
         // @ts-expect-error - Type mismatch with Supabase generated types
-        .update({ status: normalizedStatus })
-        .eq('id', distributor.id);
+        .update({ status: newStatus })
+        .eq('user_id', distributor.user_id);
+      
       if (error) throw error;
-      toast({ title: 'Status updated', variant: 'default' });
-      // Always call API and log when status is set to 'active'
-      if (normalizedStatus === 'active') {
-        const payload = {
-          companyName: distributor.nama_bisnis,
-          phone: distributor.kontak_pemilik,
-          email: distributor.email || '',
-          companyTypeId: '1', // Default company type
-          assignedUsersId: [], // Empty array for now
-          parentCompanyId: '', // Empty for independent distributors
-          childType: 'distributor',
-          districtId: 0,
-          detailAddress: distributor.alamat_lengkap,
-          companyWebsite: '',
-          notes: `Auto-created from distributor profile approval`,
-          postalCode: '',
-          billingAddress: {
-            address: distributor.alamat_lengkap,
-            district: distributor.kota,
-            city: distributor.kota,
-            province: '',
-            zipcode: ''
-          },
-          shippingAddress: {
-            address: distributor.alamat_lengkap,
-            district: distributor.kota,
-            city: distributor.kota,
-            province: '',
-            zipcode: ''
-          },
-          primaryContact: {
-            name: distributor.nama_pemilik,
-            email: distributor.email || '',
-            phone: distributor.kontak_pemilik,
-            jobTitle: 'Owner',
-            leadSource: 'distributor-hub'
-          },
-        };
-        
-        console.log('[DistributorManager] Registering distributor in Baskit API:', {
-          distributorId: distributor.id,
-          previousStatus,
-          newStatus: normalizedStatus
-        });
-        
+      
+      toast({ title: t.statusUpdated, variant: 'default' });
+      
+      // Only call customer API when status becomes 'active' (approved)
+      if (newStatus === 'active') {
         try {
-          const response = await createCustomer(payload);
-          console.log('createCustomer API response:', response);
-          // If response is an object, check statusCode property
-          const statusCode = (response && typeof response === 'object' && 'statusCode' in response)
-            ? (response as { statusCode?: number }).statusCode
-            : undefined;
-          if (statusCode === 200) {
-            toast({ title: 'Customer created in Baskit API', variant: 'default' });
+          // Build comprehensive payload for createCustomer API
+          const payload: CustomerPayload = {
+            companyName: distributor.nama_bisnis,
+            phone: distributor.kontak_pemilik,
+            email: distributor.email || '',
+            companyTypeId: '1', // Default company type ID
+            assignedUsersId: [], // TODO: Add assigned users if needed
+            parentCompanyId: '', // Independent distributor
+            childType: 'distributor',
+            districtId: 0, // Default district ID since field doesn't exist
+            detailAddress: distributor.alamat_lengkap,
+            companyWebsite: '',
+            notes: `Auto-created from distributor approval`,
+            postalCode: '',
+            billingAddress: {
+              address: distributor.alamat_lengkap,
+              district: distributor.kota,
+              city: distributor.kota,
+              province: '',
+              zipcode: ''
+            },
+            shippingAddress: {
+              address: distributor.alamat_lengkap,
+              district: distributor.kota,
+              city: distributor.kota,
+              province: '',
+              zipcode: ''
+            },
+            primaryContact: {
+              name: distributor.nama_pemilik,
+              email: distributor.email || '',
+              phone: distributor.kontak_pemilik,
+              jobTitle: 'Owner',
+              leadSource: 'distributor-hub'
+            }
+          };
+          
+          // Call createCustomer API
+          const result = await createCustomer(payload);
+          
+          // Handle API response based on actual return type
+          console.log('createCustomer API response:', result);
+          
+          // Check if the response indicates success (adapt based on your API response format)
+          const isSuccess = result && typeof result === 'object' && 
+            ('statusCode' in result ? (result as { statusCode?: number }).statusCode === 200 : true);
+          
+          if (isSuccess) {
+            toast({ title: t.success, description: 'Customer registered in Baskit API successfully', variant: 'default' });
           } else {
-            toast({ title: 'Failed to create customer in Baskit API', variant: 'destructive' });
+            toast({ title: t.error, description: 'Failed to create customer in Baskit API', variant: 'destructive' });
           }
         } catch (apiError) {
           console.error('createCustomer API error:', apiError);
-          toast({ title: 'API error', description: apiError instanceof Error ? apiError.message : String(apiError), variant: 'destructive' });
+          toast({ title: t.error, description: apiError instanceof Error ? apiError.message : String(apiError), variant: 'destructive' });
         }
       }
+      
+      // Refresh distributors list
       fetchDistributors();
     } catch (err) {
       console.error('Status update error:', err);
-      toast({ title: 'Error', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
+      toast({ title: t.error, description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
     }
+  };
+
+  // Get status badge color and label using actual database values
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      'pending': { color: 'bg-yellow-500 text-white', label: t.pending },
+      'waiting_activation': { color: 'bg-blue-500 text-white', label: t.waitingActivation },
+      'active': { color: 'bg-green-500 text-white', label: t.active },
+      'inactive': { color: 'bg-gray-500 text-white', label: t.inactive },
+      'rejected': { color: 'bg-red-500 text-white', label: t.rejected },
+    };
+    
+    const config = statusConfig[status] || { color: 'bg-gray-400 text-white', label: status };
+    return (
+      <Badge className={config.color}>
+        {config.label}
+      </Badge>
+    );
   };
 
   return (
     <div className="space-y-6">
       {/* Header with Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t.totalDistributors}</CardTitle>
@@ -235,36 +255,40 @@ const DistributorManager = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t.thisMonth}</CardTitle>
+            <CardTitle className="text-sm font-medium">{t.activeDistributors}</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {distributors.filter(d => {
-                const createdDate = new Date(d.created_at);
-                const now = new Date();
-                return createdDate.getMonth() === now.getMonth() && createdDate.getFullYear() === now.getFullYear();
-              }).length}
+              {distributors.filter(d => d.status === 'active').length}
             </div>
-            <p className="text-xs text-muted-foreground">{t.newRegistrations}</p>
+            <p className="text-xs text-muted-foreground">{t.approvedAndActive}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t.recentActivity}</CardTitle>
+            <CardTitle className="text-sm font-medium">{t.pendingApproval}</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {distributors.filter(d => {
-                const updatedDate = new Date(d.updated_at);
-                const dayAgo = new Date();
-                dayAgo.setDate(dayAgo.getDate() - 7);
-                return updatedDate > dayAgo;
-              }).length}
+              {distributors.filter(d => d.status === 'pending').length}
             </div>
-            <p className="text-xs text-muted-foreground">{t.lastWeek}</p>
+            <p className="text-xs text-muted-foreground">{t.awaitingReview}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{t.waitingActivation}</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {distributors.filter(d => d.status === 'waiting_activation').length}
+            </div>
+            <p className="text-xs text-muted-foreground">{t.kybCompleted}</p>
           </CardContent>
         </Card>
       </div>
@@ -322,13 +346,24 @@ const DistributorManager = () => {
                     <TableCell>{distributor.kontak_pemilik}</TableCell>
                     <TableCell>{distributor.kota}</TableCell>
                     <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        distributor.status === 'active' ? 'bg-green-100 text-green-800' :
-                        distributor.status === 'inactive' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {distributor.status}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(distributor.status)}
+                        <Select
+                          value={distributor.status}
+                          onValueChange={(newStatus) => handleStatusChange(distributor, newStatus)}
+                        >
+                          <SelectTrigger className="w-auto h-6 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">{t.pending}</SelectItem>
+                            <SelectItem value="waiting_activation">{t.waitingActivation}</SelectItem>
+                            <SelectItem value="active">{t.active}</SelectItem>
+                            <SelectItem value="inactive">{t.inactive}</SelectItem>
+                            <SelectItem value="rejected">{t.rejected}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </TableCell>
                     <TableCell>{formatDate(distributor.created_at || '')}</TableCell>
                     <TableCell>
@@ -402,6 +437,16 @@ const translations = {
     status: "Status",
     cancel: "Batal",
     saveChanges: "Simpan Perubahan",
+    statusUpdated: "Status berhasil diperbarui",
+    success: "Berhasil",
+    error: "Error",
+    pending: "Menunggu Persetujuan",
+    waitingActivation: "Menunggu Aktivasi",
+    active: "Aktif",
+    inactive: "Tidak Aktif",
+    rejected: "Ditolak",
+    changeStatus: "Ubah Status",
+    kybCompleted: "KYB selesai",
     confirmDelete: "Apakah Anda yakin ingin menghapus distributor ini?",
     distributorUpdated: "Distributor Diperbarui",
     distributorUpdatedDesc: "Informasi distributor berhasil diperbarui",
@@ -409,7 +454,11 @@ const translations = {
     distributorDeletedDesc: "Distributor berhasil dihapus dari sistem",
     errorFetching: "Gagal Memuat Data",
     errorUpdating: "Gagal Memperbarui",
-    errorDeleting: "Gagal Menghapus"
+    errorDeleting: "Gagal Menghapus",
+    activeDistributors: "Distributor Aktif",
+    approvedAndActive: "disetujui & aktif",
+    pendingApproval: "Menunggu Persetujuan",
+    awaitingReview: "menunggu tinjauan"
   },
   en: {
     totalDistributors: "Total Distributors",
@@ -444,6 +493,16 @@ const translations = {
     status: "Status",
     cancel: "Cancel",
     saveChanges: "Save Changes",
+    statusUpdated: "Status updated successfully",
+    success: "Success",
+    error: "Error",
+    pending: "Pending Approval",
+    waitingActivation: "Waiting Activation",
+    active: "Active",
+    inactive: "Inactive",
+    rejected: "Rejected",
+    changeStatus: "Change Status",
+    kybCompleted: "KYB completed",
     confirmDelete: "Are you sure you want to delete this distributor?",
     distributorUpdated: "Distributor Updated",
     distributorUpdatedDesc: "Distributor information updated successfully",
@@ -451,6 +510,10 @@ const translations = {
     distributorDeletedDesc: "Distributor successfully removed from system",
     errorFetching: "Failed to Fetch Data",
     errorUpdating: "Failed to Update",
-    errorDeleting: "Failed to Delete"
+    errorDeleting: "Failed to Delete",
+    activeDistributors: "Active Distributors",
+    approvedAndActive: "approved & active",
+    pendingApproval: "Pending Approval",
+    awaitingReview: "awaiting review"
   }
 };

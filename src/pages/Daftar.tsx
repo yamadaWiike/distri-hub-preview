@@ -132,34 +132,76 @@ export default function Daftar() {
       return;
     }
     
-    await register({
-      email: form.email,
-      password: form.password,
-      namaBisnis: form.namaBisnis,
-      alamatLengkap: form.alamatLengkap,
-      provinsiId: form.provinsiId,
-      provinceName: form.provinsiName,
-      regencyId: form.regencyId,
-      regencyName: form.regencyName,
-      districtId: form.districtId,
-      districtName: form.districtName,
-      kota: form.regencyName, // Keep for backward compatibility
-      namaPemilik: form.namaPemilik,
-      kontakPemilik: form.nomorHpPemilik, // Using the renamed field but keeping the API parameter name
-      // Additional company information
-      emailPerusahaan: form.emailPerusahaan,
-      nomorTelpPerusahaan: form.nomorTelpPerusahaan,
-      namaDirektur: form.namaDirektur,
-      statusPkp: form.statusPkp,
-      npwpNumber: form.npwpNumber,
-      nibNumber: form.nibNumber,
-      // KYB Documents
-      storePhotoUrl: form.fotoTokoUrl,
-      ktpUrl: form.ktpUrl,
-      aktaUrl: form.aktaUrl,
-      npwpUrl: form.npwpUrl,
-    });
-    navigate('/daftar-produk');
+    try {
+      await register({
+        email: form.email,
+        password: form.password,
+        namaBisnis: form.namaBisnis,
+        alamatLengkap: form.alamatLengkap,
+        provinsiId: form.provinsiId,
+        provinceName: form.provinsiName,
+        regencyId: form.regencyId,
+        regencyName: form.regencyName,
+        districtId: form.districtId,
+        districtName: form.districtName,
+        kota: form.regencyName, // Keep for backward compatibility
+        namaPemilik: form.namaPemilik,
+        kontakPemilik: form.nomorHpPemilik, // Using the renamed field but keeping the API parameter name
+        // Additional company information
+        emailPerusahaan: form.emailPerusahaan,
+        nomorTelpPerusahaan: form.nomorTelpPerusahaan,
+        namaDirektur: form.namaDirektur,
+        statusPkp: form.statusPkp,
+        npwpNumber: form.npwpNumber,
+        nibNumber: form.nibNumber,
+        // KYB Documents
+        storePhotoUrl: form.fotoTokoUrl,
+        ktpUrl: form.ktpUrl,
+        aktaUrl: form.aktaUrl,
+        npwpUrl: form.npwpUrl,
+      });
+      navigate('/daftar-produk');
+    } catch (error) {
+      console.error('Registration error:', error);
+      
+      if (error instanceof Error) {
+        if (error.message.includes('User already registered') || error.message.includes('already been registered')) {
+          toast({
+            title: lang === 'id' ? "Email Sudah Terdaftar" : "Email Already Registered",
+            description: lang === 'id' 
+              ? "Email ini sudah terdaftar. Silakan gunakan email lain atau masuk dengan akun yang sudah ada." 
+              : "This email is already registered. Please use a different email or sign in with your existing account.",
+            variant: "destructive"
+          });
+        } else if (error.message.includes('Invalid email') || error.message.includes('email')) {
+          toast({
+            title: lang === 'id' ? "Email Tidak Valid" : "Invalid Email",
+            description: lang === 'id' 
+              ? "Format email tidak valid. Silakan periksa kembali." 
+              : "Invalid email format. Please check and try again.",
+            variant: "destructive"
+          });
+        } else if (error.message.includes('Password') || error.message.includes('password')) {
+          toast({
+            title: lang === 'id' ? "Password Tidak Valid" : "Invalid Password",
+            description: lang === 'id' 
+              ? "Password harus minimal 8 karakter dan mengandung kombinasi huruf dan angka." 
+              : "Password must be at least 8 characters with letters and numbers.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: lang === 'id' ? "Gagal Mendaftar" : "Registration Failed",
+            description: lang === 'id' 
+              ? "Terjadi kesalahan saat mendaftar. Silakan coba lagi." 
+              : "An error occurred during registration. Please try again.",
+            variant: "destructive"
+          });
+        }
+      }
+      
+      setIsSubmitting(false);
+    }
   };
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });

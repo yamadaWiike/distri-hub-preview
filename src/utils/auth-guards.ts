@@ -24,7 +24,8 @@ export interface AuthValidationResult {
   hasRole: (role: string) => boolean;
   isAdmin: boolean;
   isApproved: boolean;
-  canAccessAPI: boolean;
+  canAccessAPI: boolean; // Can place orders - only active users
+  canViewPrices: boolean; // Can see prices - pending, waiting_activation, active users
 }
 
 /**
@@ -55,8 +56,8 @@ export async function validateAuth(): Promise<AuthValidationResult> {
       .maybeSingle();
 
     const userRole = user.app_metadata?.role || 'user';
-    const userStatus: 'pending' | 'active' | 'inactive' | 'rejected' = 
-      (profile as UserProfile)?.status as 'pending' | 'active' | 'inactive' | 'rejected' || 'pending';
+    const userStatus: 'pending' | 'waiting_activation' | 'active' | 'inactive' | 'rejected' = 
+      (profile as UserProfile)?.status as 'pending' | 'waiting_activation' | 'active' | 'inactive' | 'rejected' || 'pending';
     const isApproved = userStatus === 'active';
     const isAdmin = userRole === 'admin';
 
@@ -77,7 +78,8 @@ export async function validateAuth(): Promise<AuthValidationResult> {
       hasRole: (role: string) => userRole === role,
       isAdmin,
       isApproved,
-      canAccessAPI: isApproved || isAdmin // Admin can access even if not approved
+      canAccessAPI: isApproved || isAdmin, // Only active users and admins can place orders
+      canViewPrices: isApproved || isAdmin || userStatus === 'waiting_activation' || userStatus === 'pending' // Can see prices but not order
     };
 
   } catch (error) {
@@ -96,7 +98,8 @@ function createUnauthenticatedResult(): AuthValidationResult {
     hasRole: () => false,
     isAdmin: false,
     isApproved: false,
-    canAccessAPI: false
+    canAccessAPI: false,
+    canViewPrices: false
   };
 }
 
@@ -112,14 +115,21 @@ export async function requireAuth(): Promise<AuthValidationResult> {
   }
   
   if (!authResult.canAccessAPI) {
-    throw new Error('Account approval required. Your account is pending approval by an administrator.');
+    const status = authResult.user?.status;
+    if (status === 'pending') {
+      throw new Error('Please complete your profile (KYB) to continue.');
+    } else if (status === 'waiting_activation') {
+      throw new Error('Your account is waiting for admin activation. You can view products but cannot place orders yet.');
+    } else {
+      throw new Error('Account approval required. Your account is pending approval by an administrator.');
+    }
   }
   
   return authResult;
 }
 
 /**
- * Authentication guard for viewing products (allows pending users)
+ * Authentication guard for viewing products (allows all authenticated users)
  * Only requires authentication, not approval
  */
 export async function requireAuthForViewing(): Promise<AuthValidationResult> {
@@ -129,7 +139,50 @@ export async function requireAuthForViewing(): Promise<AuthValidationResult> {
     throw new Error('Authentication required. Please log in to access this resource.');
   }
   
-  // Allow pending users to view products (just not prices/order)
+  // Allow all authenticated users to view products
+  return authResult;
+}
+
+/**
+ * Authentication guard for viewing prices
+ * Allows pending, waiting_activation, and active users to see prices
+ */
+export async function requireAuthForPrices(): Promise<AuthValidationResult> {
+  const authResult = await validateAuth();
+  
+  if (!authResult.isAuthenticated) {
+    throw new Error('Authentication required. Please log in to access this resource.');
+  }
+  
+  if (!authResult.canViewPrices) {
+    throw new Error('Complete your profile to view prices.');
+  }
+  
+  return authResult;
+}
+
+/**
+ * Authentication guard for placing orders
+ * Only allows active users to place orders
+ */
+export async function requireAuthForOrdering(): Promise<AuthValidationResult> {
+  const authResult = await validateAuth();
+  
+  if (!authResult.isAuthenticated) {
+    throw new Error('Authentication required. Please log in to access this resource.');
+  }
+  
+  if (!authResult.canAccessAPI) {
+    const status = authResult.user?.status;
+    if (status === 'pending') {
+      throw new Error('Please complete your profile (KYB) before placing orders.');
+    } else if (status === 'waiting_activation') {
+      throw new Error('Your account is waiting for admin activation. Please wait for approval before placing orders.');
+    } else {
+      throw new Error('Account activation required to place orders.');
+    }
+  }
+  
   return authResult;
 }
 

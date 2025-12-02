@@ -93,7 +93,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           // Check local storage for fallback (for development until auth is fully implemented)
           const stored = localStorage.getItem('baskit_user');
-          if (stored) setUser(JSON.parse(stored));
+          if (stored) {
+            try {
+              const userData = JSON.parse(stored);
+              // Validate that user ID is a proper UUID format
+              const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+              
+              if (userData.id && uuidRegex.test(userData.id)) {
+                setUser(userData);
+              } else {
+                console.warn('Invalid user ID in localStorage, clearing stored user data');
+                localStorage.removeItem('baskit_user');
+              }
+            } catch (err) {
+              console.error('Error parsing stored user data:', err);
+              localStorage.removeItem('baskit_user');
+            }
+          }
         }
       } catch (error) {
         console.error('Session check error:', error);
@@ -255,26 +271,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
         
         try {
-          // Create profile - bypass TypeScript issues with explicit any
+          // Create profile with proper error logging
           const { data: insertResult, error } = await supabase
             .from('distributor_profiles')
-            .insert(profileData as never)
+            .insert(profileData)
             .select();
             
+          if (error) {
+            console.error('Profile creation error:', error);
+            console.log('Profile data that failed:', profileData);
+          }
           profileError = error;
         } catch (err) {
-          profileError = { message: 'Failed to create profile' };
+          console.error('Profile creation exception:', err);
+          profileError = { message: 'Failed to create profile due to exception' };
         }
         
         // Handle profile creation result
         if (profileError) {
-          
-          // If profile creation fails, still continue since the auth account was created
-          toast({
-            title: "Pendaftaran Berhasil",
-            description: `Akun Anda berhasil dibuat tetapi ada masalah dengan data profil: ${profileError.message}. Silakan hubungi admin.`,
-            variant: "default"
-          });
+          // If profile creation fails, throw an error so Daftar.tsx can handle it
+          throw new Error(`Profile creation failed: ${profileError.message}`);
         } else {
           toast({
             title: "Pendaftaran Berhasil",
@@ -300,15 +316,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error: unknown) {
       console.error('Registration error:', error);
-      const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan";
       
-      // Show error toast
-      toast({
-        title: "Pendaftaran Gagal",
-        description: errorMessage || "Terjadi kesalahan saat mendaftar. Silakan coba lagi.",
-        variant: "destructive"
-      });
+      // Don't show toast here - let the component handle the error display
+      // This prevents double error messages
       
+      // Re-throw error for component handling
       throw error;
     }
   };
