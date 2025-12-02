@@ -17,9 +17,9 @@ import {
   fetchRegenciesByProvince, 
   fetchDistrictsByRegency,
   fetchAllRegencies,
-  type Province, 
-  type Regency, 
-  type District 
+  type Province,
+  type Regency,
+  type District
 } from "@/data/indonesiaRegions";
 import {
   Select,
@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
 
 type ExtendedDistributorProfile =
   Database["public"]["Tables"]["distributor_profiles"]["Row"] & {
@@ -42,9 +43,6 @@ type ExtendedDistributorProfile =
     companyWebsite?: string;
     postal_code?: string;
   };
-
-// Indonesian Cities and Regencies
-// Indonesian Cities and Regencies removed - replaced with dynamic data from Supabase
 
 export default function LengkapiProfil() {
   const { user } = useAuth();
@@ -88,6 +86,7 @@ export default function LengkapiProfil() {
     status_kepemilikan: "",
     npwp: "",
     nib: "",
+    companyWebsite: "",
 
     // Upload Dokumen
     npwp_file: null as File | null,
@@ -278,6 +277,7 @@ export default function LengkapiProfil() {
             area_distribusi: [],
             aplikasi_penjualan: [],
             metode_pembayaran: [],
+            companyWebsite: "",
           });
 
           // Parse coordinates if available
@@ -382,9 +382,49 @@ export default function LengkapiProfil() {
     }
 
     try {
-      const { supabase } = await import("@/integrations/supabase/client");
+      setIsLoading(true);
 
-      // Update profile data - include all 6 required fields for profile completion
+      const companyTypeId = "9cd7553a-1e03-4ed1-86d2-967cdf185bdb"; // ID for Distributor Type on ERP
+      const customerPayload: CustomerPayload = {
+        companyName: form.nama_perusahaan,
+        phone: form.nomor_kontak_perusahaan,
+        email: form.email_perusahaan,
+        companyTypeId: companyTypeId,
+        assignedUsersId: null, // TODO: Add assigned user
+        parentCompanyId: null, // TODO: Add parent company selection if needed
+        childType: null, // TODO: Default to distributor
+        districtId: parseInt(form.districtId),
+        detailAddress: form.alamat_perusahaan,
+        companyWebsite: form.companyWebsite,
+        notes: "",
+        postalCode: existingData?.postal_code ?? "",
+        billingAddress: {
+          address: form.alamat_perusahaan,
+          district: form.districtId,
+          city: form.regencyId,
+          province: form.provinsiId,
+          zipcode: existingData?.postal_code ?? "",
+        },
+        shippingAddress: {
+          address: `${form.alamat_gudang}, ${form.districtName}, ${form.regencyName}, ${form.provinsiName}`,
+          district: form.districtId,
+          city: form.regencyId,
+          province: form.provinsiId,
+          zipcode: existingData?.postal_code ?? "",
+        },
+        primaryContact: {
+          name: form.nama_pic ?? form.nama_pemilik,
+          email: form.email_pic ?? form.email_pemilik,
+          phone: form.nomor_kontak_pic ?? form.kontak_pemilik,
+          jobTitle: form.posisi_pic ?? "Owner",
+          leadSource: "distributor-hub",
+        },
+      };
+
+      // Call the createCustomer API
+      await createCustomer(customerPayload);
+
+      // Update profile data
       const updateData = {
         nama_bisnis: form.nama_perusahaan,
         alamat_lengkap: form.alamat_perusahaan,
@@ -392,6 +432,17 @@ export default function LengkapiProfil() {
         nama_pemilik: form.nama_pemilik,
         kontak_pemilik: form.kontak_pemilik,
         email_pemilik: form.email_pemilik,
+        
+        // Extended fields that exist in DB
+        alamat_gudang: form.alamat_gudang,
+        koordinat: form.koordinat,
+        bank: form.nama_bank,
+        norek: form.nomor_rekening,
+        nama_rek: form.nama_pemilik_akun,
+        jumlah_karyawan: form.jumlah_karyawan ? parseInt(form.jumlah_karyawan) : null,
+        npwp: form.npwp,
+        nib: form.nib,
+        
         // New address fields
         province_id: form.provinsiId,
         province_name: form.provinsiName,
@@ -414,8 +465,6 @@ export default function LengkapiProfil() {
         .eq("user_id", user!.id);
 
       if (error) throw error;
-
-      // Note: Customer API will be called when admin activates the account (status = 'active')
 
       toast({
         title: lang === "id" ? "Profil Lengkap" : "Profile Complete",
@@ -912,6 +961,19 @@ export default function LengkapiProfil() {
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {lang === "id" ? "Website Perusahaan" : "Company Website"}
+                  </label>
+                  <input
+                    type="text"
+                    value={form.companyWebsite}
+                    onChange={set("companyWebsite")}
+                    placeholder="https://www.baskit.id"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
+                  />
                 </div>
 
                 {/* Upload Dokumen Pendukung */}
