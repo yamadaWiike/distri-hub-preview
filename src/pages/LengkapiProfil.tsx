@@ -11,7 +11,7 @@ import { ArrowLeft, MapPin } from "lucide-react";
 import MapSelector from "@/components/ui/map-selector";
 import "leaflet/dist/leaflet.css";
 import { Database } from "@/integrations/supabase/types";
-import { createCustomer, CustomerPayload } from "@/lib/baskitApiCustomer";
+// import { createCustomer, CustomerPayload } from "@/lib/baskitApiCustomer"; // BYPASSED
 import { 
   fetchProvinces, 
   fetchRegenciesByProvince, 
