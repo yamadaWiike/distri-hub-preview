@@ -17,6 +17,7 @@ export type User = {
   role: 'user' | 'admin';
   status?: 'pending' | 'active' | 'inactive' | 'rejected';
   isApproved?: boolean; // Computed field for easy access
+  profileComplete?: boolean; // Profile completion status
 };
 
 /**
@@ -32,10 +33,27 @@ export type RegistrationData = {
   password: string; 
   namaBisnis: string; 
   alamatLengkap: string; 
-  provinsiId: string; 
-  kota: string; 
+  provinsiId: string;
+  provinceName?: string;
+  regencyId?: string;
+  regencyName?: string;
+  districtId?: string;
+  districtName?: string;
+  kota: string; // Keep for backward compatibility
   namaPemilik: string; 
-  kontakPemilik: string; 
+  kontakPemilik: string;
+  // Additional company information
+  emailPerusahaan?: string;
+  nomorTelpPerusahaan?: string;
+  namaDirektur?: string;
+  statusPkp?: string;
+  npwpNumber?: string;
+  nibNumber?: string;
+  // KYB Documents
+  ktpUrl?: string;
+  aktaUrl?: string;
+  npwpUrl?: string;
+  storePhotoUrl?: string;
 };
 
 /**

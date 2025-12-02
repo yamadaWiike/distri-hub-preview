@@ -37,6 +37,7 @@ export type Product = {
   name: string;
   size: string;
   distributorPrice: number; // base
+  retailPrice?: number; // retail price
   consumerPrice: number;
   moq: number;
   description: string;
@@ -45,7 +46,9 @@ export type Product = {
   variantOptions?: VariantOption[]; // Available options for variants
   hasVariants?: boolean; // Quick flag to check if product has variants
   image?: string; // URL or imported asset path
+  images?: string[]; // Multi-image support
   stock?: number; // Stock quantity
+  allow_negative_stock?: boolean; // Whether product can be ordered when stock is 0 or negative
   margin?: number;
   area?: string;
   units?: number;

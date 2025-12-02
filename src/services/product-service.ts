@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Product, RegionPricing, ProductVariant } from '@/data/products';
-import { withAuth, requireAuth, validateAuth } from '@/utils/auth-guards';
+import { withAuth, requireAuth, requireAuthForViewing, validateAuth } from '@/utils/auth-guards';
 
 // Define database types to match our schema
 export type ProductFromDB = {
@@ -11,11 +11,13 @@ export type ProductFromDB = {
   name: string;
   size: string;
   base_distributor_price: number;
+  retail_price?: number;
   consumer_price: number;
   base_moq: number;
   description: string;
   image_url?: string;
   stock_quantity?: number;
+  allow_negative_stock?: boolean;
   created_at?: string;
   brands?: { name: string };
   product_categories?: { name: string };
@@ -105,10 +107,12 @@ export function mapDBProductToProduct(
     name: dbProduct.name,
     size: dbProduct.size,
     distributorPrice: dbProduct.base_distributor_price,
+    retailPrice: dbProduct.retail_price,
     consumerPrice: dbProduct.consumer_price,
     moq: dbProduct.base_moq,
     description: dbProduct.description,
     stock: dbProduct.stock_quantity || 0,
+    allow_negative_stock: dbProduct.allow_negative_stock ?? false,
     image: dbProduct.image_url,
     hasVariants: dbProduct.variant_count ? dbProduct.variant_count > 0 : (dbProduct.has_variants || false),
     // UOM fields
@@ -165,8 +169,8 @@ type ProductVariantWithOption = ProductVariantFromDB & {
 
 // Fetch product variants for a specific product
 export async function fetchProductVariants(productId: string) {
-  // Ensure user is authenticated and approved
-  await requireAuth();
+  // Only require authentication, not approval (allows pending users to view products)
+  await requireAuthForViewing();
   
   try {
     
@@ -301,11 +305,14 @@ interface ProductWithVariantCount {
   brand_id?: string;
   name: string;
   size: string;
-  distributor_price: number;
+  base_distributor_price: number;
+  retail_price?: number;
   consumer_price: number;
   moq: number;
   description: string;
   image?: string;
+  stock_quantity?: number;
+  allow_negative_stock?: boolean;
   variant_count: number;
   base_uom?: string;
   moq_uom?: string;
@@ -337,10 +344,13 @@ interface FallbackProduct {
   name: string;
   size: string;
   base_distributor_price: number;
+  retail_price?: number;
   consumer_price: number;
   base_moq: number;
   description: string;
   image_url?: string;
+  stock_quantity?: number;
+  allow_negative_stock?: boolean;
   has_variants: boolean;
   base_uom?: string;
   moq_uom?: string;
@@ -355,93 +365,68 @@ interface FallbackProduct {
 
 // Fetch all products with variant information
 export async function fetchProductsWithVariants(): Promise<Product[]> {
-  // Ensure user is authenticated and approved
-  await requireAuth();
+  // Only require authentication, not approval (allows pending users to view products)
+  await requireAuthForViewing();
   
   try {
-    // First try to get products from the products_with_variants view
-    const { data: viewProducts, error: productsError } = await supabase
-      .from('products_with_variants')
+    // Query products directly from the products table (view doesn't exist in schema)
+    const { data: fallbackProducts, error: fallbackError } = await supabase
+      .from('products')
       .select(`
         id,
         sku,
-        category_id,
-        brand_id,
         name,
         size,
-        distributor_price,
+        base_distributor_price,
+        retail_price,
         consumer_price,
-        moq,
+        base_moq,
         description,
-        image,
-        variant_count,
+        image_url,
+        stock_quantity,
+        allow_negative_stock,
+        has_variants,
         base_uom,
         moq_uom,
         pricing_uom,
         enable_uom_conversions,
         single_sku_moq,
-        allow_mix_variants
+        allow_mix_variants,
+        brands:brand_id(name),
+        product_categories:category_id(name)
       `);
     
     // Variable to hold our final products list
     let productsData: ProductWithVariantCount[] = [];
     
-    // If the view doesn't exist, fallback to joining the tables directly
-    if (productsError) {
-      console.error('Error fetching from products_with_variants view, falling back to direct query:', productsError);
-      
-      // Use a direct query to get the same information
-      const { data: fallbackProducts, error: fallbackError } = await supabase
-        .from('products')
-        .select(`
-          id,
-          sku,
-          name,
-          size,
-          base_distributor_price,
-          consumer_price,
-          base_moq,
-          description,
-          image_url,
-          has_variants,
-          base_uom,
-          moq_uom,
-          pricing_uom,
-          enable_uom_conversions,
-          brands:brand_id(name),
-          product_categories:category_id(name)
-        `);
-      
-      if (fallbackError || !fallbackProducts) {
-        console.error('Error with fallback products query:', fallbackError);
-        return [];
-      }
-      
-      // Transform the fallback data to match the expected format
-      productsData = (fallbackProducts as FallbackProduct[]).map(p => ({
-        id: p.id,
-        category: p.product_categories?.name || 'Uncategorized',
-        brand: p.brands?.name || 'Unknown',
-        name: p.name,
-        size: p.size,
-        distributor_price: p.base_distributor_price,
-        consumer_price: p.consumer_price,
-        moq: p.base_moq,
-        description: p.description,
-        image: p.image_url,
-        variant_count: p.has_variants ? 1 : 0, // Assume has_variants flag means at least one variant
-        base_uom: p.base_uom || 'pcs',
-        moq_uom: p.moq_uom || 'pcs',
-        pricing_uom: p.pricing_uom || 'pcs',
-        enable_uom_conversions: p.enable_uom_conversions || false,
-        // Mix variants fields
-        single_sku_moq: p.single_sku_moq || 0,
-        allow_mix_variants: p.allow_mix_variants || false
-      }));
-    } else {
-      // Use the view data if available
-      productsData = viewProducts as ProductWithVariantCount[];
+    if (fallbackError || !fallbackProducts) {
+      console.error('Error fetching products:', fallbackError);
+      return [];
     }
+    
+    // Transform the data to match the expected format
+    productsData = (fallbackProducts as FallbackProduct[]).map(p => ({
+      id: p.id,
+      category: p.product_categories?.name || 'Uncategorized',
+      brand: p.brands?.name || 'Unknown',
+      name: p.name,
+      size: p.size,
+      base_distributor_price: p.base_distributor_price,
+      retail_price: p.retail_price,
+      consumer_price: p.consumer_price,
+      moq: p.base_moq,
+      description: p.description,
+      image: p.image_url,
+      variant_count: p.has_variants ? 1 : 0,
+      stock_quantity: p.stock_quantity,
+      allow_negative_stock: p.allow_negative_stock,
+      base_uom: p.base_uom || 'pcs',
+      moq_uom: p.moq_uom || 'pcs',
+      pricing_uom: p.pricing_uom || 'pcs',
+      enable_uom_conversions: p.enable_uom_conversions || false,
+      single_sku_moq: p.single_sku_moq || 0,
+      allow_mix_variants: p.allow_mix_variants || false
+    }));
     
     if (!productsData || productsData.length === 0) {
       console.error('No product data available');
@@ -466,14 +451,17 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
       return {
         id: dbProduct.id,
         category: dbProduct.category,
-        brand: dbProduct.brand_id || 'Unknown', // Use brand_id instead of brand
+        brand: dbProduct.brand || 'Unknown',
         name: dbProduct.name,
         size: dbProduct.size,
-        distributorPrice: dbProduct.distributor_price,
+        distributorPrice: dbProduct.base_distributor_price,
+        retailPrice: dbProduct.retail_price,
         consumerPrice: dbProduct.consumer_price,
         moq: dbProduct.moq,
         description: dbProduct.description,
         image: dbProduct.image,
+        stock: dbProduct.stock_quantity || 0,
+        allow_negative_stock: dbProduct.allow_negative_stock ?? false,
         hasVariants: dbProduct.variant_count > 0,
         // UOM fields
         base_uom: dbProduct.base_uom || 'pcs',
@@ -507,8 +495,8 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
 
 // Get all products with their region pricing
 export async function getAllProducts(): Promise<Product[]> {
-  // Ensure user is authenticated and approved
-  await requireAuth();
+  // Only require authentication, not approval (allows pending users to view products)
+  await requireAuthForViewing();
   
   try {
     // Fetch all products with brand and category names - explicitly select UOM fields
@@ -520,11 +508,13 @@ export async function getAllProducts(): Promise<Product[]> {
         name,
         size,
         base_distributor_price,
+        retail_price,
         consumer_price,
         base_moq,
         description,
         image_url,
         stock_quantity,
+        allow_negative_stock,
         has_variants,
         base_uom,
         moq_uom,
@@ -567,8 +557,8 @@ export async function getAllProducts(): Promise<Product[]> {
 
 // Get a single product by ID
 export async function getProductById(id: string): Promise<Product | null> {
-  // Ensure user is authenticated and approved
-  await requireAuth();
+  // Only require authentication, not approval (allows pending users to view products)
+  await requireAuthForViewing();
   
   try {
     // Check if the id looks like a UUID or a SKU
@@ -634,8 +624,8 @@ export async function getProductById(id: string): Promise<Product | null> {
 
 // Get areas where products are available (distinct list)
 export async function getAllAreas(): Promise<string[]> {
-  // Ensure user is authenticated and approved
-  await requireAuth();
+  // Only require authentication, not approval (allows pending users to view products)
+  await requireAuthForViewing();
   
   try {
     const { data, error } = await supabase
@@ -658,8 +648,8 @@ export async function getAllAreas(): Promise<string[]> {
 
 // Get all available brands (distinct list)
 export async function getAllBrands(): Promise<string[]> {
-  // Ensure user is authenticated and approved
-  await requireAuth();
+  // Only require authentication, not approval (allows pending users to view products)
+  await requireAuthForViewing();
   
   try {
     // Query the brands table directly - not the products table
@@ -699,26 +689,49 @@ export interface ProductWithVariant extends Omit<Product, 'variants' | 'hasVaria
 
 // Fetch products expanded by variants - each variant becomes a separate product entry
 export async function fetchProductsExpandedByVariants(): Promise<ProductWithVariant[]> {
-  // Ensure user is authenticated and approved
-  await requireAuth();
+  // Only require authentication, not approval (allows pending users to view products)
+  await requireAuthForViewing();
   
   try {
-    // First get all base products
-    const baseProducts = await fetchProductsWithVariants();
+    // Fetch all base products and all variants in parallel
+    const [baseProducts, allVariantsData] = await Promise.all([
+      fetchProductsWithVariants(),
+      supabase
+        .from('product_variants')
+        .select('*')
+        .eq('is_active', true)
+    ]);
+    
+    // Create a map of variants by product_id for O(1) lookup
+    const variantsByProduct = new Map<string, ProductVariantFromDB[]>();
+    if (allVariantsData.data) {
+      allVariantsData.data.forEach((variant: ProductVariantFromDB) => {
+        if (!variantsByProduct.has(variant.product_id)) {
+          variantsByProduct.set(variant.product_id, []);
+        }
+        variantsByProduct.get(variant.product_id)!.push(variant);
+      });
+    }
+    
     const expandedProducts: ProductWithVariant[] = [];
     
     for (const product of baseProducts) {
       if (product.hasVariants) {
-        // Fetch variants for this product
-        const variants = await fetchProductVariants(product.id);
+        const variants = variantsByProduct.get(product.id) || [];
         
-        // For testing - only add real variants, no test data
         if (variants.length > 0) {
           // Create a separate product entry for each variant
-          for (const variant of variants) {
+          for (const variantData of variants) {
+            const variant = {
+              id: variantData.id,
+              variantName: variantData.variant_name || 'Unnamed Variant',
+              variantDescription: variantData.variant_description || '',
+              additionalPrice: variantData.additional_price || 0,
+              isActive: variantData.is_active
+            };
+            
             const variantProduct: ProductWithVariant = {
               ...product,
-              // Create a unique ID for the variant product entry
               id: `${product.id}_variant_${variant.id}`,
               baseProductId: product.id,
               isVariant: true,
@@ -729,20 +742,15 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
                 variantDescription: variant.variantDescription,
                 additionalPrice: variant.additionalPrice
               },
-              // Update pricing to include variant additional price
               distributorPrice: product.distributorPrice + variant.additionalPrice,
               consumerPrice: product.consumerPrice + variant.additionalPrice,
-              // Mix variant fields - inherit from base product
               singleSkuMoq: product.singleSkuMoq || 0,
               allowMixVariants: product.allowMixVariants || false,
-              // Update regional pricing to include variant additional price while preserving UOM
               regions: product.regions.map(region => ({
                 ...region,
                 distributorPrice: region.distributorPrice + variant.additionalPrice,
-                // Ensure UOM fields are preserved from parent product's regional pricing
                 moq_uom: region.moq_uom || product.moq_uom,
                 price_uom: region.price_uom || product.pricing_uom,
-                // Mix variant fields for regions - inherit from base region
                 skuLevelMoq: region.skuLevelMoq || 0,
                 allowMixVariants: region.allowMixVariants || false
               }))
@@ -750,7 +758,6 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
             expandedProducts.push(variantProduct);
           }
         } else {
-          // If product has variants flag but no actual variants, show as regular product
           const regularProduct: ProductWithVariant = {
             ...product,
             baseProductId: product.id,
@@ -760,7 +767,6 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
           expandedProducts.push(regularProduct);
         }
       } else {
-        // For products without variants, add as regular product
         const regularProduct: ProductWithVariant = {
           ...product,
           baseProductId: product.id,

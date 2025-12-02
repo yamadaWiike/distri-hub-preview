@@ -1,16 +1,29 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
-import { Eye, Edit, Trash2, Search, Loader2, Calendar, Phone, Mail, MapPin } from 'lucide-react';
+import { Eye, Edit, Trash2, Search, Loader2, Calendar, MoreVertical } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { createCustomer, type CustomerPayload } from '@/lib/baskitApiCustomer';
 import { useLanguage } from '@/hooks/use-language';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { provinces, getCitiesByProvince, City } from '@/data/indonesia';
+
 
 // Define distributor profile type based on actual database schema
 type DistributorProfile = {
@@ -30,16 +43,12 @@ type DistributorProfile = {
 const DistributorManager = () => {
   const { toast } = useToast();
   const { lang } = useLanguage();
+  const navigate = useNavigate();
   const t = lang === 'id' ? translations.id : translations.en;
   
   const [distributors, setDistributors] = useState<DistributorProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDistributor, setSelectedDistributor] = useState<DistributorProfile | null>(null);
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editForm, setEditForm] = useState<Partial<DistributorProfile>>({});
-  const [availableCities, setAvailableCities] = useState<City[]>([]);
 
   // Fetch distributors from database
   const fetchDistributors = async () => {
@@ -70,54 +79,6 @@ const DistributorManager = () => {
     fetchDistributors();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update available cities when province changes in edit form
-  useEffect(() => {
-    // Province field does not exist in distributor profile, so skip updating available cities
-    setAvailableCities([]);
-  }, [editForm]);
-
-  // Save distributor changes
-  const saveDistributor = async () => {
-    if (!selectedDistributor) return;
-
-    try {
-      // Use correct field names matching database schema
-      const updateData = {
-        nama_bisnis: editForm.nama_bisnis,
-        nama_pemilik: editForm.nama_pemilik,
-        email: editForm.email,
-        kontak_pemilik: editForm.kontak_pemilik,
-        alamat_lengkap: editForm.alamat_lengkap,
-        kota: editForm.kota,
-        status: editForm.status
-      };
-
-      // Use a direct approach without type assertion
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any)
-        .from('distributor_profiles')
-        .update(updateData)
-        .eq('id', selectedDistributor.id);
-
-      if (error) throw error;
-
-      toast({
-        title: t.distributorUpdated,
-        description: t.distributorUpdatedDesc,
-      });
-
-      setIsEditDialogOpen(false);
-      fetchDistributors();
-    } catch (error) {
-      console.error('Error updating distributor:', error);
-      toast({
-        title: t.errorUpdating,
-        description: error instanceof Error ? error.message : String(error),
-        variant: "destructive"
-      });
-    }
-  };
-
   // Delete distributor
   const deleteDistributor = async (distributorId: string) => {
     if (!confirm(t.confirmDelete)) return;
@@ -146,20 +107,14 @@ const DistributorManager = () => {
     }
   };
 
-  // Open edit dialog
-  const openEditDialog = (distributor: DistributorProfile) => {
-    setSelectedDistributor(distributor);
-    setEditForm({
-      nama_bisnis: distributor.nama_bisnis,
-      nama_pemilik: distributor.nama_pemilik,
-      email: distributor.email,
-      kontak_pemilik: distributor.kontak_pemilik,
-      alamat_lengkap: distributor.alamat_lengkap,
-      kota: distributor.kota,
-      status: distributor.status,
-    });
-    
-    setIsEditDialogOpen(true);
+  // Navigate to view distributor page
+  const handleViewDistributor = (distributor: DistributorProfile) => {
+    navigate(`/admin/distributors/view/${distributor.user_id}`);
+  };
+
+  // Navigate to edit distributor page
+  const handleEditDistributor = (distributor: DistributorProfile) => {
+    navigate(`/admin/distributors/edit/${distributor.user_id}`);
   };
 
   // Filter distributors based on search query
@@ -182,10 +137,111 @@ const DistributorManager = () => {
     });
   };
 
+  // Handle status change using actual database status values
+  const handleStatusChange = async (distributor: DistributorProfile, newStatus: string) => {
+    try {
+      // Update status in Supabase directly
+      const { error } = await supabase
+        .from('distributor_profiles')
+        // @ts-expect-error - Type mismatch with Supabase generated types
+        .update({ status: newStatus })
+        .eq('user_id', distributor.user_id);
+      
+      if (error) throw error;
+      
+      toast({ title: t.statusUpdated, variant: 'default' });
+      
+      // Only call customer API when status becomes 'active' (approved)
+      if (newStatus === 'active') {
+        try {
+          // Build comprehensive payload for createCustomer API
+          const payload: CustomerPayload = {
+            companyName: distributor.nama_bisnis,
+            phone: distributor.kontak_pemilik,
+            email: distributor.email || '',
+            companyTypeId: '1', // Default company type ID
+            assignedUsersId: [], // TODO: Add assigned users if needed
+            parentCompanyId: '', // Independent distributor
+            childType: 'distributor',
+            districtId: 0, // Default district ID since field doesn't exist
+            detailAddress: distributor.alamat_lengkap,
+            companyWebsite: '',
+            notes: `Auto-created from distributor approval`,
+            postalCode: '',
+            billingAddress: {
+              address: distributor.alamat_lengkap,
+              district: distributor.kota,
+              city: distributor.kota,
+              province: '',
+              zipcode: ''
+            },
+            shippingAddress: {
+              address: distributor.alamat_lengkap,
+              district: distributor.kota,
+              city: distributor.kota,
+              province: '',
+              zipcode: ''
+            },
+            primaryContact: {
+              name: distributor.nama_pemilik,
+              email: distributor.email || '',
+              phone: distributor.kontak_pemilik,
+              jobTitle: 'Owner',
+              leadSource: 'distributor-hub'
+            }
+          };
+          
+          // Call createCustomer API
+          const result = await createCustomer(payload);
+          
+          // Handle API response based on actual return type
+          console.log('createCustomer API response:', result);
+          
+          // Check if the response indicates success (adapt based on your API response format)
+          const isSuccess = result && typeof result === 'object' && 
+            ('statusCode' in result ? (result as { statusCode?: number }).statusCode === 200 : true);
+          
+          if (isSuccess) {
+            toast({ title: t.success, description: 'Customer registered in Baskit API successfully', variant: 'default' });
+          } else {
+            toast({ title: t.error, description: 'Failed to create customer in Baskit API', variant: 'destructive' });
+          }
+        } catch (apiError) {
+          console.error('createCustomer API error:', apiError);
+          toast({ title: t.error, description: apiError instanceof Error ? apiError.message : String(apiError), variant: 'destructive' });
+        }
+      }
+      
+      // Refresh distributors list
+      fetchDistributors();
+    } catch (err) {
+      console.error('Status update error:', err);
+      toast({ title: t.error, description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
+    }
+  };
+
+  // Get status badge color and label using actual database values
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      'pending': { color: 'bg-yellow-500 text-white', label: t.pending },
+      'waiting_activation': { color: 'bg-blue-500 text-white', label: t.waitingActivation },
+      'active': { color: 'bg-green-500 text-white', label: t.active },
+      'inactive': { color: 'bg-gray-500 text-white', label: t.inactive },
+      'rejected': { color: 'bg-red-500 text-white', label: t.rejected },
+    };
+    
+    const config = statusConfig[status] || { color: 'bg-gray-400 text-white', label: status };
+    return (
+      <Badge className={config.color}>
+        {config.label}
+      </Badge>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header with Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t.totalDistributors}</CardTitle>
@@ -199,36 +255,40 @@ const DistributorManager = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t.thisMonth}</CardTitle>
+            <CardTitle className="text-sm font-medium">{t.activeDistributors}</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {distributors.filter(d => {
-                const createdDate = new Date(d.created_at);
-                const now = new Date();
-                return createdDate.getMonth() === now.getMonth() && createdDate.getFullYear() === now.getFullYear();
-              }).length}
+              {distributors.filter(d => d.status === 'active').length}
             </div>
-            <p className="text-xs text-muted-foreground">{t.newRegistrations}</p>
+            <p className="text-xs text-muted-foreground">{t.approvedAndActive}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t.recentActivity}</CardTitle>
+            <CardTitle className="text-sm font-medium">{t.pendingApproval}</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {distributors.filter(d => {
-                const updatedDate = new Date(d.updated_at);
-                const dayAgo = new Date();
-                dayAgo.setDate(dayAgo.getDate() - 7);
-                return updatedDate > dayAgo;
-              }).length}
+              {distributors.filter(d => d.status === 'pending').length}
             </div>
-            <p className="text-xs text-muted-foreground">{t.lastWeek}</p>
+            <p className="text-xs text-muted-foreground">{t.awaitingReview}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{t.waitingActivation}</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {distributors.filter(d => d.status === 'waiting_activation').length}
+            </div>
+            <p className="text-xs text-muted-foreground">{t.kybCompleted}</p>
           </CardContent>
         </Card>
       </div>
@@ -286,42 +346,48 @@ const DistributorManager = () => {
                     <TableCell>{distributor.kontak_pemilik}</TableCell>
                     <TableCell>{distributor.kota}</TableCell>
                     <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        distributor.status === 'active' ? 'bg-green-100 text-green-800' :
-                        distributor.status === 'inactive' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {distributor.status}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(distributor.status)}
+                        <Select
+                          value={distributor.status}
+                          onValueChange={(newStatus) => handleStatusChange(distributor, newStatus)}
+                        >
+                          <SelectTrigger className="w-auto h-6 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">{t.pending}</SelectItem>
+                            <SelectItem value="waiting_activation">{t.waitingActivation}</SelectItem>
+                            <SelectItem value="active">{t.active}</SelectItem>
+                            <SelectItem value="inactive">{t.inactive}</SelectItem>
+                            <SelectItem value="rejected">{t.rejected}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </TableCell>
                     <TableCell>{formatDate(distributor.created_at || '')}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedDistributor(distributor);
-                            setIsViewDialogOpen(true);
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditDialog(distributor)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteDistributor(distributor.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditDistributor(distributor)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            {t.edit}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewDistributor(distributor)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            {t.viewDetails}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600" onClick={() => deleteDistributor(distributor.id)}>
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            {t.delete}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -330,166 +396,11 @@ const DistributorManager = () => {
           )}
         </CardContent>
       </Card>
-
-      {/* View Details Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{t.distributorDetails}</DialogTitle>
-            <DialogDescription>
-              View detailed information about the selected distributor including business details and contact information.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedDistributor && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    {t.registeredOn}: {formatDate(selectedDistributor.created_at)}
-                  </span>
-                </div>
-                
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-sm font-medium">{t.businessName}</Label>
-                    <p className="text-sm">{selectedDistributor.nama_bisnis}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">{t.contactPerson}</Label>
-                    <p className="text-sm">{selectedDistributor.nama_pemilik}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm">{selectedDistributor.email}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm">{selectedDistributor.kontak_pemilik}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm">{selectedDistributor.alamat_lengkap}, {selectedDistributor.kota}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <div>
-                  <Label className="text-sm font-medium">{t.status}</Label>
-                  <p className="text-sm">{selectedDistributor.status}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">{t.businessType}</Label>
-                  <p className="text-sm text-muted-foreground">Not Available</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">{t.distributorLicense}</Label>
-                  <p className="text-sm text-muted-foreground">Not Available</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">{t.taxId}</Label>
-                  <p className="text-sm text-muted-foreground">Not Available</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">{t.bankInfo}</Label>
-                  <p className="text-sm text-muted-foreground">Not Available</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{t.editDistributor}</DialogTitle>
-            <DialogDescription>
-              Edit distributor information including business details, contact information, and location settings.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="nama_bisnis">{t.businessName}</Label>
-              <Input
-                id="nama_bisnis"
-                value={editForm.nama_bisnis || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, nama_bisnis: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="nama_pemilik">{t.contactPerson}</Label>
-              <Input
-                id="nama_pemilik"
-                value={editForm.nama_pemilik || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, nama_pemilik: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">{t.email}</Label>
-              <Input
-                id="email"
-                type="email"
-                value={editForm.email || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="kontak_pemilik">{t.phone}</Label>
-              <Input
-                id="kontak_pemilik"
-                value={editForm.kontak_pemilik || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, kontak_pemilik: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="alamat_lengkap">{t.address}</Label>
-              <Input
-                id="alamat_lengkap"
-                value={editForm.alamat_lengkap || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, alamat_lengkap: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="kota">{t.city}</Label>
-              <Input
-                id="kota"
-                value={editForm.kota || ''}
-                onChange={(e) => setEditForm(prev => ({ ...prev, kota: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">{t.status}</Label>
-              <Select 
-                value={editForm.status || ''} 
-                onValueChange={(value) => setEditForm(prev => ({ ...prev, status: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              {t.cancel}
-            </Button>
-            <Button onClick={saveDistributor}>
-              {t.saveChanges}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
+
+export default DistributorManager;
 
 // Translations
 const translations = {
@@ -511,6 +422,9 @@ const translations = {
     city: "Kota",
     registrationDate: "Tanggal Daftar",
     actions: "Aksi",
+    edit: "Edit",
+    viewDetails: "Lihat Detail",
+    delete: "Hapus",
     distributorDetails: "Detail Distributor",
     registeredOn: "Terdaftar pada",
     address: "Alamat",
@@ -523,6 +437,16 @@ const translations = {
     status: "Status",
     cancel: "Batal",
     saveChanges: "Simpan Perubahan",
+    statusUpdated: "Status berhasil diperbarui",
+    success: "Berhasil",
+    error: "Error",
+    pending: "Menunggu Persetujuan",
+    waitingActivation: "Menunggu Aktivasi",
+    active: "Aktif",
+    inactive: "Tidak Aktif",
+    rejected: "Ditolak",
+    changeStatus: "Ubah Status",
+    kybCompleted: "KYB selesai",
     confirmDelete: "Apakah Anda yakin ingin menghapus distributor ini?",
     distributorUpdated: "Distributor Diperbarui",
     distributorUpdatedDesc: "Informasi distributor berhasil diperbarui",
@@ -530,7 +454,11 @@ const translations = {
     distributorDeletedDesc: "Distributor berhasil dihapus dari sistem",
     errorFetching: "Gagal Memuat Data",
     errorUpdating: "Gagal Memperbarui",
-    errorDeleting: "Gagal Menghapus"
+    errorDeleting: "Gagal Menghapus",
+    activeDistributors: "Distributor Aktif",
+    approvedAndActive: "disetujui & aktif",
+    pendingApproval: "Menunggu Persetujuan",
+    awaitingReview: "menunggu tinjauan"
   },
   en: {
     totalDistributors: "Total Distributors",
@@ -550,6 +478,9 @@ const translations = {
     city: "City",
     registrationDate: "Registration Date",
     actions: "Actions",
+    edit: "Edit",
+    viewDetails: "View Details",
+    delete: "Delete",
     distributorDetails: "Distributor Details",
     registeredOn: "Registered on",
     address: "Address",
@@ -562,6 +493,16 @@ const translations = {
     status: "Status",
     cancel: "Cancel",
     saveChanges: "Save Changes",
+    statusUpdated: "Status updated successfully",
+    success: "Success",
+    error: "Error",
+    pending: "Pending Approval",
+    waitingActivation: "Waiting Activation",
+    active: "Active",
+    inactive: "Inactive",
+    rejected: "Rejected",
+    changeStatus: "Change Status",
+    kybCompleted: "KYB completed",
     confirmDelete: "Are you sure you want to delete this distributor?",
     distributorUpdated: "Distributor Updated",
     distributorUpdatedDesc: "Distributor information updated successfully",
@@ -569,8 +510,10 @@ const translations = {
     distributorDeletedDesc: "Distributor successfully removed from system",
     errorFetching: "Failed to Fetch Data",
     errorUpdating: "Failed to Update",
-    errorDeleting: "Failed to Delete"
+    errorDeleting: "Failed to Delete",
+    activeDistributors: "Active Distributors",
+    approvedAndActive: "approved & active",
+    pendingApproval: "Pending Approval",
+    awaitingReview: "awaiting review"
   }
 };
-
-export default DistributorManager;

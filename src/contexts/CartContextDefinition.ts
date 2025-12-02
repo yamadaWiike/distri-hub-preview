@@ -79,6 +79,14 @@ export type CartItem = {
   skuLevelMoq?: number;
   /** Whether variants can be mixed for MOQ */
   allowMixVariants?: boolean;
+  /** Inventory ID from ERP system (for order API) */
+  inventoryId?: string;
+  /** Inventory price tier ID (for order API) */
+  inventoryPriceTierId?: string;
+  /** Product SKU code */
+  sku?: string;
+  /** Available stock quantity */
+  qtyOnHand?: number;
 };
 
 /**

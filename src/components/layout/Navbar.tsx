@@ -24,8 +24,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-    isActive ? "text-foreground bg-accent" : "text-foreground/80 hover:text-foreground"
+  `px-4 py-2 rounded-md text-sm font-medium transition-colors relative ${
+    isActive 
+      ? "text-orange-600 font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-orange-500" 
+      : "text-gray-700 hover:text-orange-600 hover:after:absolute hover:after:bottom-0 hover:after:left-0 hover:after:right-0 hover:after:h-0.5 hover:after:bg-orange-300"
   }`;
 
 const mobileNavLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -61,9 +63,9 @@ export default function Navbar() {
   }, [isMobile]);
   
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container max-w-6xl mx-auto flex h-16 items-center justify-between px-4">
-        <div className="flex items-center gap-2">
+    <header className="sticky top-0 z-40 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 shadow-sm">
+      <div className="container max-w-7xl mx-auto flex h-16 items-center justify-between px-4">
+        <div className="flex items-center gap-8">
           {isMobile && (
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(true)} className="md:hidden">
@@ -176,8 +178,8 @@ export default function Navbar() {
             </Sheet>
           )}
           
-          <Link to="/" className="font-semibold tracking-tight text-lg whitespace-nowrap">
-            Baskit Distributor Hub
+          <Link to="/" className="flex items-center gap-2">
+            <img src="/assets/baskit-logo.png" alt="Baskit" className="h-8" />
           </Link>
         </div>
         
@@ -188,39 +190,37 @@ export default function Navbar() {
               {t.home}
             </NavLink>
             <NavLink to="/daftar-produk" className={navLinkClass}>
-              {t.productList}
+              {lang === 'id' ? "Daftar Produk" : "Product List"}
             </NavLink>
             <NavLink to="/tentang" className={navLinkClass}>
-              {t.about}
+              {lang === 'id' ? "Tentang Baskit" : "About Baskit"}
             </NavLink>
             <NavLink to="/hubungi" className={navLinkClass}>
-              {t.contact}
+              {lang === 'id' ? "Hubungi Kami" : "Contact Us"}
             </NavLink>
           </nav>
         )}
         
         {/* Right Side Actions */}
-        <div className="flex items-center gap-2">
-          {/* Cart Button has been replaced by ModernCartDrawer */}
-          
+        <div className="flex items-center gap-3">
           {/* Language Switcher (Desktop) */}
           {!isMobile ? (
-            <div className="hidden sm:flex items-center gap-1">
+            <div className="hidden sm:flex items-center gap-1 border rounded-md p-0.5">
               <Button 
-                variant="outline" 
+                variant={lang === 'id' ? 'secondary' : 'ghost'}
                 size="sm" 
                 aria-label="Bahasa Indonesia" 
                 onClick={() => setLang('id')} 
-                className={lang === 'id' ? 'bg-accent' : ''}
+                className={`text-xs ${lang === 'id' ? 'bg-gray-100' : ''}`}
               >
                 ID
               </Button>
               <Button 
-                variant="outline" 
+                variant={lang === 'en' ? 'secondary' : 'ghost'}
                 size="sm" 
                 aria-label="English" 
                 onClick={() => setLang('en')} 
-                className={lang === 'en' ? 'bg-accent' : ''}
+                className={`text-xs ${lang === 'en' ? 'bg-gray-100' : ''}`}
               >
                 EN
               </Button>
@@ -243,40 +243,43 @@ export default function Navbar() {
             </DropdownMenu>
           )}
           
-          {/* Cart */}
-          <ModernCartDrawer />
+          {/* Masuk Link */}
+          {!user && !isMobile && (
+            <Link to="/masuk">
+              <Button variant="ghost" className="hidden sm:inline-flex text-gray-700 hover:text-orange-600">
+                {t.login}
+              </Button>
+            </Link>
+          )}
           
-          {/* Auth Actions (Desktop) */}
-          {!isMobile ? (
+          {/* Daftar Distributor Button */}
+          {!user && !isMobile && (
+            <Link to="/daftar">
+              <Button className="hidden sm:inline-flex bg-orange-500 hover:bg-orange-600 text-white rounded-lg px-5">
+                {lang === 'id' ? "Daftar Distributor" : "Register Distributor"}
+              </Button>
+            </Link>
+          )}
+          
+          {/* Cart */}
+          {user && <ModernCartDrawer />}
+          
+          {/* Auth Actions (Desktop) - Only show if logged in */}
+          {!isMobile && user ? (
             <>
-              {user ? (
-                <>
-                  <Link to="/profil">
-                    <Button variant="ghost" className="hidden sm:inline-flex">
-                      {t.profile}
-                    </Button>
-                  </Link>
-                  <Button variant="outline" onClick={logout} className="hidden sm:inline-flex">
-                    {t.logout}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Link to="/masuk">
-                    <Button variant="ghost" className="hidden sm:inline-flex">
-                      {t.login}
-                    </Button>
-                  </Link>
-                  <Link to="/daftar">
-                    <Button variant="hero" className="hidden sm:inline-flex">
-                      {t.register}
-                    </Button>
-                  </Link>
-                </>
-              )}
+              <Link to="/profil">
+                <Button variant="ghost" className="hidden sm:inline-flex text-gray-700 hover:text-orange-600">
+                  {t.profile}
+                </Button>
+              </Link>
+              <Button variant="outline" onClick={logout} className="hidden sm:inline-flex text-gray-700 hover:text-orange-600">
+                {t.logout}
+              </Button>
             </>
-          ) : (
-            /* User Menu (Mobile) */
+          ) : null}
+          
+          {/* Mobile User Menu */}
+          {isMobile && (
             user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

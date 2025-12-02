@@ -29,7 +29,20 @@ import Hubungi from "./pages/Hubungi";
 import Masuk from "./pages/Masuk";
 import Daftar from "./pages/Daftar";
 import Profil from "./pages/Profil";
+import LengkapiProfil from "./pages/LengkapiProfil";
 import Admin from "./pages/Admin";
+import AllActivities from "./pages/AllActivities";
+import AdminDistributors from "./pages/AdminDistributors";
+import AdminUsers from "./pages/AdminUsers";
+import AdminProducts from "./pages/AdminProducts";
+import AdminSKUManager from "./pages/AdminSKUManager";
+import AdminAddProduct from "./pages/AdminAddProduct";
+import AdminEditProduct from "./pages/AdminEditProduct";
+import AdminViewDistributor from "./pages/AdminViewDistributor";
+import AdminEditDistributor from "./pages/AdminEditDistributor";
+import AdminOrders from "./pages/AdminOrders";
+import AdminAnalytics from "./pages/AdminAnalytics";
+import AdminReports from "./pages/AdminReports";
 import Checkout from "./pages/Checkout";
 import NotFound from "./pages/NotFound";
 
@@ -93,7 +106,7 @@ const App: React.FC = () => (
                   {/* Public pages */}
                   <Route path="/" element={<Index />} />
                   <Route path="/daftar-produk" element={<DaftarProduk />} />
-                  <Route path="/produk/:id" element={<ProdukDetail />} />
+                  <Route path="/produk/:category/:slug" element={<ProdukDetail />} />
                   <Route path="/tentang" element={<Tentang />} />
                   <Route path="/hubungi" element={<Hubungi />} />
                   <Route path="/masuk" element={<Masuk />} />
@@ -101,10 +114,23 @@ const App: React.FC = () => (
                   
                   {/* Protected routes - require authentication */}
                   <Route path="/profil" element={<Protected><Profil /></Protected>} />
+                  <Route path="/lengkapi-profil" element={<Protected><LengkapiProfil /></Protected>} />
                   <Route path="/checkout" element={<Protected><Checkout /></Protected>} />
                   
                   {/* Admin routes */}
                   <Route path="/admin" element={<Admin />} />
+                  <Route path="/admin/activities" element={<AllActivities />} />
+                  <Route path="/admin/distributors" element={<AdminDistributors />} />
+                  <Route path="/admin/distributors/view/:id" element={<AdminViewDistributor />} />
+                  <Route path="/admin/distributors/edit/:id" element={<AdminEditDistributor />} />
+                  <Route path="/admin/users" element={<AdminUsers />} />
+                  <Route path="/admin/products" element={<AdminProducts />} />
+                  <Route path="/admin/products/add" element={<AdminAddProduct />} />
+                  <Route path="/admin/products/edit/:id" element={<AdminEditProduct />} />
+                  <Route path="/admin/sku-manager" element={<AdminSKUManager />} />
+                  <Route path="/admin/orders" element={<AdminOrders />} />
+                  <Route path="/admin/analytics" element={<AdminAnalytics />} />
+                  <Route path="/admin/reports" element={<AdminReports />} />
                   
                   {/* Fallback route for 404 errors */}
                   <Route path="*" element={<NotFound />} />

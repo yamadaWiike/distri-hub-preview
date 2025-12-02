@@ -126,6 +126,19 @@ export default function Checkout() {
       return;
     }
     
+    // Check if profile is complete
+    if (user.profileComplete === false) {
+      toast({
+        title: lang === 'id' ? "Profil Belum Lengkap" : "Profile Incomplete",
+        description: lang === 'id' 
+          ? "Anda perlu melengkapi profil terlebih dahulu untuk dapat memesan barang." 
+          : "You need to complete your profile first to place orders.",
+        variant: "destructive",
+      });
+      navigate("/profil", { replace: true });
+      return;
+    }
+    
     if (items.length === 0) {
       navigate("/daftar-produk", { replace: true });
       return;
@@ -177,6 +190,7 @@ export default function Checkout() {
     
     fetchProfileData();
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, items, navigate]);
 
   // Update delivery details
@@ -201,37 +215,98 @@ export default function Checkout() {
       return;
     }
     
-    // Include address type in order data
-    const orderData = {
-      ...deliveryDetails,
-      addressType: deliveryDetails.addressType,
-      items: items,
-      totalAmount
-    };
-
-
     try {
-      // Import supabase client
+      // Import supabase client, createOrder API, and getInventory
       const { supabase } = await import('@/integrations/supabase/client');
+      const { createOrder } = await import('@/lib/baskitApiOrder');
+      const { getInventory } = await import('@/lib/baskitApiInventory');
+
+      // Fetch inventory data for all cart items
+      console.log('Fetching inventory data for cart items...');
+      const productIds = items.map(item => item.id);
       
-      // First, get the distributor profile ID
+      // Start with original items, will be enriched if inventory data is available
+      let enrichedItems = items;
+      
+      try {
+        const inventoryResponse = await getInventory({
+          inventoryId: productIds,
+          active: true,
+          $limit: 100 // Get up to 100 items
+        });
+
+        console.log('Inventory response:', inventoryResponse);
+
+        if (inventoryResponse.statusCode === 200 && inventoryResponse.data) {
+          // Create a map of product ID to inventory data
+          const inventoryMap = new Map(
+            inventoryResponse.data.map(inv => [inv.inventoryId, inv])
+          );
+
+          // Validate stock and enrich cart items with inventory data
+          const itemsWithInventory = items.map(item => {
+            const inventoryData = inventoryMap.get(item.id);
+            
+            if (!inventoryData) {
+              console.warn(`No inventory data found for product ${item.id}`);
+              return {
+                ...item,
+                inventoryId: item.id, // Fallback to product ID
+              };
+            }
+
+            // Check stock availability
+            if (inventoryData.qtyOnHand < item.qty) {
+              throw new Error(
+                lang === 'id'
+                  ? `Stok tidak cukup untuk ${item.name}. Tersedia: ${inventoryData.qtyOnHand}, Diminta: ${item.qty}`
+                  : `Insufficient stock for ${item.name}. Available: ${inventoryData.qtyOnHand}, Requested: ${item.qty}`
+              );
+            }
+
+            return {
+              ...item,
+              inventoryId: inventoryData.id, // Use the inventory record ID
+              sku: inventoryData.sku,
+              qtyOnHand: inventoryData.qtyOnHand,
+              inventoryPriceTierId: inventoryData.id, // Use inventory ID as price tier ID
+            };
+          });
+
+          console.log('Items enriched with inventory data:', itemsWithInventory);
+
+          // Use enriched items for order creation
+          enrichedItems = itemsWithInventory;
+        } else {
+          console.warn('Inventory API returned non-200 status or no data, proceeding with fallback');
+        }
+      } catch (inventoryError) {
+        console.error('Error fetching inventory:', inventoryError);
+        // If it's a stock validation error, re-throw it
+        if (inventoryError instanceof Error && inventoryError.message.includes('Stok tidak cukup')) {
+          throw inventoryError;
+        }
+        // Otherwise, log and continue with fallback (product IDs)
+        console.warn('Continuing with product IDs as fallback for inventoryId');
+      }
+
+      // Get distributor profile ID
       const { data: distributorProfile, error: profileError } = await supabase
         .from('distributor_profiles')
-        .select('id')
+        .select('id, company_id')
         .eq('user_id', user?.id)
         .single();
-        
+
       if (profileError || !distributorProfile) {
         throw new Error('Distributor profile not found. Please complete your profile first.');
       }
 
-      const typedDistributorProfile = distributorProfile as DbDistributorProfile;
+      const typedDistributorProfile = distributorProfile as DbDistributorProfile & { company_id?: string };
 
-      // Generate unique order number with retry logic
+      // Generate unique order number
       let orderNumber: string;
       let attempts = 0;
       const maxAttempts = 5;
-      
       do {
         const now = new Date();
         const dateStr = now.getFullYear().toString() + 
@@ -239,23 +314,63 @@ export default function Checkout() {
                       now.getDate().toString().padStart(2, '0');
         const randomNum = Math.floor(Math.random() * 99999).toString().padStart(5, '0');
         orderNumber = `ORD-${dateStr}-${randomNum}`;
-        
-        // Check if order number already exists
         const { data: existingOrder } = await supabase
           .from('orders')
           .select('id')
           .eq('order_number', orderNumber)
           .single();
-          
         if (!existingOrder) {
-          break; // Order number is unique, we can use it
+          break;
         }
-        
         attempts++;
       } while (attempts < maxAttempts);
-      
       if (attempts >= maxAttempts) {
         throw new Error('Unable to generate unique order number. Please try again.');
+      }
+
+      // Calculate order totals
+      const subTotal = totalAmount;
+      const taxRate = 0.11; // 11% tax
+      const taxAmount = Math.round(subTotal * taxRate);
+      const shippingCost = 0; // Can be updated based on shipping selection
+      const orderTotal = subTotal + taxAmount + shippingCost;
+
+      // Build external API payload
+      const orderPayload = {
+        customerId: user?.id || '',
+        companyId: typedDistributorProfile.company_id || '',
+        paymentTypeId: '', // Optional - can be added later
+        orderType: 'SHOP',
+        wareHouse: 1,
+        shippingCost: shippingCost,
+        tax: taxAmount,
+        subTotal: subTotal,
+        total: orderTotal,
+        refCode: orderNumber,
+        paymentNotes: deliveryDetails.notes || '',
+        notes: deliveryDetails.notes || '',
+        deliveryType: 'REGULAR',
+        expeditionName: '', // Optional - can be added later
+        products: enrichedItems.map(item => ({
+          productId: item.id,
+          companyId: typedDistributorProfile.company_id || '',
+          inventoryId: item.inventoryId || item.id, // Fallback to product ID if inventoryId not available
+          qty: item.qty,
+          neededQty: item.qty,
+          price: item.unitPrice,
+          inventoryPriceTierId: item.inventoryPriceTierId,
+          discount: 0,
+          discountAmount: 0,
+          tax: Math.round(item.unitPrice * item.qty * taxRate),
+        }))
+      };
+
+      // Call external order API
+      const apiResponse = await createOrder(orderPayload);
+      const statusCode = apiResponse?.statusCode;
+
+      if (statusCode && statusCode !== 200) {
+        throw new Error(apiResponse?.message || 'Order API failed. Please try again.');
       }
 
       // Calculate shipping address based on address type
@@ -263,7 +378,7 @@ export default function Checkout() {
       const shippingCity = deliveryDetails.city;
       const shippingNotes = deliveryDetails.notes || null;
 
-      // Insert order into database with type assertion
+      // Insert order into database
       const { data: orderData, error: orderError } = await (supabase
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from('orders') as any)

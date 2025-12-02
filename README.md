@@ -3,6 +3,39 @@
 
 **Platform distributor GT Baskit:** katalog produk, harga, MOQ, dan pendaftaran distributor.
 
+## 🚀 Quick Start with PM2
+
+### For Production Server Deployment
+
+**Option 1: Automated Deployment (Recommended)**
+```bash
+# One-command deployment
+./deploy.sh
+```
+
+**Option 2: Manual PM2 Deployment**
+```bash
+npm install -g pm2
+npm install
+npm run build
+npm run pm2:start
+```
+
+**Option 3: Lightweight with Serve**
+```bash
+npm install -g serve
+npm install
+npm run build
+npm run serve
+```
+
+📖 **Full Documentation**: 
+- PM2 Production: [DEPLOYMENT.md](./DEPLOYMENT.md) | [PM2_QUICKSTART.md](./PM2_QUICKSTART.md)
+- Serve Lightweight: [SERVE_DEPLOYMENT.md](./SERVE_DEPLOYMENT.md)
+- Server Setup: [SERVER_SETUP.md](./SERVER_SETUP.md)
+
+---
+
 ## Project Overview
 
 Baskit Distributor Hub adalah portal resmi untuk distributor FMCG di Indonesia. Platform ini memudahkan distributor untuk:

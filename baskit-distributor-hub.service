@@ -1,0 +1,28 @@
+[Unit]
+Description=Baskit Distributor Hub - Node.js Application
+Documentation=https://github.com/Baskit-App/baskit-distributor-hub-25
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/baskit-distributor-hub-25
+Environment="NODE_ENV=production"
+Environment="PORT=8081"
+Environment="HOST=0.0.0.0"
+ExecStart=/usr/bin/npm run preview
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/var/log/baskit-distributor-hub/out.log
+StandardError=append:/var/log/baskit-distributor-hub/error.log
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65536
+MemoryLimit=1G
+
+[Install]
+WantedBy=multi-user.target

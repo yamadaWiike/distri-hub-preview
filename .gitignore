@@ -69,3 +69,8 @@ scripts/validate-*.sql
 
 # Local security directory
 security-local/
+
+# Documentation files (markdown)
+*.md
+*.txt
+!README.md

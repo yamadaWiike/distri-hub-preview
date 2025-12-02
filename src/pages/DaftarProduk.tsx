@@ -1,5 +1,6 @@
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
 import { Product, ProductVariant } from "@/data/products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,13 +13,13 @@ import {
   TooltipTrigger 
 } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { Link } from "react-router-dom";
 import { Slider } from "@/components/ui/slider";
 import { useCart } from "@/hooks/use-cart";
-import { formatIDR } from "@/lib/utils";
+import { formatIDR, generateProductSlug } from "@/lib/utils";
 import { useLanguage } from "@/hooks/use-language";
 import { addPDFHeader, addPDFFooter } from "@/utils/pdf-utils";
 import { translations } from "@/lib/translations";
@@ -28,6 +29,7 @@ import { generateCatalogPDF } from "@/utils/catalog";
 import { supabase } from "@/integrations/supabase/client";
 import { CartItem } from "@/contexts/CartContextDefinition";
 import { Clock, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { checkMixedVariantsMOQ } from "@/utils/mixVariants";
 
 // Import the analytics helpers
 import { trackCatalogExport, trackDeniedCatalogExport } from "@/utils/analytics";
@@ -35,25 +37,7 @@ import { trackCatalogExport, trackDeniedCatalogExport } from "@/utils/analytics"
 // Cache duration constant
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 
-// Helper function to check mixed variants MOQ
-const checkMixedVariantsMOQ = (items: CartItem[], baseProductId: string, area: string, skuLevelMoq: number) => {
-  // Find all items in cart that match this base product and area
-  const relatedItems = items.filter(item => 
-    item.id === baseProductId && item.province === area
-  );
-  
-  const currentTotal = relatedItems.reduce((sum, item) => sum + item.qty, 0);
-  const hasEnoughItems = currentTotal >= skuLevelMoq;
-  const neededToReachMOQ = Math.max(0, skuLevelMoq - currentTotal);
-  
-  return {
-    hasEnoughItems,
-    currentTotal,
-    neededToReachMOQ
-  };
-};
-
-function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: ProductWithVariant; loggedIn: boolean; selectedFilterArea?: string }) {
+const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = '' }: { product: ProductWithVariant; loggedIn: boolean; user: any; selectedFilterArea?: string }) => {
   
   // Get cart functions and items
   const { addItem, items } = useCart();
@@ -150,6 +134,73 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
       setQty(prev => Math.max(prev, newMoq));
     }
   }, [selectedFilterArea, product.regions, product.moq]);
+
+  // Add to cart handler
+  const handleAddToCart = () => {
+    let finalQty = qty;
+    let moqMessage = '';
+    
+    if (allowMixVariants && skuLevelMoq > 0 && product.isVariant) {
+      const { hasEnoughItems, currentTotal } = checkMixedVariantsMOQ(
+        items,
+        product.baseProductId,
+        regional?.area || '',
+        skuLevelMoq
+      );
+      
+      const newTotal = currentTotal + qty;
+      
+      if (hasEnoughItems || newTotal >= skuLevelMoq) {
+        moqMessage = lang === 'id'
+          ? ` (Total varian: ${newTotal}/${skuLevelMoq})`
+          : ` (Total variants: ${newTotal}/${skuLevelMoq})`;
+      } else {
+        const stillNeeded = skuLevelMoq - newTotal;
+        moqMessage = lang === 'id'
+          ? ` (${newTotal}/${skuLevelMoq}, perlu ${stillNeeded} lagi)`
+          : ` (${newTotal}/${skuLevelMoq}, need ${stillNeeded} more)`;
+      }
+      
+      finalQty = qty;
+    } else if (qty < usedMoq) {
+      finalQty = usedMoq;
+    }
+    
+    addItem({
+      id: product.baseProductId,
+      name: product.name,
+      size: product.size,
+      image: product.image,
+      province: regional?.area || '',
+      unitPrice: basePrice,
+      moq: usedMoq,
+      qty: finalQty,
+      consumerPrice: product.consumerPrice,
+      skuLevelMoq: allowMixVariants ? skuLevelMoq : undefined,
+      allowMixVariants: allowMixVariants,
+      variant: product.isVariant && product.variantInfo ? {
+        id: product.variantInfo.id,
+        name: product.variantInfo.variantName,
+        additionalPrice: product.variantInfo.additionalPrice
+      } : undefined,
+      uomConversions: uomConversions,
+      selectedUoms: {
+        moq: moqUom,
+        pricing: pricingUom,
+        base: baseUom
+      }
+    });
+
+    toast({
+      title: `${product.displayName} ${product.size}`,
+      description: lang === 'id' 
+        ? `${finalQty} item ditambahkan ke keranjang${moqMessage}` 
+        : `${finalQty} items added to cart${moqMessage}`,
+      duration: 3000,
+    });
+  };
+
+  const canAddToCart = distributorAccess.canPlaceOrders && basePrice > 0 && regional && user?.profileComplete === true;
   
   // Calculate margin and profit for a single unit to avoid qty-related issues
   const unitProfit = Math.max(0, product.consumerPrice - basePrice);
@@ -161,336 +212,353 @@ function ProductCard({ product, loggedIn, selectedFilterArea = '' }: { product: 
   const profit = potentialRevenue - subtotalDistributor;
   const margin = potentialRevenue > 0 ? (profit / potentialRevenue) * 100 : 0;
 
+  // Simplified card for non-logged-in or pending approval users
+  if (!loggedIn || distributorAccess.isPending) {
+    return (
+      <article className="border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow h-full flex flex-col">
+        {/* Product Image with Area Badge */}
+        <div className="relative w-full h-48">
+          <img
+            src={product.image || '/placeholder.svg'}
+            alt={`${product.displayName} — ${product.size}`}
+            loading="lazy"
+            className="w-full h-48 object-cover"
+          />
+          {/* Area Badge - top right corner */}
+          <div className="absolute top-2 right-2 bg-gray-600 text-white rounded px-2 py-1 text-xs font-medium">
+            {regional?.area ?? '-'}
+          </div>
+        </div>
+
+        {/* Product Info Section */}
+        <div className="p-3 flex-1 flex flex-col">
+          {/* Brand Name */}
+          {product.brand && product.brand !== 'unknown' && product.brand !== 'Unknown Brand' && product.brand !== 'Unknown' && (
+            <div className="text-xs text-gray-600 mb-1">{product.brand}</div>
+          )}
+
+          {/* Product Name with Variant */}
+          <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2">
+            {product.name}
+            {product.isVariant && product.variantInfo && ` ${product.variantInfo.variantName}`}
+          </h3>
+
+          {/* Category - SKU Variant */}
+          <div className="text-xs text-gray-500 mb-3">
+            {product.category && product.category !== 'unknown' && product.category !== 'Uncategorized' && product.category}
+            {product.isVariant && product.variantInfo && (
+              <> - {product.variantInfo.variantName}</>
+            )}
+          </div>
+
+          {/* Price Section - Blurred */}
+          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50 relative">
+            <div className="text-xs text-gray-600 mb-2 blur-sm select-none">
+              Harga per karton
+            </div>
+            
+            {/* Distributor Price - Blurred with Orange Background */}
+            <div className="mb-1 -mx-3 px-3 py-1.5 bg-orange-50 blur-sm select-none">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-600">Distributor</span>
+                <span className="text-sm font-bold text-gray-900">Rp 150,000</span>
+              </div>
+            </div>
+
+            {/* Retail Price - Blurred */}
+            <div className="mb-1 blur-sm select-none">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-600">Retail</span>
+                <span className="text-sm font-semibold text-gray-900">Rp 180,000</span>
+              </div>
+            </div>
+
+            {/* Konsumen Price - Blurred */}
+            <div className="blur-sm select-none">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-600">Konsumen</span>
+                <span className="text-sm font-normal text-gray-900">Rp 205,200</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Margin Display - Blurred */}
+          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50 blur-sm select-none">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-600">
+                Margin (Distributor — Retail)
+              </span>
+              <span className="text-sm font-bold text-teal-600">30000%</span>
+            </div>
+          </div>
+
+          {/* MOQ Info */}
+          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
+            <div className="flex justify-between text-xs">
+              <span className="text-gray-600">MOQ</span>
+              <span className="font-medium text-gray-900">{displayMoq} karton</span>
+            </div>
+          </div>
+
+          {/* Login/Approval Message */}
+          <div className="mt-auto mb-3 p-3 bg-orange-50 border border-orange-300 rounded-md">
+            <p className="text-xs text-orange-800 text-center font-medium">
+              {!loggedIn 
+                ? (lang === 'id' 
+                    ? 'Silakan login untuk mengakses harga dan melakukan pemesanan.' 
+                    : 'Please login to access prices and place orders.')
+                : (lang === 'id'
+                    ? 'Menunggu approval admin untuk mengakses harga dan melakukan pemesanan.'
+                    : 'Waiting for admin approval to access prices and place orders.')
+              }
+            </p>
+          </div>
+        </div>
+      </article>
+    );
+  }
+  
+  // Card for active users with incomplete profile - show prices but can't order
+  if (loggedIn && distributorAccess.canSeePrices && !user?.profileComplete) {
+    return (
+      <article className="border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow h-full flex flex-col">
+        {/* Product Image with Area Badge */}
+        <div className="relative w-full h-48">
+          <img
+            src={product.image || '/placeholder.svg'}
+            alt={`${product.displayName} — ${product.size}`}
+            loading="lazy"
+            className="w-full h-48 object-cover"
+          />
+          {/* Area Badge - top right corner */}
+          <div className="absolute top-2 right-2 bg-gray-600 text-white rounded px-2 py-1 text-xs font-medium">
+            {regional?.area ?? '-'}
+          </div>
+        </div>
+
+        {/* Product Info Section */}
+        <div className="p-3 flex-1 flex flex-col">
+          {/* Brand Name */}
+          {product.brand && product.brand !== 'unknown' && product.brand !== 'Unknown Brand' && product.brand !== 'Unknown' && (
+            <div className="text-xs text-gray-600 mb-1">{product.brand}</div>
+          )}
+
+          {/* Product Name with Variant */}
+          <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2">
+            {product.name}
+            {product.isVariant && product.variantInfo && ` ${product.variantInfo.variantName}`}
+          </h3>
+
+          {/* Category - SKU Variant */}
+          <div className="text-xs text-gray-500 mb-3">
+            {product.category && product.category !== 'unknown' && product.category !== 'Uncategorized' && product.category}
+            {product.isVariant && product.variantInfo && (
+              <> - {product.variantInfo.variantName}</>
+            )}
+          </div>
+
+          {/* Price Section - Visible for active users */}
+          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
+            <div className="text-xs text-gray-600 mb-2">
+              {lang === 'id' ? "Harga per karton" : "Price per carton"}
+            </div>
+            
+            {/* Distributor Price with Orange Background */}
+            <div className="mb-1 -mx-3 px-3 py-1.5 bg-orange-50">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-600">{lang === 'id' ? 'Distributor' : 'Distributor'}</span>
+                <span className="text-sm font-bold text-orange-600">{formatIDR(basePrice)}</span>
+              </div>
+            </div>
+
+            {/* Retail Price */}
+            <div className="mb-1">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-600">{lang === 'id' ? 'Retail' : 'Retail'}</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {product.retailPrice && product.retailPrice > 0 ? formatIDR(product.retailPrice) : '-'}
+                </span>
+              </div>
+            </div>
+
+            {/* Konsumen Price */}
+            <div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-600">{lang === 'id' ? 'Konsumen' : 'Consumer'}</span>
+                <span className="text-sm font-normal text-gray-900">{formatIDR(product.consumerPrice)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Margin Display */}
+          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-600">
+                {lang === 'id' ? 'Margin (Distributor — Retail)' : 'Margin (Distributor — Retail)'}
+              </span>
+              <span className="text-sm font-bold text-teal-600">{unitMargin.toFixed(1)}%</span>
+            </div>
+          </div>
+
+          {/* MOQ Info */}
+          <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
+            <div className="flex justify-between text-xs">
+              <span className="text-gray-600">MOQ</span>
+              <span className="font-medium text-gray-900">{displayMoq} karton</span>
+            </div>
+          </div>
+
+          {/* Complete Profile Message */}
+          <div className="mt-auto mb-3 p-3 bg-blue-50 border border-blue-300 rounded-md">
+            <p className="text-xs text-blue-800 text-center font-medium mb-2">
+              {lang === 'id' 
+                ? 'Lengkapi profil Anda untuk dapat memesan barang.' 
+                : 'Complete your profile to place orders.'}
+            </p>
+            <Link 
+              to="/profil" 
+              className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-2 px-4 rounded transition"
+            >
+              {lang === 'id' ? 'Lengkapi Profil Disini' : 'Complete Profile Here'}
+            </Link>
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  // Full card for logged-in and approved users
   return (
-    <article className="border rounded-lg p-4 flex flex-col h-full bg-white shadow-sm hover:shadow-md transition-shadow">
-      {/* Product Image */}
-      <div className="relative w-full overflow-hidden rounded-md mb-4">
+    <article className="border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow h-full flex flex-col">
+      {/* Product Image with Area Badge */}
+      <div className="relative w-full h-48">
         <img
           src={product.image || '/placeholder.svg'}
           alt={`${product.displayName} — ${product.size}`}
           loading="lazy"
-          className="w-full h-40 object-cover"
+          className="w-full h-48 object-cover"
         />
+        {/* Area Badge - top right corner */}
+        <div className="absolute top-2 right-2 bg-gray-600 text-white rounded px-2 py-1 text-xs font-medium">
+          {regional?.area ?? '-'}
+        </div>
       </div>
 
-      {/* Product Header */}
-      <div className="mb-4">
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-              <span>{product.category}</span>
-              <span>•</span>
-              <span>{product.brand}</span>
-            </div>
-            <h3 className="text-base font-semibold leading-tight text-foreground mb-1">
-              {product.displayName}
-            </h3>
-            <div className="text-sm text-muted-foreground">{product.size}</div>
-          </div>
-          <div className="flex flex-col items-end gap-2 min-w-0">
-            <Link
-              to={`/produk/${product.baseProductId}`}
-              className="text-xs text-primary hover:text-primary/80 font-medium px-2 py-1 rounded-md hover:bg-primary/10 transition-colors"
-            >
-              {lang === 'id' ? "Lihat Detail" : "View Details"}
-            </Link>
+      {/* Product Info Section */}
+      <div className="p-3 flex-1 flex flex-col">
+        {/* Brand Name */}
+        {product.brand && product.brand !== 'unknown' && product.brand !== 'Unknown Brand' && product.brand !== 'Unknown' && (
+          <div className="text-xs text-gray-600 mb-1">{product.brand}</div>
+        )}
 
-            {/* Variant Info - Under Lihat Detail in same column */}
-            {product.isVariant && product.variantInfo && (
-              <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full font-medium">
-                Variant: {product.variantInfo.variantName}
+        {/* Product Name with Variant */}
+        <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2">
+          {product.name}
+          {product.isVariant && product.variantInfo && ` ${product.variantInfo.variantName}`}
+        </h3>
+
+        {/* Category - SKU Variant */}
+        <div className="text-xs text-gray-500 mb-3">
+          {product.category && product.category !== 'unknown' && product.category !== 'Uncategorized' && product.category}
+          {product.isVariant && product.variantInfo && (
+            <> - {product.variantInfo.variantName}</>
+          )}
+        </div>
+
+        {/* Price Section */}
+        <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
+          <div className="text-xs text-gray-600 mb-2">
+            {lang === 'id' ? "Harga per karton" : "Price per carton"}
+          </div>
+          
+          {/* Distributor Price with Orange Background */}
+          <div className="mb-1 -mx-3 px-3 py-1.5 bg-orange-50">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-600">{lang === 'id' ? 'Distributor' : 'Distributor'}</span>
+              <span className="text-sm font-bold text-orange-600">{formatIDR(basePrice)}</span>
+            </div>
+          </div>
+
+          {/* Retail Price */}
+          <div className="mb-1">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-600">{lang === 'id' ? 'Retail' : 'Retail'}</span>
+              <span className="text-sm font-semibold text-gray-900">
+                {product.retailPrice && product.retailPrice > 0 ? formatIDR(product.retailPrice) : '-'}
               </span>
-            )}
+            </div>
+          </div>
+
+          {/* Konsumen Price */}
+          <div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-600">{lang === 'id' ? 'Konsumen' : 'Consumer'}</span>
+              <span className="text-sm font-normal text-gray-900">
+                {product.consumerPrice && product.consumerPrice > 0 ? formatIDR(product.consumerPrice) : '-'}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Variant Description - Full width if exists */}
-        {product.isVariant && product.variantInfo?.variantDescription && (
-          <div className="pt-2">
-            <p className="text-sm text-muted-foreground">
-              {product.variantInfo.variantDescription}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Pricing Section */}
-      <div className="mb-4">
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div className="bg-gray-50 rounded-lg p-3">
-            <div className="text-xs font-medium text-muted-foreground mb-2">
-              {lang === 'id' ? "Harga Pelanggan" : "Customer Price"}
-            </div>
-            <div className="text-sm font-bold text-foreground flex flex-wrap items-baseline gap-1">
-              <span>{formatIDR(product.consumerPrice)}</span>
-              {product.pricing_uom && product.pricing_uom !== 'pcs' && (
-                <span className="text-xs text-muted-foreground">/{product.pricing_uom}</span>
-              )}
-            </div>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-3">
-            <div className="text-xs font-medium text-muted-foreground mb-2">
-              {lang === 'id' ? "Harga Distributor" : "Distributor Price"}
-            </div>
-            {loggedIn ? (
-              <div className="text-sm font-bold text-foreground flex flex-wrap items-baseline gap-1">
-                <span>{distributorAccess.canViewPrices ? formatIDR(basePrice) : '••••••'}</span>
-                {(() => {
-                  const priceUom = product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (regional?.price_uom || 'pcs');
-                  return priceUom !== 'pcs' ? <span className="text-xs text-muted-foreground">/{priceUom}</span> : null;
-                })()}
-              </div>
-            ) : (
-              <div className="text-sm font-bold text-foreground blur-sm select-none flex flex-wrap items-baseline gap-1">
-                <span>{formatIDR(basePrice)}</span>
-                {(() => {
-                  const priceUom = product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (regional?.price_uom || 'pcs');
-                  return priceUom !== 'pcs' ? <span className="text-xs text-muted-foreground">/{priceUom}</span> : null;
-                })()}
-              </div>
-            )}
+        {/* Margin Display */}
+        <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-gray-600">
+              Margin (Distributor — Retail)
+            </span>
+            <span className="text-sm font-bold text-teal-600">
+              {unitMargin.toFixed(0)}%
+            </span>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="text-center">
-            <div className="text-xs font-medium text-muted-foreground mb-1">MOQ</div>
-            <div className="text-sm font-semibold text-foreground">
-              {displayMoq} {product.moq_uom && product.moq_uom !== 'pcs' ? product.moq_uom : (regional?.moq_uom || 'pcs')}
-              {allowMixVariants && product.isVariant ? (
-                <div className="text-xs text-emerald-700 font-bold mt-1">
-                  {lang === 'id' ? "Boleh Mix Variant untuk MOQ" : "Allow Mix Variant for MOQ"}
-                </div>
-              ) : null}
-            </div>
-            {/* Removed debug information for min per variant and cart counts */}
-          </div>
-          <div className="text-center">
-            <div className="text-xs font-medium text-muted-foreground mb-1">Area Distribusi</div>
-            <div className="text-sm font-semibold text-foreground">{regional?.area ?? '-'}</div>
+        {/* MOQ Info */}
+        <div className="mb-3 -mx-3 px-3 py-2 bg-gray-50">
+          <div className="flex justify-between text-xs">
+            <span className="text-gray-600">MOQ</span>
+            <span className="font-medium text-gray-900">{displayMoq} karton</span>
           </div>
         </div>
-      </div>
 
-      {/* Use mt-auto to push this section to the bottom of the card */}
-      <div className="mt-auto pt-2">
-        {loggedIn ? (
-          distributorAccess.isActive ? (
-            <div className="space-y-3">
-              <div className="grid gap-2 grid-cols-2">
-                <div>
-                  <label className="text-xs text-muted-foreground">Area Distribusi</label>
-                  <select
-                    value={selectedArea}
-                    onChange={(e) => {
-                      const newArea = e.target.value;
-                      setSelectedArea(newArea);
-                      
-                      // Find the new MOQ and mix variants settings for the selected area
-                      const newRegional = product.regions.find(r => r.area === newArea) || product.regions[0];
-                      const newMoq = newRegional?.moq ?? product.moq;
-                      const newAllowMixVariants = Boolean(newRegional?.allowMixVariants === true || product.allowMixVariants === true);
-                      
-                      // If mixed variants are allowed, min qty can be 1, otherwise use MOQ
-                      const minQty = (newAllowMixVariants && product.isVariant) ? 1 : newMoq;
-                      
-                      // Update quantity to at least match the minimum quantity
-                      setQty((currentQty) => {
-                        return Math.max(currentQty, minQty);
-                      });
-                    }}
-                    className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-xs"
-                  >
-                    {product.regions.map((r) => (
-                      <option key={r.area} value={r.area}>{r.area}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs text-muted-foreground">Kuantitas</label>
-                  <input
-                    type="number"
-                    // IMPORTANT: Force min="1" directly when mixed variants are allowed
-                    min="1" 
-                    step="1"
-                    value={qty}
-                    onChange={(e) => {
-                      // Parse the new value as integer
-                      let newValue = parseInt(e.target.value || '0');
-                      
-                      // Always ensure at least 1
-                      if (newValue <= 0) {
-                        newValue = 1;
-                      }
-                      
-                      // Critical check: When mix variants is allowed, accept ANY positive value
-                      if (allowMixVariants && product.isVariant) {
-                        // For mixed variants, allow ANY quantity (no enforcement)
-                        setQty(newValue);
-                      } else {
-                        // For regular products, enforce individual MOQ
-                        setQty(newValue < usedMoq ? usedMoq : newValue);
-                      }
-                    }}
-                    className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-xs"
-                  />
-                </div>
-              </div>
-              <div className="bg-muted/30 rounded-md p-2">
-                <div className="text-xs text-muted-foreground mb-1">Estimasi Margin</div>
-                <div className="text-sm font-medium">
-                  {/* Always calculate and display margin if prices are available */}
-                  {basePrice > 0 && product.consumerPrice > 0 ? (
-                    <div className="space-y-0.5">
-                      <div className="font-semibold">{formatIDR(unitProfit * qty)}</div>
-                      <div className={`text-xs ${unitMargin >= 25 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                        {unitMargin.toFixed(1)}% margin
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-muted-foreground py-1">Tidak tersedia</div>
-                  )}
-                </div>
-              </div>
-              {/* Fixed height button container */}
-              <div className="h-10">
-                <Button
-                  variant="hero"
-                  size="sm"
-                  className="w-full h-full"
-                  onClick={() => {
-                    // For mixed variants, check if we're meeting MOQ across all variants
-                    let finalQty = qty;
-                    let moqMessage = '';
-                    
-                    if (allowMixVariants && skuLevelMoq > 0 && product.isVariant) {
-                      // For mixed variants products, always allow any quantity (minimum 1)
-                      // Calculate the mixed variant status
-                      const { hasEnoughItems, currentTotal } = checkMixedVariantsMOQ(
-                        items,
-                        product.baseProductId,
-                        regional?.area || '',
-                        skuLevelMoq
-                      );
-                      
-                      // For mixed variants, always allow adding any quantity
-                      // Just provide different messages based on whether MOQ is met
-                      const newTotal = currentTotal + qty;
-                      
-                      if (hasEnoughItems || newTotal >= skuLevelMoq) {
-                        // We're good - the current cart + this addition will meet or exceed SKU-level MOQ
-                        moqMessage = lang === 'id'
-                          ? ` (Total varian: ${newTotal}/${skuLevelMoq})`
-                          : ` (Total variants: ${newTotal}/${skuLevelMoq})`;
-                      } else {
-                        // We're adding a quantity that won't meet the MOQ yet - show how many more needed
-                        const stillNeeded = skuLevelMoq - newTotal;
-                        moqMessage = lang === 'id'
-                          ? ` (${newTotal}/${skuLevelMoq}, perlu ${stillNeeded} lagi)`
-                          : ` (${newTotal}/${skuLevelMoq}, need ${stillNeeded} more)`;
-                      }
-                      
-                      // Use exactly the quantity the user specified - no auto adjustments
-                      finalQty = qty;
-                    } else if (qty < usedMoq) {
-                      // For regular products, enforce individual MOQ
-                      finalQty = usedMoq;
-                    }
-                    
-                    // Add to cart with exact quantity specified and variant if selected
-                    addItem({
-                      id: product.baseProductId, // Use base product ID for cart consistency
-                      name: product.name, // Use original product name
-                      size: product.size,
-                      image: product.image,
-                      province: regional?.area || '',
-                      unitPrice: basePrice,
-                      moq: usedMoq,
-                      qty: finalQty, // Use calculated quantity based on MOQ rules
-                      consumerPrice: product.consumerPrice,
-                      // Include mixed variants information for MOQ validation
-                      skuLevelMoq: allowMixVariants ? skuLevelMoq : undefined,
-                      allowMixVariants: allowMixVariants,
-                      variant: product.isVariant && product.variantInfo ? {
-                        id: product.variantInfo.id,
-                        name: product.variantInfo.variantName,
-                        additionalPrice: product.variantInfo.additionalPrice
-                      } : undefined,
-                      // UOM conversion data (not displayed but available for calculations)
-                      uomConversions: uomConversions,
-                      selectedUoms: {
-                        moq: moqUom,
-                        pricing: pricingUom,
-                        base: baseUom
-                      }
-                    });
-
-                    // Show toast notification
-                    toast({
-                      title: `${product.displayName} ${product.size}`,
-                      description: lang === 'id' 
-                        ? `${finalQty} item ditambahkan ke keranjang${moqMessage}` 
-                        : `${finalQty} items added to cart${moqMessage}`,
-                      duration: 3000,
-                    });
-                  }}
-                >
-                  {lang === 'id' ? "Tambah ke Keranjang" : "Add to Cart"}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            // Account pending approval or rejected
-            <div className="space-y-3">
-              <Alert className={`border-${distributorAccess.statusColor === 'yellow' ? 'orange' : distributorAccess.statusColor}-200 bg-${distributorAccess.statusColor === 'yellow' ? 'orange' : distributorAccess.statusColor}-50`}>
-                <div className="flex items-center gap-2">
-                  {distributorAccess.isPending && <Clock className="h-4 w-4 text-orange-500" />}
-                  {distributorAccess.isRejected && <XCircle className="h-4 w-4 text-red-500" />}
-                  {distributorAccess.isInactive && <AlertTriangle className="h-4 w-4 text-gray-500" />}
-                  <AlertDescription className="text-sm">
-                    {lang === 'id' ? (
-                      distributorAccess.isPending ? 'Akun menunggu persetujuan admin' :
-                      distributorAccess.isRejected ? 'Akun telah ditolak' :
-                      distributorAccess.isInactive ? 'Akun tidak aktif' :
-                      'Status akun tidak diketahui'
-                    ) : (
-                      distributorAccess.statusMessage
-                    )}
-                  </AlertDescription>
-                </div>
-              </Alert>
-              <div className="h-10">
-                <Button variant="outline" size="sm" className="w-full h-full" disabled>
-                  {lang === 'id' ? 
-                    (distributorAccess.isPending ? "Menunggu Persetujuan" : "Tidak Dapat Memesan") :
-                    (distributorAccess.isPending ? "Pending Approval" : "Cannot Order")
-                  }
-                </Button>
-              </div>
-            </div>
-          )
-        ) : (
-          <div className="flex flex-col gap-3">
-            <div className="text-sm text-muted-foreground">
-              {lang === 'id'
-                ? "Masuk untuk menggunakan simulasi dan melihat harga distributor."
-                : "Login to use simulation and view distributor prices."
-              }
-            </div>
-            <div className="h-10">
-              <Link to="/masuk" className="block">
-                <Button variant="hero" size="sm" className="w-full h-full">
-                  {lang === 'id' ? "Lihat Harga" : "View Prices"}
-                </Button>
-              </Link>
-            </div>
-          </div>
-        )}
+        {/* Action Buttons */}
+        <div className="mt-auto grid grid-cols-2 gap-2">
+          <Link to={`/produk/${generateProductSlug(product)}`} className="block">
+            <button className="w-full py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
+              Lihat Detail
+            </button>
+          </Link>
+          <button
+            onClick={handleAddToCart}
+            disabled={!canAddToCart}
+            className={`w-full py-2.5 text-sm font-medium text-white rounded-md transition-colors flex items-center justify-center gap-2 ${
+              canAddToCart 
+                ? 'bg-orange-500 hover:bg-orange-600' 
+                : 'bg-gray-300 cursor-not-allowed'
+            }`}
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          </button>
+        </div>
       </div>
     </article>
   );
-}
+});
+
+// Loading skeleton component
+const ProductCardSkeleton = () => (
+  <div className="border rounded-lg overflow-hidden bg-white shadow-sm h-full flex flex-col animate-pulse">
+    <div className="w-full h-48 bg-gray-200" />
+    <div className="p-3 flex-1 flex flex-col space-y-3">
+      <div className="h-3 bg-gray-200 rounded w-1/3" />
+      <div className="h-4 bg-gray-200 rounded w-3/4" />
+      <div className="h-3 bg-gray-200 rounded w-1/2" />
+      <div className="flex-1" />
+      <div className="h-8 bg-gray-200 rounded" />
+    </div>
+  </div>
+);
 
 export default function DaftarProduk() {
   const { user } = useAuth();
@@ -1456,277 +1524,234 @@ export default function DaftarProduk() {
           </Alert>
         )}
 
-        {/* Filter Bar - Redesigned for cleaner UX */}
-        <div className="bg-background border rounded-lg p-4 shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-            {/* Area Distribution Filter - 4 columns */}
-            <div className="md:col-span-4">
-              <div className="flex flex-col">
-                <label className="text-sm font-medium mb-1.5">
-                  {lang === 'id' ? "Area Distribusi" : "Distribution Area"}
-                </label>
-                <div className="flex gap-2">
-                  <select
-                    value={area}
-                    onChange={(e) => {
-                      setArea(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="">
-                      {lang === 'id' ? "Semua Area" : "All Areas"}
-                    </option>
-                    {["Jabodetabek", "Jawa Barat", "Jawa Tengah", "Jawa Timur"].map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 flex-shrink-0"
-                    onClick={detectUserLocation}
-                    title={lang === 'id' ? "Deteksi Lokasi" : "Detect Location"}
-                    disabled={isLocating}
-                  >
-                    {isLocating ?
-                      <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div> :
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" /></svg>
-                    }
-                  </Button>
-                </div>
-                {locationError && <p className="text-xs text-destructive mt-1">{locationError}</p>}
+        {/* Alert for non-logged-in users */}
+        {!user && (
+          <Alert className="border-orange-200 bg-orange-50">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-orange-600" />
+              <div className="flex-1">
+                <AlertDescription className="text-sm font-medium text-orange-800">
+                  {lang === 'id' 
+                    ? 'Masuk untuk menggunakan simulasi dan melihat harga distributor.' 
+                    : 'Login to use simulation and view distributor prices.'}
+                </AlertDescription>
               </div>
             </div>
+          </Alert>
+        )}
 
-            {/* Brand Filter - 3 columns */}
-            <div className="md:col-span-3">
-              <div className="flex flex-col">
-                <label className="text-sm font-medium mb-1.5">Brand</label>
-                <select
-                  value={selectedBrand}
-                  onChange={(e) => {
-                    setSelectedBrand(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                >
-                  <option value="">
-                    {lang === 'id' ? "Semua Brand" : "All Brands"}
-                  </option>
-                  {allBrands.map((brand) => (
-                    <option key={brand} value={brand}>{brand}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+        {/* Search and Filter Panel - White background */}
+        <div className="bg-white border rounded-lg p-6 shadow-sm space-y-6">
+          {/* Search Bar */}
+          <div>
+            <Input
+              type="text"
+              placeholder={lang === 'id' ? "Cari produk..." : "Search products..."}
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full"
+            />
+          </div>
 
-            {/* Price Range Filter - 5 columns */}
-            <div className="md:col-span-5">
-              <div className="flex flex-col">
-                <div className="flex justify-between mb-1.5">
-                  <label className="text-sm font-medium">
-                    {lang === 'id' ? "Rentang Harga per Karton" : "Price Range per Carton"}
-                  </label>
-                  <div className="text-xs text-muted-foreground">
-                    {formatIDR(priceRange[0])} - {formatIDR(priceRange[1])}
-                  </div>
-                </div>
-                <div className="flex gap-4 items-center">
-                  <div className="flex-1">
-                    <input
-                      type="number"
-                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                      min={priceBounds[0]}
-                      max={priceRange[1]}
-                      value={priceRange[0]}
-                      onChange={(e) => {
-                        const value = Number(e.target.value);
-                        const newMin = Math.max(priceBounds[0], value);
-                        if (newMin <= priceRange[1]) {
-                          setPriceRange([newMin, priceRange[1]]);
-                          setCurrentPage(1);
-                        }
-                      }}
-                      placeholder="Min"
-                    />
-                  </div>
-                  <span className="text-sm">-</span>
-                  <div className="flex-1">
-                    <input
-                      type="number"
-                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                      min={priceRange[0]}
-                      max={priceBounds[1]}
-                      value={priceRange[1]}
-                      onChange={(e) => {
-                        const value = Number(e.target.value);
-                        const newMax = Math.min(priceBounds[1], value);
-                        if (newMax >= priceRange[0]) {
-                          setPriceRange([priceRange[0], newMax]);
-                          setCurrentPage(1);
-                        }
-                      }}
-                      placeholder="Max"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Buttons - 1 column */}
-            <div className="md:col-span-1 flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={() => {
-                  setArea("");
-                  setSelectedBrand("");
-                  setPriceRange([priceBounds[0], priceBounds[1]]);
+          {/* Filter Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Area Distribution Filter */}
+            <div className="flex flex-col">
+              <label className="text-sm font-medium mb-1.5 text-foreground">
+                {lang === 'id' ? "Area Distribusi" : "Area Distribusi"}
+              </label>
+              <select
+                value={area}
+                onChange={(e) => {
+                  setArea(e.target.value);
                   setCurrentPage(1);
                 }}
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
               >
-                {lang === 'id' ? "Reset" : "Reset"}
-              </Button>
+                <option value="">
+                  {lang === 'id' ? "Semua Area" : "Semua Area"}
+                </option>
+                {["Jabodetabek", "Jawa Barat", "Jawa Tengah", "Jawa Timur"].map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
             </div>
 
-            {/* Export Button - 1 column with optional separator on mobile */}
-            <div className="md:col-span-12 md:border-t md:pt-3 md:mt-2 md:flex md:justify-end">
-              <div className="flex flex-col md:flex-row gap-2">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        onClick={exportFilteredCatalog}
-                        disabled={!distributorAccess.canDownloadCatalog}
-                        className={`w-full md:w-auto flex items-center justify-center ${(!user || !distributorAccess.canDownloadCatalog) ? 'relative' : ''}`}
-                      >
-                        {!user && (
-                          <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-                            <svg className="w-3 h-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H9m3-10v1m0 0v1m0-1h1m-1 0h-1" />
-                            </svg>
-                          </div>
-                        )}
-                        {user && !distributorAccess.canDownloadCatalog && (
-                          <div className="absolute -top-1 -right-1 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center">
-                            <Clock className="w-3 h-3 text-white" />
-                          </div>
-                        )}
-                        <svg className="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        {lang === 'id' ? "Unduh Katalog" : "Download Catalog"}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>
-                        {!user ? (
-                          lang === 'id' ? 'Harap masuk untuk mengunduh katalog' : 'Please sign in to download catalog'
-                        ) : !distributorAccess.canDownloadCatalog ? (
-                          lang === 'id' ? 'Menunggu persetujuan admin untuk mengunduh katalog' : 'Waiting for admin approval to download catalog'
-                        ) : (
-                          lang === 'id' ? 'Unduh katalog produk' : 'Download product catalog'
-                        )}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                
-                <div className="text-xs text-muted-foreground text-right flex items-center md:ml-2">
-                  {/* Empty div to maintain layout */}
-                </div>
+            {/* Brand Filter */}
+            <div className="flex flex-col">
+              <label className="text-sm font-medium mb-1.5 text-foreground">Brand</label>
+              <select
+                value={selectedBrand}
+                onChange={(e) => {
+                  setSelectedBrand(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              >
+                <option value="">
+                  {lang === 'id' ? "Semua Brand" : "Semua Brand"}
+                </option>
+                {allBrands.map((brand) => (
+                  <option key={brand} value={brand}>{brand}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Sort Order Filter */}
+            <div className="flex flex-col">
+              <label className="text-sm font-medium mb-1.5 text-foreground">
+                {lang === 'id' ? "Urutkan" : "Urutkan"}
+              </label>
+              <select
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              >
+                <option value="">
+                  {lang === 'id' ? "Urutkan" : "Urutkan"}
+                </option>
+              </select>
+            </div>
+
+            {/* Price Range Filter */}
+            <div className="flex flex-col">
+              <label className="text-sm font-medium mb-1.5 text-foreground">
+                {lang === 'id' ? "Rentang Harga per Karton" : "Rentang Harga per Karton"}
+              </label>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="number"
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  min={priceBounds[0]}
+                  max={priceRange[1]}
+                  value={priceRange[0]}
+                  onChange={(e) => {
+                    const value = Number(e.target.value);
+                    const newMin = Math.max(priceBounds[0], value);
+                    if (newMin <= priceRange[1]) {
+                      setPriceRange([newMin, priceRange[1]]);
+                      setCurrentPage(1);
+                    }
+                  }}
+                  placeholder={`Rp ${priceBounds[0].toLocaleString()}`}
+                />
+                <span className="text-sm">-</span>
+                <input
+                  type="number"
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  min={priceRange[0]}
+                  max={priceBounds[1]}
+                  value={priceRange[1]}
+                  onChange={(e) => {
+                    const value = Number(e.target.value);
+                    const newMax = Math.min(priceBounds[1], value);
+                    if (newMax >= priceRange[0]) {
+                      setPriceRange([priceRange[0], newMax]);
+                      setCurrentPage(1);
+                    }
+                  }}
+                  placeholder={`Rp ${priceBounds[1].toLocaleString()}`}
+                />
               </div>
             </div>
           </div>
         </div>
+
+        {/* Product Count and Download Catalog */}
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            {lang === 'id' ? "Menampilkan " : "Showing "}
+            <span className="font-semibold text-foreground">{filteredProducts.length}</span>
+            {lang === 'id' ? " produk" : " products"}
+          </div>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={exportFilteredCatalog}
+                  disabled={!distributorAccess.canDownloadCatalog}
+                  className="flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {lang === 'id' ? "Unduh Katalog" : "Unduh Katalog"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>
+                  {!user ? (
+                    lang === 'id' ? 'Harap masuk untuk mengunduh katalog' : 'Please sign in to download catalog'
+                  ) : !distributorAccess.canDownloadCatalog ? (
+                    lang === 'id' ? 'Menunggu persetujuan admin untuk mengunduh katalog' : 'Waiting for admin approval to download catalog'
+                  ) : (
+                    lang === 'id' ? 'Unduh katalog produk' : 'Download product catalog'
+                  )}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+        
+        {/* Informational text for non-logged-in or pending users */}
         {!user && (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground text-sm italic">
             {lang === 'id'
-              ? "Harga distributor akan terlihat setelah Anda masuk dan akun disetujui admin."
-              : "Distributor prices will be visible after you login and your account is approved by admin."
+              ? "Masuk untuk mengakses harga distributor dan fitur pemesanan."
+              : "Login to access distributor prices and ordering features."
             }
           </p>
         )}
         {user && !distributorAccess.isActive && (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground text-sm italic">
             {lang === 'id'
               ? "Harga distributor dan fitur pemesanan akan tersedia setelah akun Anda disetujui admin."
               : "Distributor prices and ordering features will be available after your account is approved by admin."
             }
           </p>
         )}
+        
+        {/* Alert for active users with incomplete profile */}
+        {user && distributorAccess.isActive && !user.profileComplete && (
+          <Alert className="bg-orange-50 border-orange-300">
+            <AlertDescription className="flex items-center justify-between">
+              <span className="text-orange-800 font-medium">
+                {lang === 'id'
+                  ? "Lengkapi profil Anda untuk dapat memesan produk."
+                  : "Complete your profile to be able to order products."}
+              </span>
+              <Link to="/lengkapi-profil">
+                <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white ml-4">
+                  {lang === 'id' ? 'Lengkapi Profil Disini' : 'Complete Profile Here'}
+                </Button>
+              </Link>
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <div ref={ref} className="space-y-4">
-          <div className="border rounded-md p-3 text-sm flex items-center justify-between">
-            <div>
-              <div className="font-medium">
-                {lang === 'id' ? "Filter & Tampilan" : "Filter & Display"}
-              </div>
-              <div className="text-muted-foreground">
-                {searchQuery && (
-                  <>
-                    {lang === 'id' ? "Pencarian: " : "Search: "}"{searchQuery}" •
-                  </>
-                )}
-                {lang === 'id' ? "Area: " : "Area: "}{area || (lang === 'id' ? 'Semua Area' : 'All Areas')} •
-                Brand: {selectedBrand || (lang === 'id' ? 'Semua Brand' : 'All Brands')} •
-                {lang === 'id' ? " Rentang Harga: " : " Price Range: "}{formatIDR(priceRange[0])} - {formatIDR(priceRange[1])}
-              </div>
-            </div>
-            <div className="text-right text-muted-foreground">
-              <div className="text-sm font-medium text-foreground">
-                {lang === 'id' ? "Menampilkan: " : "Showing: "}{filteredProducts.length} {lang === 'id' ? 'produk' : 'products'}
-              </div>
-              {currentPage > 1 && (
-                <div className="text-xs">
-                  {lang === 'id'
-                    ? `Halaman ${currentPage} dari ${paginationTotalPages}`
-                    : `Page ${currentPage} of ${paginationTotalPages}`
-                  }
-                </div>
-              )}
-              {items?.length > 0 && (
-                <div className="text-xs">
-                  {lang === 'id'
-                    ? `${items.length} item di keranjang`
-                    : `${items.length} items in cart`
-                  }
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Search Bar - Positioned above product cards */}
-          <div className="bg-background border rounded-lg p-4 shadow-sm">
-            <div className="max-w-md">
-              <label className="text-sm font-medium mb-2 block">
-                {lang === 'id' ? "Cari SKU/Produk" : "Search SKU/Product"}
-              </label>
-              <Input
-                type="text"
-                placeholder={lang === 'id' ? "Masukkan SKU atau nama produk..." : "Enter SKU or product name..."}
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full"
-              />
-            </div>
-          </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {currentProducts.map((p) => (
-              <div key={p.id} className="h-full flex">
-                <ProductCard
-                  product={p}
-                  loggedIn={!!user}
-                  selectedFilterArea={area}
-                />
-              </div>
-            ))}
+            {loading ? (
+              // Show skeleton loading cards
+              Array.from({ length: 12 }).map((_, index) => (
+                <ProductCardSkeleton key={`skeleton-${index}`} />
+              ))
+            ) : (
+              currentProducts.map((p) => (
+                <div key={p.id} className="h-full flex">
+                  <ProductCard
+                    product={p}
+                    loggedIn={!!user}
+                    user={user}
+                    selectedFilterArea={area}
+                  />
+                </div>
+              ))
+            )}
           </div>
 
           {/* Pagination Controls */}
@@ -1849,6 +1874,7 @@ export default function DaftarProduk() {
           )}
         </div>
       </main>
+      <Footer />
     </div>
   );
 }

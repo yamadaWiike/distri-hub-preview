@@ -1,5 +1,6 @@
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -415,6 +416,7 @@ export default function Hubungi() {
           </div>
         </div>
       </main>
+      <Footer />
     </div>
   );
 }
