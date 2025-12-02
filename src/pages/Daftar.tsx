@@ -16,7 +16,14 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { provinces, getCitiesByProvince, City } from "@/data/indonesia";
+import { 
+  fetchProvinces, 
+  fetchRegenciesByProvince, 
+  fetchDistrictsByRegency,
+  Province,
+  Regency,
+  District
+} from "@/data/indonesiaRegions";
 
 export default function Daftar() {
   const { register } = useAuth();
@@ -28,7 +35,12 @@ export default function Daftar() {
     fotoTokoUrl: "", // URL from S3 after upload
     alamatLengkap: "",
     provinsiId: "",
-    kota: "",
+    provinsiName: "",
+    regencyId: "",
+    regencyName: "",
+    districtId: "",
+    districtName: "",
+    kota: "", // Keep for backward compatibility
     namaPemilik: "",
     nomorHpPemilik: "", // Renamed from kontakPemilik
     email: "",
@@ -49,7 +61,7 @@ export default function Daftar() {
     npwpFile: null as File | null,
     npwpUrl: "",
   });
-  
+
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [ktpPreview, setKtpPreview] = useState<string | null>(null);
@@ -58,7 +70,15 @@ export default function Daftar() {
   const [isUploadingKtp, setIsUploadingKtp] = useState(false);
   const [isUploadingAkta, setIsUploadingAkta] = useState(false);
   const [isUploadingNpwp, setIsUploadingNpwp] = useState(false);
-  const [availableCities, setAvailableCities] = useState<City[]>([]);
+  
+  // Address data states
+  const [provinces, setProvinces] = useState<Province[]>([]);
+  const [regencies, setRegencies] = useState<Regency[]>([]);
+  const [districts, setDistricts] = useState<District[]>([]);
+  const [isLoadingProvinces, setIsLoadingProvinces] = useState(false);
+  const [isLoadingRegencies, setIsLoadingRegencies] = useState(false);
+  const [isLoadingDistricts, setIsLoadingDistricts] = useState(false);
+  
   const [passwordError, setPasswordError] = useState("");
   const [passwordValidation, setPasswordValidation] = useState({
     minLength: false,
@@ -118,7 +138,12 @@ export default function Daftar() {
       namaBisnis: form.namaBisnis,
       alamatLengkap: form.alamatLengkap,
       provinsiId: form.provinsiId,
-      kota: form.kota,
+      provinceName: form.provinsiName,
+      regencyId: form.regencyId,
+      regencyName: form.regencyName,
+      districtId: form.districtId,
+      districtName: form.districtName,
+      kota: form.regencyName, // Keep for backward compatibility
       namaPemilik: form.namaPemilik,
       kontakPemilik: form.nomorHpPemilik, // Using the renamed field but keeping the API parameter name
       // Additional company information
@@ -141,15 +166,63 @@ export default function Daftar() {
   
   const setSelectValue = (k: string) => (value: string) => setForm({ ...form, [k]: value });
   
-  // Update available cities when province changes
+  // Load provinces on component mount
   useEffect(() => {
-    if (form.provinsiId) {
-      const citiesList = getCitiesByProvince(form.provinsiId);
-      setAvailableCities(citiesList);
-      // Reset the city selection when changing province
-      setForm(prev => ({ ...prev, kota: "" }));
-    }
+    const loadProvinces = async () => {
+      setIsLoadingProvinces(true);
+      const data = await fetchProvinces();
+      setProvinces(data);
+      setIsLoadingProvinces(false);
+    };
+    loadProvinces();
+  }, []);
+
+  // Load regencies when province changes
+  useEffect(() => {
+    const loadRegencies = async () => {
+      if (form.provinsiId) {
+        setIsLoadingRegencies(true);
+        const data = await fetchRegenciesByProvince(form.provinsiId);
+        setRegencies(data);
+        setIsLoadingRegencies(false);
+        // Reset regency and district when province changes
+        setForm(prev => ({ 
+          ...prev, 
+          regencyId: "", 
+          regencyName: "",
+          districtId: "",
+          districtName: "",
+          kota: "" 
+        }));
+        setDistricts([]);
+      } else {
+        setRegencies([]);
+        setDistricts([]);
+      }
+    };
+    loadRegencies();
   }, [form.provinsiId]);
+
+  // Load districts when regency changes
+  useEffect(() => {
+    const loadDistricts = async () => {
+      if (form.regencyId) {
+        setIsLoadingDistricts(true);
+        const data = await fetchDistrictsByRegency(form.regencyId);
+        setDistricts(data);
+        setIsLoadingDistricts(false);
+        // Reset district when regency changes
+        setForm(prev => ({ 
+          ...prev, 
+          districtId: "",
+          districtName: "" 
+        }));
+      } else {
+        setDistricts([]);
+      }
+    };
+    loadDistricts();
+  }, [form.regencyId]);
 
   // Functions to handle step navigation
   const nextStep = () => setCurrentStep(current => Math.min(current + 1, 3));
@@ -161,7 +234,8 @@ export default function Daftar() {
     if (!form.fotoToko) return false;
     if (!form.alamatLengkap.trim()) return false;
     if (!form.provinsiId) return false;
-    if (!form.kota) return false;
+    if (!form.regencyId) return false;
+    if (!form.districtId) return false;
     return true;
   };
   
@@ -269,7 +343,7 @@ export default function Daftar() {
       
       setIsUploadingKtp(true);
       try {
-        const result = await uploadStorePhoto(file, 'ktp');
+        const result = await uploadStorePhoto(file);
         if (result.success && result.url) {
           const previewUrl = getImageUrl(result.url);
           setForm({ ...form, ktpFile: file, ktpUrl: result.url });
@@ -318,7 +392,7 @@ export default function Daftar() {
       
       setIsUploadingAkta(true);
       try {
-        const result = await uploadStorePhoto(file, 'akta');
+        const result = await uploadStorePhoto(file);
         if (result.success && result.url) {
           const previewUrl = file.type === 'application/pdf' ? '/pdf-icon.svg' : getImageUrl(result.url);
           setForm({ ...form, aktaFile: file, aktaUrl: result.url });
@@ -367,7 +441,7 @@ export default function Daftar() {
       
       setIsUploadingNpwp(true);
       try {
-        const result = await uploadStorePhoto(file, 'npwp');
+        const result = await uploadStorePhoto(file);
         if (result.success && result.url) {
           const previewUrl = file.type === 'application/pdf' ? '/pdf-icon.svg' : getImageUrl(result.url);
           setForm({ ...form, npwpFile: file, npwpUrl: result.url });
@@ -539,18 +613,30 @@ export default function Daftar() {
                   />
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 gap-5">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       {lang === 'id' ? "Provinsi" : "Province"} <span className="text-red-500">*</span>
                     </label>
-                    <Select value={form.provinsiId} onValueChange={setSelectValue('provinsiId')} required>
+                    <Select 
+                      value={form.provinsiId} 
+                      onValueChange={(value) => {
+                        const selectedProvince = provinces.find(p => String(p.id) === String(value));
+                        setForm({ 
+                          ...form, 
+                          provinsiId: value,
+                          provinsiName: selectedProvince?.name || ""
+                        });
+                      }} 
+                      required
+                      disabled={isLoadingProvinces}
+                    >
                       <SelectTrigger className="w-full h-10">
                         <SelectValue placeholder={lang === 'id' ? "Pilih Provinsi" : "Select Province"} />
                       </SelectTrigger>
                       <SelectContent>
                         {provinces.map((province) => (
-                          <SelectItem key={province.id} value={province.id}>
+                          <SelectItem key={province.id} value={String(province.id)}>
                             {province.name}
                           </SelectItem>
                         ))}
@@ -562,14 +648,57 @@ export default function Daftar() {
                     <label className="block text-sm font-medium mb-2">
                       {lang === 'id' ? "Kota/Kabupaten" : "City/Regency"} <span className="text-red-500">*</span>
                     </label>
-                    <Select value={form.kota} onValueChange={setSelectValue('kota')} disabled={!form.provinsiId} required>
+                    <Select 
+                      value={form.regencyId} 
+                      onValueChange={(value) => {
+                        const selectedRegency = regencies.find(r => String(r.id) === String(value));
+                        setForm({ 
+                          ...form, 
+                          regencyId: value,
+                          regencyName: selectedRegency?.name || "",
+                          kota: selectedRegency?.name || "" // For backward compatibility
+                        });
+                      }} 
+                      disabled={!form.provinsiId || isLoadingRegencies} 
+                      required
+                    >
                       <SelectTrigger className="w-full h-10">
                         <SelectValue placeholder={lang === 'id' ? "Pilih Kota/Kabupaten" : "Select City/Regency"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {availableCities.map((city) => (
-                          <SelectItem key={city.id} value={city.name}>
-                            {city.name}
+                        {regencies.map((regency) => (
+                          <SelectItem key={regency.id} value={String(regency.id)}>
+                            {regency.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      {lang === 'id' ? "Kecamatan" : "District"} <span className="text-red-500">*</span>
+                    </label>
+                    <Select 
+                      value={form.districtId} 
+                      onValueChange={(value) => {
+                        const selectedDistrict = districts.find(d => String(d.id) === String(value));
+                        setForm({ 
+                          ...form, 
+                          districtId: value,
+                          districtName: selectedDistrict?.name || ""
+                        });
+                      }} 
+                      disabled={!form.regencyId || isLoadingDistricts} 
+                      required
+                    >
+                      <SelectTrigger className="w-full h-10">
+                        <SelectValue placeholder={lang === 'id' ? "Pilih Kecamatan" : "Select District"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {districts.map((district) => (
+                          <SelectItem key={district.id} value={String(district.id)}>
+                            {district.name}
                           </SelectItem>
                         ))}
                       </SelectContent>

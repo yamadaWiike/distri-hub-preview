@@ -77,8 +77,8 @@ async function compressImage(file: File, maxSizeInBytes: number = MAX_FILE_SIZE)
         ctx.drawImage(img, 0, 0, width, height);
         
         // Try different quality levels to hit target size
-        let quality = 0.9;
-        let compressedBlob: Blob | null = null;
+        const quality = 0.9;
+        const compressedBlob: Blob | null = null;
         
         const tryCompress = (q: number) => {
           canvas.toBlob(

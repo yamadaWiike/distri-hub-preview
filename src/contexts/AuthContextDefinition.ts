@@ -33,8 +33,13 @@ export type RegistrationData = {
   password: string; 
   namaBisnis: string; 
   alamatLengkap: string; 
-  provinsiId: string; 
-  kota: string; 
+  provinsiId: string;
+  provinceName?: string;
+  regencyId?: string;
+  regencyName?: string;
+  districtId?: string;
+  districtName?: string;
+  kota: string; // Keep for backward compatibility
   namaPemilik: string; 
   kontakPemilik: string;
   // Additional company information

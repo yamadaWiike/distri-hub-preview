@@ -233,6 +233,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           nama_pemilik: data.namaPemilik,
           kontak_pemilik: data.kontakPemilik,
           status: 'pending',
+          // New address fields for Indonesia regions
+          province_id: data.provinsiId || null,
+          province_name: data.provinceName || null,
+          regency_id: data.regencyId || null,
+          regency_name: data.regencyName || null,
+          district_id: data.districtId || null,
+          district_name: data.districtName || null,
           // Additional company information
           email_perusahaan: data.emailPerusahaan || null,
           nomor_telp_perusahaan: data.nomorTelpPerusahaan || null,
@@ -245,8 +252,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ktp_url: data.ktpUrl || null,
           akta_url: data.aktaUrl || null,
           npwp_url: data.npwpUrl || null,
-          // Note: Removed provinsi_id for now since it expects UUID but we're sending string
-          // The province data is stored as string in kota field for now
         };
         
         try {

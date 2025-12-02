@@ -48,6 +48,12 @@ export interface Database {
           tax_id?: string | null;
           bank_account?: string | null;
           bank_name?: string | null;
+          // New address fields for Indonesia regions
+          province_name?: string | null;
+          regency_id?: string | null;
+          regency_name?: string | null;
+          district_id?: string | null;
+          district_name?: string | null;
         };
         Insert: {
           id?: string;
@@ -92,6 +98,12 @@ export interface Database {
           tax_id?: string | null;
           bank_account?: string | null;
           bank_name?: string | null;
+          // New address fields for Indonesia regions
+          province_name?: string | null;
+          regency_id?: string | null;
+          regency_name?: string | null;
+          district_id?: string | null;
+          district_name?: string | null;
         };
         Update: {
           id?: string;
@@ -136,6 +148,12 @@ export interface Database {
           tax_id?: string | null;
           bank_account?: string | null;
           bank_name?: string | null;
+          // New address fields for Indonesia regions
+          province_name?: string | null;
+          regency_id?: string | null;
+          regency_name?: string | null;
+          district_id?: string | null;
+          district_name?: string | null;
         };
       };
       products: {

@@ -12,6 +12,22 @@ import MapSelector from "@/components/ui/map-selector";
 import "leaflet/dist/leaflet.css";
 import { Database } from "@/integrations/supabase/types";
 import { createCustomer, CustomerPayload } from "@/lib/baskitApiCustomer";
+import { 
+  fetchProvinces, 
+  fetchRegenciesByProvince, 
+  fetchDistrictsByRegency,
+  fetchAllRegencies,
+  type Province, 
+  type Regency, 
+  type District 
+} from "@/data/indonesiaRegions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type ExtendedDistributorProfile =
   Database["public"]["Tables"]["distributor_profiles"]["Row"] & {
@@ -28,543 +44,7 @@ type ExtendedDistributorProfile =
   };
 
 // Indonesian Cities and Regencies
-const INDONESIAN_AREAS = [
-  // DKI Jakarta
-  "Jakarta Pusat",
-  "Jakarta Utara",
-  "Jakarta Barat",
-  "Jakarta Selatan",
-  "Jakarta Timur",
-  "Kepulauan Seribu",
-  // Jawa Barat
-  "Bandung",
-  "Kota Bandung",
-  "Bekasi",
-  "Kota Bekasi",
-  "Bogor",
-  "Kota Bogor",
-  "Cirebon",
-  "Kota Cirebon",
-  "Depok",
-  "Sukabumi",
-  "Kota Sukabumi",
-  "Tasikmalaya",
-  "Kota Tasikmalaya",
-  "Banjar",
-  "Cimahi",
-  "Garut",
-  "Indramayu",
-  "Karawang",
-  "Kuningan",
-  "Majalengka",
-  "Pangandaran",
-  "Purwakarta",
-  "Subang",
-  "Sumedang",
-  "Ciamis",
-  "Cianjur",
-  // Jawa Tengah
-  "Semarang",
-  "Surakarta (Solo)",
-  "Magelang",
-  "Kota Magelang",
-  "Salatiga",
-  "Pekalongan",
-  "Kota Pekalongan",
-  "Tegal",
-  "Kota Tegal",
-  "Banyumas",
-  "Cilacap",
-  "Purbalingga",
-  "Banjarnegara",
-  "Kebumen",
-  "Purworejo",
-  "Wonosobo",
-  "Boyolali",
-  "Klaten",
-  "Sukoharjo",
-  "Wonogiri",
-  "Karanganyar",
-  "Sragen",
-  "Grobogan",
-  "Blora",
-  "Rembang",
-  "Pati",
-  "Kudus",
-  "Jepara",
-  "Demak",
-  "Semarang (Kab.)",
-  "Temanggung",
-  "Kendal",
-  "Batang",
-  "Pemalang",
-  "Brebes",
-  // DI Yogyakarta
-  "Yogyakarta",
-  "Sleman",
-  "Bantul",
-  "Kulon Progo",
-  "Gunung Kidul",
-  // Jawa Timur
-  "Surabaya",
-  "Malang",
-  "Kota Malang",
-  "Kediri",
-  "Kota Kediri",
-  "Blitar",
-  "Kota Blitar",
-  "Madiun",
-  "Kota Madiun",
-  "Mojokerto",
-  "Kota Mojokerto",
-  "Pasuruan",
-  "Kota Pasuruan",
-  "Probolinggo",
-  "Kota Probolinggo",
-  "Batu",
-  "Jember",
-  "Lumajang",
-  "Bondowoso",
-  "Situbondo",
-  "Banyuwangi",
-  "Gresik",
-  "Sidoarjo",
-  "Bangkalan",
-  "Sampang",
-  "Pamekasan",
-  "Sumenep",
-  "Nganjuk",
-  "Magetan",
-  "Ngawi",
-  "Bojonegoro",
-  "Tuban",
-  "Lamongan",
-  "Jombang",
-  "Tulungagung",
-  "Trenggalek",
-  "Pacitan",
-  "Ponorogo",
-  // Banten
-  "Tangerang",
-  "Kota Tangerang",
-  "Tangerang Selatan",
-  "Serang",
-  "Kota Serang",
-  "Cilegon",
-  "Lebak",
-  "Pandeglang",
-  // Bali
-  "Denpasar",
-  "Badung",
-  "Gianyar",
-  "Tabanan",
-  "Klungkung",
-  "Bangli",
-  "Karangasem",
-  "Buleleng",
-  "Jembrana",
-  // Sumatera Utara
-  "Medan",
-  "Binjai",
-  "Tebing Tinggi",
-  "Pematang Siantar",
-  "Tanjung Balai",
-  "Padang Sidempuan",
-  "Gunung Sitoli",
-  "Deli Serdang",
-  "Langkat",
-  "Serdang Bedagai",
-  "Karo",
-  "Dairi",
-  "Toba",
-  "Samosir",
-  "Asahan",
-  "Labuhanbatu",
-  "Labuhanbatu Selatan",
-  "Labuhanbatu Utara",
-  "Tapanuli Selatan",
-  "Tapanuli Tengah",
-  "Tapanuli Utara",
-  "Mandailing Natal",
-  "Nias",
-  "Nias Selatan",
-  "Nias Utara",
-  "Nias Barat",
-  "Humbang Hasundutan",
-  "Pakpak Bharat",
-  "Padang Lawas",
-  "Padang Lawas Utara",
-  "Batu Bara",
-  "Simalungun",
-  // Sumatera Barat
-  "Padang",
-  "Bukittinggi",
-  "Padang Panjang",
-  "Payakumbuh",
-  "Sawahlunto",
-  "Solok",
-  "Kota Solok",
-  "Pariaman",
-  "Agam",
-  "Lima Puluh Kota",
-  "Pasaman",
-  "Pasaman Barat",
-  "Sijunjung",
-  "Tanah Datar",
-  "Dharmasraya",
-  "Kepulauan Mentawai",
-  "Pesisir Selatan",
-  // Riau
-  "Pekanbaru",
-  "Dumai",
-  "Bengkalis",
-  "Indragiri Hilir",
-  "Indragiri Hulu",
-  "Kampar",
-  "Kepulauan Meranti",
-  "Kuantan Singingi",
-  "Pelalawan",
-  "Rokan Hilir",
-  "Rokan Hulu",
-  "Siak",
-  // Kepulauan Riau
-  "Batam",
-  "Tanjung Pinang",
-  "Bintan",
-  "Karimun",
-  "Natuna",
-  "Lingga",
-  "Kepulauan Anambas",
-  // Jambi
-  "Jambi",
-  "Sungai Penuh",
-  "Batang Hari",
-  "Bungo",
-  "Kerinci",
-  "Merangin",
-  "Muaro Jambi",
-  "Sarolangun",
-  "Tanjung Jabung Barat",
-  "Tanjung Jabung Timur",
-  "Tebo",
-  // Sumatera Selatan
-  "Palembang",
-  "Prabumulih",
-  "Pagar Alam",
-  "Lubuklinggau",
-  "Banyuasin",
-  "Empat Lawang",
-  "Lahat",
-  "Muara Enim",
-  "Musi Banyuasin",
-  "Musi Rawas",
-  "Musi Rawas Utara",
-  "Ogan Ilir",
-  "Ogan Komering Ilir",
-  "Ogan Komering Ulu",
-  "Ogan Komering Ulu Selatan",
-  "Ogan Komering Ulu Timur",
-  "Penukal Abab Lematang Ilir",
-  // Bengkulu
-  "Bengkulu",
-  "Bengkulu Selatan",
-  "Bengkulu Tengah",
-  "Bengkulu Utara",
-  "Kaur",
-  "Kepahiang",
-  "Lebong",
-  "Mukomuko",
-  "Rejang Lebong",
-  "Seluma",
-  // Lampung
-  "Bandar Lampung",
-  "Metro",
-  "Lampung Barat",
-  "Lampung Selatan",
-  "Lampung Tengah",
-  "Lampung Timur",
-  "Lampung Utara",
-  "Mesuji",
-  "Pesawaran",
-  "Pesisir Barat",
-  "Pringsewu",
-  "Tanggamus",
-  "Tulang Bawang",
-  "Tulang Bawang Barat",
-  "Way Kanan",
-  // Kalimantan Barat
-  "Pontianak",
-  "Singkawang",
-  "Bengkayang",
-  "Kapuas Hulu",
-  "Kayong Utara",
-  "Ketapang",
-  "Kubu Raya",
-  "Landak",
-  "Melawi",
-  "Mempawah",
-  "Sambas",
-  "Sanggau",
-  "Sekadau",
-  "Sintang",
-  // Kalimantan Tengah
-  "Palangka Raya",
-  "Barito Selatan",
-  "Barito Timur",
-  "Barito Utara",
-  "Gunung Mas",
-  "Kapuas",
-  "Katingan",
-  "Kotawaringin Barat",
-  "Kotawaringin Timur",
-  "Lamandau",
-  "Murung Raya",
-  "Pulang Pisau",
-  "Seruyan",
-  "Sukamara",
-  // Kalimantan Selatan
-  "Banjarmasin",
-  "Banjarbaru",
-  "Balangan",
-  "Banjar",
-  "Barito Kuala",
-  "Hulu Sungai Selatan",
-  "Hulu Sungai Tengah",
-  "Hulu Sungai Utara",
-  "Kotabaru",
-  "Tabalong",
-  "Tanah Bumbu",
-  "Tanah Laut",
-  "Tapin",
-  // Kalimantan Timur
-  "Balikpapan",
-  "Samarinda",
-  "Bontang",
-  "Berau",
-  "Kutai Barat",
-  "Kutai Kartanegara",
-  "Kutai Timur",
-  "Mahakam Ulu",
-  "Paser",
-  "Penajam Paser Utara",
-  // Kalimantan Utara
-  "Tarakan",
-  "Bulungan",
-  "Malinau",
-  "Nunukan",
-  "Tana Tidung",
-  // Sulawesi Utara
-  "Manado",
-  "Bitung",
-  "Tomohon",
-  "Kotamobagu",
-  "Bolaang Mongondow",
-  "Bolaang Mongondow Selatan",
-  "Bolaang Mongondow Timur",
-  "Bolaang Mongondow Utara",
-  "Kepulauan Sangihe",
-  "Kepulauan Siau Tagulandang Biaro",
-  "Kepulauan Talaud",
-  "Minahasa",
-  "Minahasa Selatan",
-  "Minahasa Tenggara",
-  "Minahasa Utara",
-  // Sulawesi Tengah
-  "Palu",
-  "Banggai",
-  "Banggai Kepulauan",
-  "Banggai Laut",
-  "Buol",
-  "Donggala",
-  "Morowali",
-  "Morowali Utara",
-  "Parigi Moutong",
-  "Poso",
-  "Sigi",
-  "Tojo Una-Una",
-  "Toli-Toli",
-  // Sulawesi Selatan
-  "Makassar",
-  "Palopo",
-  "Parepare",
-  "Bantaeng",
-  "Barru",
-  "Bone",
-  "Bulukumba",
-  "Enrekang",
-  "Gowa",
-  "Jeneponto",
-  "Kepulauan Selayar",
-  "Luwu",
-  "Luwu Timur",
-  "Luwu Utara",
-  "Maros",
-  "Pangkajene dan Kepulauan",
-  "Pinrang",
-  "Sidenreng Rappang",
-  "Sinjai",
-  "Soppeng",
-  "Takalar",
-  "Tana Toraja",
-  "Toraja Utara",
-  "Wajo",
-  // Sulawesi Tenggara
-  "Kendari",
-  "Bau-Bau",
-  "Bombana",
-  "Buton",
-  "Buton Selatan",
-  "Buton Tengah",
-  "Buton Utara",
-  "Kolaka",
-  "Kolaka Timur",
-  "Kolaka Utara",
-  "Konawe",
-  "Konawe Kepulauan",
-  "Konawe Selatan",
-  "Konawe Utara",
-  "Muna",
-  "Muna Barat",
-  "Wakatobi",
-  // Gorontalo
-  "Gorontalo",
-  "Boalemo",
-  "Bone Bolango",
-  "Gorontalo Utara",
-  "Pohuwato",
-  // Sulawesi Barat
-  "Mamuju",
-  "Majene",
-  "Mamasa",
-  "Mamuju Tengah",
-  "Mamuju Utara",
-  "Pasangkayu",
-  "Polewali Mandar",
-  // Maluku
-  "Ambon",
-  "Tual",
-  "Buru",
-  "Buru Selatan",
-  "Kepulauan Aru",
-  "Maluku Barat Daya",
-  "Maluku Tengah",
-  "Maluku Tenggara",
-  "Maluku Tenggara Barat",
-  "Seram Bagian Barat",
-  "Seram Bagian Timur",
-  // Maluku Utara
-  "Ternate",
-  "Tidore Kepulauan",
-  "Halmahera Barat",
-  "Halmahera Selatan",
-  "Halmahera Tengah",
-  "Halmahera Timur",
-  "Halmahera Utara",
-  "Kepulauan Sula",
-  "Pulau Morotai",
-  "Pulau Taliabu",
-  // Papua
-  "Jayapura",
-  "Asmat",
-  "Biak Numfor",
-  "Boven Digoel",
-  "Deiyai",
-  "Dogiyai",
-  "Intan Jaya",
-  "Jayapura (Kab.)",
-  "Jayawijaya",
-  "Keerom",
-  "Kepulauan Yapen",
-  "Lanny Jaya",
-  "Mamberamo Raya",
-  "Mamberamo Tengah",
-  "Mappi",
-  "Merauke",
-  "Mimika",
-  "Nabire",
-  "Nduga",
-  "Paniai",
-  "Pegunungan Bintang",
-  "Puncak",
-  "Puncak Jaya",
-  "Sarmi",
-  "Supiori",
-  "Tolikara",
-  "Waropen",
-  "Yahukimo",
-  "Yalimo",
-  // Papua Barat
-  "Sorong",
-  "Fakfak",
-  "Kaimana",
-  "Manokwari",
-  "Manokwari Selatan",
-  "Maybrat",
-  "Pegunungan Arfak",
-  "Raja Ampat",
-  "Sorong Selatan",
-  "Tambrauw",
-  "Teluk Bintuni",
-  "Teluk Wondama",
-  // Nusa Tenggara Barat
-  "Mataram",
-  "Bima",
-  "Kota Bima",
-  "Dompu",
-  "Lombok Barat",
-  "Lombok Tengah",
-  "Lombok Timur",
-  "Lombok Utara",
-  "Sumbawa",
-  "Sumbawa Barat",
-  // Nusa Tenggara Timur
-  "Kupang",
-  "Alor",
-  "Belu",
-  "Ende",
-  "Flores Timur",
-  "Kupang (Kab.)",
-  "Lembata",
-  "Malaka",
-  "Manggarai",
-  "Manggarai Barat",
-  "Manggarai Timur",
-  "Nagekeo",
-  "Ngada",
-  "Rote Ndao",
-  "Sabu Raijua",
-  "Sikka",
-  "Sumba Barat",
-  "Sumba Barat Daya",
-  "Sumba Tengah",
-  "Sumba Timur",
-  "Timor Tengah Selatan",
-  "Timor Tengah Utara",
-  // Aceh
-  "Banda Aceh",
-  "Langsa",
-  "Lhokseumawe",
-  "Sabang",
-  "Subulussalam",
-  "Aceh Barat",
-  "Aceh Barat Daya",
-  "Aceh Besar",
-  "Aceh Jaya",
-  "Aceh Selatan",
-  "Aceh Singkil",
-  "Aceh Tamiang",
-  "Aceh Tengah",
-  "Aceh Tenggara",
-  "Aceh Timur",
-  "Aceh Utara",
-  "Bener Meriah",
-  "Bireuen",
-  "Gayo Lues",
-  "Nagan Raya",
-  "Pidie",
-  "Pidie Jaya",
-  "Simeulue",
-].sort();
+// Indonesian Cities and Regencies removed - replaced with dynamic data from Supabase
 
 export default function LengkapiProfil() {
   const { user } = useAuth();
@@ -594,7 +74,14 @@ export default function LengkapiProfil() {
     nama_perusahaan: "",
     email_perusahaan: "",
     alamat_perusahaan: "",
-    kota: "", // City field - required for profile completion
+    // Address fields
+    provinsiId: "",
+    provinsiName: "",
+    regencyId: "",
+    regencyName: "",
+    districtId: "",
+    districtName: "",
+    kota: "", // Kept for backward compatibility
     nomor_kontak_perusahaan: "",
     nama_direktur: "",
     status_pkp: "",
@@ -628,6 +115,82 @@ export default function LengkapiProfil() {
   const [areaSearch, setAreaSearch] = useState("");
 
   const [existingData, setExistingData] = useState<ExtendedDistributorProfile | null>(null);
+
+  // Address Data States
+  const [provinces, setProvinces] = useState<Province[]>([]);
+  const [regencies, setRegencies] = useState<Regency[]>([]);
+  const [districts, setDistricts] = useState<District[]>([]);
+  
+  const [isLoadingProvinces, setIsLoadingProvinces] = useState(false);
+  const [isLoadingRegencies, setIsLoadingRegencies] = useState(false);
+  const [isLoadingDistricts, setIsLoadingDistricts] = useState(false);
+  
+  // All regencies for distribution area search
+  const [allRegencies, setAllRegencies] = useState<Regency[]>([]);
+
+  // Fetch Provinces and All Regencies on mount
+  useEffect(() => {
+    const loadInitialData = async () => {
+      setIsLoadingProvinces(true);
+      try {
+        const [provincesData, allRegenciesData] = await Promise.all([
+          fetchProvinces(),
+          fetchAllRegencies()
+        ]);
+        setProvinces(provincesData);
+        setAllRegencies(allRegenciesData);
+      } catch (error) {
+        console.error("Error loading initial data:", error);
+      } finally {
+        setIsLoadingProvinces(false);
+      }
+    };
+    loadInitialData();
+  }, []);
+
+  // Fetch Regencies when Province changes
+  useEffect(() => {
+    const loadRegencies = async () => {
+      if (!form.provinsiId) {
+        setRegencies([]);
+        return;
+      }
+      
+      setIsLoadingRegencies(true);
+      try {
+        const data = await fetchRegenciesByProvince(form.provinsiId);
+        setRegencies(data);
+      } catch (error) {
+        console.error("Error loading regencies:", error);
+      } finally {
+        setIsLoadingRegencies(false);
+      }
+    };
+    
+    loadRegencies();
+  }, [form.provinsiId]);
+
+  // Fetch Districts when Regency changes
+  useEffect(() => {
+    const loadDistricts = async () => {
+      if (!form.regencyId) {
+        setDistricts([]);
+        return;
+      }
+      
+      setIsLoadingDistricts(true);
+      try {
+        const data = await fetchDistrictsByRegency(form.regencyId);
+        setDistricts(data);
+      } catch (error) {
+        console.error("Error loading districts:", error);
+      } finally {
+        setIsLoadingDistricts(false);
+      }
+    };
+    
+    loadDistricts();
+  }, [form.regencyId]);
 
   // Debug logging
   useEffect(() => {
@@ -677,7 +240,14 @@ export default function LengkapiProfil() {
             nama_perusahaan: data.nama_bisnis || "",
             email_perusahaan: extendedData.email_perusahaan || "",
             alamat_perusahaan: data.alamat_lengkap || "",
-            kota: data.kota || "", // Load existing city data
+            // Populate address fields
+            provinsiId: data.province_id || "",
+            provinsiName: data.province_name || "",
+            regencyId: data.regency_id || "",
+            regencyName: data.regency_name || "",
+            districtId: data.district_id || "",
+            districtName: data.district_name || "",
+            kota: data.kota || "", // Keep for backward compatibility
             nomor_kontak_perusahaan: extendedData.nomor_telp_perusahaan || "",
             nama_direktur: extendedData.nama_direktur || "",
             status_pkp: extendedData.status_pkp || "",
@@ -757,7 +327,8 @@ export default function LengkapiProfil() {
         !form.email_pemilik ||
         !form.nama_perusahaan ||
         !form.alamat_perusahaan ||
-        !form.kota
+        !form.regencyId || // Check regency instead of kota
+        !form.districtId   // Check district
       ) {
         toast({
           title: lang === "id" ? "Data Belum Lengkap" : "Incomplete Data",
@@ -804,10 +375,17 @@ export default function LengkapiProfil() {
       const updateData = {
         nama_bisnis: form.nama_perusahaan,
         alamat_lengkap: form.alamat_perusahaan,
-        kota: form.kota,
+        kota: form.regencyName, // Use regency name for backward compatibility
         nama_pemilik: form.nama_pemilik,
         kontak_pemilik: form.kontak_pemilik,
         email_pemilik: form.email_pemilik,
+        // New address fields
+        province_id: form.provinsiId,
+        province_name: form.provinsiName,
+        regency_id: form.regencyId,
+        regency_name: form.regencyName,
+        district_id: form.districtId,
+        district_name: form.districtName,
       };
 
       const { error } = await supabase
@@ -827,23 +405,23 @@ export default function LengkapiProfil() {
         assignedUsersId: [], // TODO: Add assigned user
         parentCompanyId: "", // TODO: Add parent company selection if needed
         childType: "", // Default to distributor
-        districtId: 0, // TODO: Add district selection to form
+        districtId: parseInt(form.districtId), // Use actual district ID
         detailAddress: form.alamat_perusahaan,
         companyWebsite: existingData?.companyWebsite || "",
         notes: "",
         postalCode: existingData?.postal_code || "",
         billingAddress: {
           address: form.alamat_perusahaan,
-          district: "", // TODO: Add district field to form
-          city: "", // TODO: Add city field to form
-          province: "", // TODO: Add province field to form
+          district: form.districtName,
+          city: form.regencyName,
+          province: form.provinsiName,
           zipcode: existingData?.postal_code || "",
         },
         shippingAddress: {
           address: form.alamat_gudang || form.alamat_perusahaan,
-          district: "", // TODO: Add district field to form
-          city: "", // TODO: Add city field to form
-          province: "", // TODO: Add province field to form
+          district: form.districtName,
+          city: form.regencyName,
+          province: form.provinsiName,
           zipcode: existingData?.postal_code || "",
         },
         primaryContact: {
@@ -1137,28 +715,100 @@ export default function LengkapiProfil() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {lang === "id" ? "Kota/Kabupaten" : "City/Regency"}{" "}
-                    <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={form.kota}
-                    onChange={set("kota")}
-                    placeholder={
-                      lang === "id"
-                        ? "Contoh: Jakarta Selatan, Bandung, Surabaya"
-                        : "Example: Jakarta Selatan, Bandung, Surabaya"
-                    }
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    {lang === "id"
-                      ? "Masukkan nama kota atau kabupaten tempat perusahaan berada"
-                      : "Enter the city or regency where the company is located"}
-                  </p>
+                <div className="grid grid-cols-1 gap-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {lang === 'id' ? "Provinsi" : "Province"} <span className="text-red-500">*</span>
+                    </label>
+                    <Select 
+                      value={form.provinsiId} 
+                      onValueChange={(value) => {
+                        // Convert both to string for comparison to handle type mismatch
+                        const selectedProvince = provinces.find(p => String(p.id) === String(value));
+                        setForm({ 
+                          ...form, 
+                          provinsiId: value,
+                          provinsiName: selectedProvince?.name || ""
+                        });
+                      }} 
+                      required
+                      disabled={isLoadingProvinces}
+                    >
+                      <SelectTrigger className="w-full h-10">
+                        <SelectValue placeholder={lang === 'id' ? "Pilih Provinsi" : "Select Province"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {provinces.map((province) => (
+                          <SelectItem key={province.id} value={String(province.id)}>
+                            {province.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {lang === 'id' ? "Kota/Kabupaten" : "City/Regency"} <span className="text-red-500">*</span>
+                    </label>
+                    <Select 
+                      value={form.regencyId} 
+                      onValueChange={(value) => {
+                        // Convert both to string for comparison to handle type mismatch
+                        const selectedRegency = regencies.find(r => String(r.id) === String(value));
+                        setForm({ 
+                          ...form, 
+                          regencyId: value,
+                          regencyName: selectedRegency?.name || "",
+                          kota: selectedRegency?.name || "" // For backward compatibility
+                        });
+                      }} 
+                      disabled={!form.provinsiId || isLoadingRegencies} 
+                      required
+                    >
+                      <SelectTrigger className="w-full h-10">
+                        <SelectValue placeholder={lang === 'id' ? "Pilih Kota/Kabupaten" : "Select City/Regency"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {regencies.map((regency) => (
+                          <SelectItem key={regency.id} value={String(regency.id)}>
+                            {regency.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {lang === 'id' ? "Kecamatan" : "District"} <span className="text-red-500">*</span>
+                    </label>
+                    <Select 
+                      value={form.districtId} 
+                      onValueChange={(value) => {
+                        // Convert both to string for comparison to handle type mismatch
+                        const selectedDistrict = districts.find(d => String(d.id) === String(value));
+                        setForm({ 
+                          ...form, 
+                          districtId: value,
+                          districtName: selectedDistrict?.name || ""
+                        });
+                      }} 
+                      disabled={!form.regencyId || isLoadingDistricts} 
+                      required
+                    >
+                      <SelectTrigger className="w-full h-10">
+                        <SelectValue placeholder={lang === 'id' ? "Pilih Kecamatan" : "Select District"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {districts.map((district) => (
+                          <SelectItem key={district.id} value={String(district.id)}>
+                            {district.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1726,21 +1376,21 @@ export default function LengkapiProfil() {
                     />
                     {areaSearch && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                        {INDONESIAN_AREAS.filter((area) =>
-                          area.toLowerCase().includes(areaSearch.toLowerCase())
+                        {allRegencies.filter((area) =>
+                          area.name.toLowerCase().includes(areaSearch.toLowerCase())
                         )
                           .slice(0, 50)
                           .map((area) => (
                             <button
-                              key={area}
+                              key={area.id}
                               type="button"
                               onClick={() => {
-                                if (!form.area_distribusi.includes(area)) {
+                                if (!form.area_distribusi.includes(area.name)) {
                                   setForm({
                                     ...form,
                                     area_distribusi: [
                                       ...form.area_distribusi,
-                                      area,
+                                      area.name,
                                     ],
                                   });
                                 }
@@ -1748,11 +1398,11 @@ export default function LengkapiProfil() {
                               }}
                               className="w-full text-left px-3 py-2 text-sm hover:bg-orange-50 transition-colors"
                             >
-                              {area}
+                              {area.name}
                             </button>
                           ))}
-                        {INDONESIAN_AREAS.filter((area) =>
-                          area.toLowerCase().includes(areaSearch.toLowerCase())
+                        {allRegencies.filter((area) =>
+                          area.name.toLowerCase().includes(areaSearch.toLowerCase())
                         ).length === 0 && (
                           <div className="px-3 py-2 text-sm text-gray-500">
                             {lang === "id" ? "Tidak ada hasil" : "No results"}
