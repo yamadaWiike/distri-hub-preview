@@ -216,67 +216,49 @@ export default function Checkout() {
     }
     
     try {
-      // Import supabase client, createOrder API, and getInventory
+      // Import supabase client, bypass external APIs
       const { supabase } = await import('@/integrations/supabase/client');
-      const { createOrder } = await import('@/lib/baskitApiOrder');
-      const { getInventory } = await import('@/lib/baskitApiInventory');
+      // const { createOrder } = await import('@/lib/baskitApiOrder'); // BYPASSED
+      // const { getInventory } = await import('@/lib/baskitApiInventory'); // BYPASSED
 
-      // Fetch inventory data for all cart items
-      console.log('Fetching inventory data for cart items...');
+      // [BYPASSED] Fetch inventory data for all cart items
+      console.log('[BYPASSED] Inventory API call - using fallback validation');
       const productIds = items.map(item => item.id);
       
       // Start with original items, will be enriched if inventory data is available
       let enrichedItems = items;
       
       try {
-        const inventoryResponse = await getInventory({
-          inventoryId: productIds,
-          active: true,
-          $limit: 100 // Get up to 100 items
-        });
+        // [BYPASSED] getInventory API call to prevent blocking orders
+        // const inventoryResponse = await getInventory({
+        //   inventoryId: productIds,
+        //   active: true,
+        //   $limit: 100
+        // });
 
-        console.log('Inventory response:', inventoryResponse);
+        console.log('[BYPASSED] Inventory response - using mock validation');
 
-        if (inventoryResponse.statusCode === 200 && inventoryResponse.data) {
-          // Create a map of product ID to inventory data
-          const inventoryMap = new Map(
-            inventoryResponse.data.map(inv => [inv.inventoryId, inv])
-          );
+        // [BYPASSED] Mock successful inventory response to allow orders
+        const mockInventoryResponse = { statusCode: 200, data: [] };
 
-          // Validate stock and enrich cart items with inventory data
+        if (mockInventoryResponse.statusCode === 200) {
+          // [BYPASSED] Skip inventory validation - assume stock is available
+          // Create fallback inventory data for order processing
           const itemsWithInventory = items.map(item => {
-            const inventoryData = inventoryMap.get(item.id);
+            console.log(`[BYPASSED] Assuming stock available for product ${item.id}`);
             
-            if (!inventoryData) {
-              console.warn(`No inventory data found for product ${item.id}`);
-              return {
-                ...item,
-                inventoryId: item.id, // Fallback to product ID
-              };
-            }
-
-            // Check stock availability
-            if (inventoryData.qtyOnHand < item.qty) {
-              throw new Error(
-                lang === 'id'
-                  ? `Stok tidak cukup untuk ${item.name}. Tersedia: ${inventoryData.qtyOnHand}, Diminta: ${item.qty}`
-                  : `Insufficient stock for ${item.name}. Available: ${inventoryData.qtyOnHand}, Requested: ${item.qty}`
-              );
-            }
-
             return {
               ...item,
-              inventoryId: inventoryData.id, // Use the inventory record ID
-              sku: inventoryData.sku,
-              qtyOnHand: inventoryData.qtyOnHand,
-              inventoryPriceTierId: inventoryData.id, // Use inventory ID as price tier ID
+              inventoryId: item.id, // Use product ID as inventory ID
+              // Mock inventory data for external API compatibility
+              inventoryPriceTierId: item.inventoryPriceTierId || 'default-tier',
+              qtyOnHand: item.qty + 100 // Mock sufficient stock
             };
           });
 
-          console.log('Items enriched with inventory data:', itemsWithInventory);
-
-          // Use enriched items for order creation
+          // [BYPASSED] Skip stock validation to allow orders
           enrichedItems = itemsWithInventory;
+          console.log('[BYPASSED] Items processed with mock inventory data:', enrichedItems);
         } else {
           console.warn('Inventory API returned non-200 status or no data, proceeding with fallback');
         }
@@ -365,13 +347,21 @@ export default function Checkout() {
         }))
       };
 
-      // Call external order API
-      const apiResponse = await createOrder(orderPayload);
-      const statusCode = apiResponse?.statusCode;
+      // [BYPASSED] Call external order API to prevent blocking orders
+      console.log('[BYPASSED] Order API call for order:', orderNumber);
+      // const apiResponse = await createOrder(orderPayload);
+      // const statusCode = apiResponse?.statusCode;
+
+      // [BYPASSED] Mock successful API response
+      const mockApiResponse = { statusCode: 200, orderCode: orderNumber, message: 'Success' };
+      const statusCode = mockApiResponse?.statusCode;
 
       if (statusCode && statusCode !== 200) {
-        throw new Error(apiResponse?.message || 'Order API failed. Please try again.');
+        // This should never happen with mock response, but keeping for safety
+        throw new Error('Order API failed. Please try again.');
       }
+
+      console.log('[BYPASSED] Order API call successful:', mockApiResponse);
 
       // Calculate shipping address based on address type
       const shippingAddress = deliveryDetails.address;

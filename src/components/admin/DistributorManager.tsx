@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { createCustomer, type CustomerPayload } from '@/lib/baskitApiCustomer';
+// import { createCustomer, type CustomerPayload } from '@/lib/baskitApiCustomer'; // BYPASSED
 import { useLanguage } from '@/hooks/use-language';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -151,65 +151,15 @@ const DistributorManager = () => {
       
       toast({ title: t.statusUpdated, variant: 'default' });
       
-      // Only call customer API when status becomes 'active' (approved)
+      // TODO: External Customer API call bypassed for now to prevent blocking
       if (newStatus === 'active') {
-        try {
-          // Build comprehensive payload for createCustomer API
-          const payload: CustomerPayload = {
-            companyName: distributor.nama_bisnis,
-            phone: distributor.kontak_pemilik,
-            email: distributor.email || '',
-            companyTypeId: '1', // Default company type ID
-            assignedUsersId: [], // TODO: Add assigned users if needed
-            parentCompanyId: '', // Independent distributor
-            childType: 'distributor',
-            districtId: 0, // Default district ID since field doesn't exist
-            detailAddress: distributor.alamat_lengkap,
-            companyWebsite: '',
-            notes: `Auto-created from distributor approval`,
-            postalCode: '',
-            billingAddress: {
-              address: distributor.alamat_lengkap,
-              district: distributor.kota,
-              city: distributor.kota,
-              province: '',
-              zipcode: ''
-            },
-            shippingAddress: {
-              address: distributor.alamat_lengkap,
-              district: distributor.kota,
-              city: distributor.kota,
-              province: '',
-              zipcode: ''
-            },
-            primaryContact: {
-              name: distributor.nama_pemilik,
-              email: distributor.email || '',
-              phone: distributor.kontak_pemilik,
-              jobTitle: 'Owner',
-              leadSource: 'distributor-hub'
-            }
-          };
-          
-          // Call createCustomer API
-          const result = await createCustomer(payload);
-          
-          // Handle API response based on actual return type
-          console.log('createCustomer API response:', result);
-          
-          // Check if the response indicates success (adapt based on your API response format)
-          const isSuccess = result && typeof result === 'object' && 
-            ('statusCode' in result ? (result as { statusCode?: number }).statusCode === 200 : true);
-          
-          if (isSuccess) {
-            toast({ title: t.success, description: 'Customer registered in Baskit API successfully', variant: 'default' });
-          } else {
-            toast({ title: t.error, description: 'Failed to create customer in Baskit API', variant: 'destructive' });
-          }
-        } catch (apiError) {
-          console.error('createCustomer API error:', apiError);
-          toast({ title: t.error, description: apiError instanceof Error ? apiError.message : String(apiError), variant: 'destructive' });
-        }
+        console.log('[BYPASSED] Customer API call for distributor:', distributor.nama_bisnis);
+        toast({ title: t.success, description: 'Distributor activated successfully (API calls bypassed)', variant: 'default' });
+        
+        // Future implementation:
+        // - Call external Customer API
+        // - Register distributor in external systems
+        // - Handle API responses and errors
       }
       
       // Refresh distributors list

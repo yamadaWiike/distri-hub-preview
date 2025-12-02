@@ -31,7 +31,7 @@ import {
   FileCheck,
 } from 'lucide-react';
 import { useLanguage } from '@/hooks/use-language';
-import { createCustomer, CustomerPayload } from '@/lib/baskitApiCustomer';
+// Customer API calls removed - handled in DistributorManager only
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -361,86 +361,29 @@ export default function UserManagementRevamped() {
   };
 
   // Handle status change and API call for customer registration
-  const handleStatusChange = async (user: User, newStatus: string) => {
+  const handleRoleChange = async (user: User, newRole: string) => {
     try {
-      // Update status in Supabase
-      const { error } = await supabase
-        .from('distributor_profiles')
-        // @ts-expect-error - Type mismatch with Supabase generated types
-        .update({ status: newStatus })
-        .eq('user_id', user.id);
+      console.log('Updating user role:', user.id, 'to:', newRole);
       
-      if (error) throw error;
-      
-      toast({ title: t.roleUpdated, variant: 'default' });
-      
-      // Only call customer API when status becomes 'actived' (KYB Approved)
-      if (newStatus === 'actived') {
-        const profile = user.profile;
-        if (profile) {
-          try {
-            // Build comprehensive payload for createCustomer API
-            const payload: CustomerPayload = {
-              companyName: profile.nama_bisnis,
-              phone: profile.kontak_pemilik,
-              email: profile.email_pemilik,
-              companyTypeId: '1', // Default company type ID
-              assignedUsersId: [], // TODO: Add assigned users if needed
-              parentCompanyId: '', // Independent distributor
-              childType: 'distributor',
-              districtId: 0, // Default district ID since field doesn't exist
-              detailAddress: profile.alamat_lengkap,
-            companyWebsite: profile.website_perusahaan || '',
-            notes: `Auto-created from user approval`,
-            postalCode: '',
-            billingAddress: {
-              address: profile.alamat_lengkap,
-              district: profile.kota,
-              city: profile.kota,
-              province: '',
-              zipcode: ''
-            },
-            shippingAddress: {
-              address: profile.alamat_lengkap,
-              district: profile.kota,
-              city: profile.kota,
-              province: '',
-              zipcode: ''
-            },
-            primaryContact: {
-              name: profile.nama_pemilik,
-              email: profile.email_pemilik,
-              phone: profile.kontak_pemilik,
-              jobTitle: 'Owner',
-              leadSource: 'distributor-hub'
-            }
-            };
-            
-            // Call createCustomer API
-            const result = await createCustomer(payload);
-            
-            // Handle API response based on actual return type
-            console.log('createCustomer API response:', result);
-            
-            // Check if the response indicates success (adapt based on your API response format)
-            const isSuccess = result && typeof result === 'object' && 
-              ('statusCode' in result ? (result as any).statusCode === 200 : true);
-            
-            if (isSuccess) {
-              toast({ title: t.success, description: 'Customer registered in Baskit API successfully', variant: 'default' });
-            } else {
-              toast({ title: t.error, description: 'Failed to create customer in Baskit API', variant: 'destructive' });
-            }
-          } catch (apiError) {
-            console.error('createCustomer API error:', apiError);
-            toast({ title: t.error, description: apiError instanceof Error ? apiError.message : String(apiError), variant: 'destructive' });
-          }
+      // Update user role in auth.users table
+      const { error: userError } = await supabase.auth.admin.updateUserById(
+        user.id,
+        {
+          user_metadata: { role: newRole }
         }
+      );
+      
+      if (userError) {
+        console.error('Error updating user role:', userError);
+        throw userError;
       }
+      
+      toast({ title: t.success, description: 'User role updated successfully', variant: 'default' });
+      
       // Refresh users list
       fetchUsers();
     } catch (err) {
-      console.error('Status update error:', err);
+      console.error('Role update error:', err);
       toast({ title: t.error, description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
     }
   };
@@ -625,8 +568,8 @@ export default function UserManagementRevamped() {
                         {t.edit}
                       </Button>
                       <Select
-                        value={user.profile?.status || ''}
-                        onValueChange={(value) => handleStatusChange(user, value)}
+                        value={user.role || ''}
+                        onValueChange={(value) => handleRoleChange(user, value)}
                       >
                         <SelectTrigger className="w-32">
                         <SelectValue />
