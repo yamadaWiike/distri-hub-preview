@@ -44,6 +44,19 @@ export interface CustomerPayload {
 }
 
 export async function createCustomer(payload: CustomerPayload) {
+  // Check if bypass mode is enabled
+  const bypassEnabled = import.meta.env.VITE_BASKIT_API_BYPASS === 'true';
+  
+  if (bypassEnabled) {
+    console.log('[BASKIT API BYPASS] Customer creation bypassed for:', payload.companyName);
+    return {
+      statusCode: 200,
+      message: 'Customer created successfully (bypassed)',
+      customerId: `BYPASS-CUSTOMER-${Date.now()}`,
+      success: true
+    };
+  }
+
   return baskitApiRequest("/distributor-hub/customer", {
     method: "POST",
     body: JSON.stringify(payload),
