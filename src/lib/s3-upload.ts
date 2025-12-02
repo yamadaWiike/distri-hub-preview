@@ -327,7 +327,7 @@ export async function uploadFileToS3(
       Key: fileName,
       Body: buffer,
       ContentType: processedFile.type,
-      ACL: 'public-read' as const,
+      // ACL removed - bucket should use bucket policy for public access instead
     };
 
     // Upload to S3
