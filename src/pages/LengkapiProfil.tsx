@@ -424,15 +424,15 @@ export default function LengkapiProfil() {
       };
 
       // Update profile data and set status to waiting_activation (KYB completed)
-      const updateDataWithStatus = {
-        ...updateData,
-        status: 'waiting_activation' // KYB completed, waiting for admin activation
-      };
+      // const updateDataWithStatus = {
+      //   ...updateData,
+      //   status: 'waiting_activation' // KYB completed, waiting for admin activation
+      // };
 
       const { error } = await supabase
         .from("distributor_profiles")
         // @ts-expect-error - Type mismatch with Supabase generated types
-        .update(updateDataWithStatus)
+        .update(updateData)
         .eq("user_id", user!.id);
 
       if (error) throw error;

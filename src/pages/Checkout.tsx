@@ -224,14 +224,13 @@ export default function Checkout() {
         description: t.requiredField,
         variant: "destructive",
       });
+      
       return;
     }
     
     try {    
       // ========== Fetch & Validate Inventory ==========
-      console.log('Fetching inventory data for cart items...');
       const productIds = items.map(item => item.id);
-      
       const inventoryResponse = await getInventory({
         inventoryId: productIds,
         active: true,
@@ -280,8 +279,6 @@ export default function Checkout() {
         };
       });
       
-      console.log('Cart items enriched with inventory data successfully');
-
       // ========== Get Distributor Profile ==========
       const { data: distributorProfile, error: profileError } = await supabase
         .from('distributor_profiles')
