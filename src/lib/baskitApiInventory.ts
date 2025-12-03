@@ -38,6 +38,20 @@ export interface InventoryResponse {
 }
 
 export async function getInventory(payload: InventoryPayload): Promise<InventoryResponse> {
+  // Check if bypass mode is enabled
+  const bypassEnabled = import.meta.env.VITE_BASKIT_API_BYPASS === 'true';
+  
+  if (bypassEnabled) {
+    console.log('[BASKIT API BYPASS] Inventory fetch bypassed');
+    console.log('[BASKIT API BYPASS] Request params:', payload);
+    return {
+      statusCode: 200,
+      totalData: 0,
+      totalPage: 0,
+      data: []
+    };
+  }
+
   // Build query string from payload
   const params = new URLSearchParams();
   

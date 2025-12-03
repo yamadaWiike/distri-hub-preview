@@ -1,28 +1,37 @@
+// React & Router
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+
+// External Libraries & Icons
+import { Upload, X, Loader2, Eye, EyeOff } from "lucide-react";
+
+// UI Components
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/use-auth";
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useLanguage } from "@/hooks/use-language";
-import { translations } from "@/lib/translations";
 import { toast } from "@/components/ui/use-toast";
-import { Upload, X, Loader2, Eye, EyeOff } from "lucide-react";
-import { uploadStorePhoto, getImageUrl } from "@/lib/s3-upload";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
-import { 
-  fetchProvinces, 
-  fetchRegenciesByProvince, 
+
+// Hooks
+import { useAuth } from "@/hooks/use-auth";
+import { useLanguage } from "@/hooks/use-language";
+
+// Utils, Data & API
+import { translations } from "@/lib/translations";
+import { uploadStorePhoto, getImageUrl } from "@/lib/s3-upload";
+import {
+  fetchProvinces,
+  fetchRegenciesByProvince,
   fetchDistrictsByRegency,
   Province,
   Regency,
-  District
+  District,
 } from "@/data/indonesiaRegions";
 
 export default function Daftar() {
@@ -326,14 +335,26 @@ export default function Daftar() {
       // Upload to S3 or localStorage
       setIsUploadingPhoto(true);
       try {
+        console.log('Starting photo upload:', file.name, file.size);
         const result = await uploadStorePhoto(file);
+        
+        console.log('Upload result:', result);
         
         if (result.success && result.url) {
           // Get the actual URL for preview
           const previewUrl = getImageUrl(result.url);
+          console.log('Preview URL generated:', previewUrl);
+          
+          // Always create a fallback object URL as backup
+          let finalPreviewUrl = previewUrl;
+          if (!previewUrl || previewUrl === 'null' || previewUrl === 'undefined') {
+            console.warn('Preview URL is invalid, using object URL fallback');
+            finalPreviewUrl = URL.createObjectURL(file);
+          }
+          console.log('Final preview URL:', finalPreviewUrl);
           
           setForm({ ...form, fotoToko: file, fotoTokoUrl: result.url });
-          setPhotoPreview(previewUrl);
+          setPhotoPreview(finalPreviewUrl);
           
           toast({
             title: lang === 'id' ? "Foto Berhasil Diunggah" : "Photo Uploaded Successfully",
@@ -357,6 +378,10 @@ export default function Daftar() {
   };
 
   const removePhoto = () => {
+    // Clean up object URL if it exists to prevent memory leaks
+    if (photoPreview && photoPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(photoPreview);
+    }
     setForm({ ...form, fotoToko: null, fotoTokoUrl: "" });
     setPhotoPreview(null);
   };
@@ -625,6 +650,19 @@ export default function Daftar() {
                         src={photoPreview} 
                         alt="Store preview" 
                         className="rounded-lg border border-gray-200 w-full max-w-xs h-48 object-cover"
+                        onError={(e) => {
+                          console.error('Image failed to load:', photoPreview);
+                          console.error('Image error event:', e);
+                          // Try to create a fallback URL from the original file if available
+                          if (form.fotoToko) {
+                            const fallbackUrl = URL.createObjectURL(form.fotoToko);
+                            console.log('Setting fallback URL:', fallbackUrl);
+                            setPhotoPreview(fallbackUrl);
+                          }
+                        }}
+                        onLoad={() => {
+                          console.log('Image loaded successfully:', photoPreview);
+                        }}
                       />
                       <button
                         type="button"

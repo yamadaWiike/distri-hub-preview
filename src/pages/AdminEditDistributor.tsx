@@ -1,5 +1,11 @@
+// React & Router
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+
+// External Libraries & Icons
+import { ArrowLeft, Save, X, User, Building2, Warehouse, CreditCard, Briefcase, FileText, Upload, Eye } from 'lucide-react';
+
+// UI Components
 import SEO from '@/components/seo/SEO';
 import Navbar from '@/components/layout/Navbar';
 import AdminSidebar from '@/components/layout/AdminSidebar';
@@ -12,10 +18,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+
+// Hooks
 import { useLanguage } from '@/hooks/use-language';
+
+// Utils & API
 import { uploadFileToS3, getImageUrl } from '@/lib/s3-upload';
-import { ArrowLeft, Save, X, User, Building2, Warehouse, CreditCard, Briefcase, FileText, Upload, Eye } from 'lucide-react';
+
+// Integrations
+import { supabase } from '@/integrations/supabase/client';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

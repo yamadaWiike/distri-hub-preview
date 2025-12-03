@@ -1,25 +1,33 @@
+// React & Router
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+
+// External Libraries
+import useEmblaCarousel from "embla-carousel-react";
+
+// UI Components
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { PRODUCTS, Product } from "@/data/products";
-import { useAuth } from "@/hooks/use-auth";
-import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { useCart } from "@/hooks/use-cart";
-import { formatIDR, getProductIdFromSlug } from "@/lib/utils";
-import { useLanguage } from "@/hooks/use-language";
-import { translations } from "@/lib/translations";
-import { useToast } from "@/components/ui/use-toast";
-import { fetchProductBySku } from "@/lib/db";
 import { Dialog, DialogContent, DialogDescription } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/components/ui/use-toast";
+
+// Hooks
+import { useAuth } from "@/hooks/use-auth";
+import { useCart } from "@/hooks/use-cart";
+import { useLanguage } from "@/hooks/use-language";
+import { useDistributorApproval } from "@/hooks/use-distributor-approval";
+
+// Utils & Data
+import { PRODUCTS, Product } from "@/data/products";
+import { formatIDR, getProductIdFromSlug, generateProductSlug } from "@/lib/utils";
+import { translations } from "@/lib/translations";
+import { fetchProductBySku } from "@/lib/db";
+import { getImageUrl } from "@/lib/s3-upload";
 import { checkMixedVariantsMOQ } from "@/utils/mixVariants";
 import { getAllProducts } from "@/services/product-service";
-import useEmblaCarousel from "embla-carousel-react";
-import { generateProductSlug } from "@/lib/utils";
 import { CartItem } from "@/contexts/CartContextDefinition";
-import { getImageUrl } from "@/lib/s3-upload";
-import { useDistributorApproval } from "@/hooks/use-distributor-approval";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function ProdukDetail() {
     const [failedImages, setFailedImages] = useState<number[]>([]);

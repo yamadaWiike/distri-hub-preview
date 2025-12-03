@@ -1,38 +1,42 @@
+// React & Router
+import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
+
+// External Libraries & Icons
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import { Clock, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+
+// UI Components
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import { Product, ProductVariant } from "@/data/products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Slider } from "@/components/ui/slider";
+import { useToast } from "@/components/ui/use-toast";
+
+// Hooks
 import { useAuth } from "@/hooks/use-auth";
 import { useDistributorApproval } from "@/hooks/use-distributor-approval";
-import { 
-  Tooltip, 
-  TooltipContent, 
-  TooltipProvider, 
-  TooltipTrigger 
-} from "@/components/ui/tooltip";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
-import { Link } from "react-router-dom";
-import { Slider } from "@/components/ui/slider";
 import { useCart } from "@/hooks/use-cart";
-import { formatIDR, generateProductSlug } from "@/lib/utils";
 import { useLanguage } from "@/hooks/use-language";
+
+// Utils, Data & API
+import { Product, ProductVariant } from "@/data/products";
+import { formatIDR, generateProductSlug } from "@/lib/utils";
 import { addPDFHeader, addPDFFooter } from "@/utils/pdf-utils";
 import { translations } from "@/lib/translations";
-import { useToast } from "@/components/ui/use-toast";
 import { getAllProducts, getAllAreas, getAllBrands, fetchProductsWithVariants, fetchProductsExpandedByVariants, ProductWithVariant } from "@/services/product-service";
 import { generateCatalogPDF } from "@/utils/catalog";
+import { checkMixedVariantsMOQ } from "@/utils/mixVariants";
+import { trackCatalogExport, trackDeniedCatalogExport } from "@/utils/analytics";
+
+// Integrations & Types
 import { supabase } from "@/integrations/supabase/client";
 import { CartItem } from "@/contexts/CartContextDefinition";
-import { Clock, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
-import { checkMixedVariantsMOQ } from "@/utils/mixVariants";
-
-// Import the analytics helpers
-import { trackCatalogExport, trackDeniedCatalogExport } from "@/utils/analytics";
 
 // Cache duration constant
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache

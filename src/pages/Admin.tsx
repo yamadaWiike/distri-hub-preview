@@ -1,22 +1,31 @@
+// React & Router
 import { useState, useEffect } from "react";
-import SEO from "@/components/seo/SEO";
-import Navbar from "@/components/layout/Navbar";
-import AdminSidebar from "@/components/layout/AdminSidebar";
-import { useLanguage } from "@/hooks/use-language";
-import { useAuth } from "@/hooks/use-auth";
-import { 
-  Package2, 
-  Users, 
-  ShoppingBag, 
+import { useNavigate } from "react-router-dom";
+
+// External Libraries & Icons
+import {
+  Package2,
+  Users,
+  ShoppingBag,
   AlertTriangle,
   UserCheck,
   TrendingUp,
-  Download
+  Download,
 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+
+// UI Components
+import SEO from "@/components/seo/SEO";
+import Navbar from "@/components/layout/Navbar";
+import AdminSidebar from "@/components/layout/AdminSidebar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+
+// Hooks
+import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/use-auth";
+
+// Integrations
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Admin() {

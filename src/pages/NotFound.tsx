@@ -3,14 +3,14 @@
  * Displayed when user navigates to a non-existent route
  */
 
-// Third-party imports
+// React & Router
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
 
 // Hooks
 import { useLanguage } from "@/hooks/use-language";
 
-// Utils
+// Utils & Data
 import { translations } from "@/lib/translations";
 
 /**

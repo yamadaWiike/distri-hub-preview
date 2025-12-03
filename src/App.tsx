@@ -1,3 +1,6 @@
+// React imports first
+import React, { useEffect } from "react";
+
 // Third-party library imports
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -79,8 +82,44 @@ const Protected: React.FC<ProtectedRouteProps> = ({ children }) => {
 /**
  * Main application component
  */
-const App: React.FC = () => (
-  <QueryClientProvider client={queryClient}>
+const App: React.FC = () => {
+  
+  // Add global error handling to prevent misleading error messages
+  useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('Unhandled promise rejection:', event.reason);
+      
+      // Check if this is related to photo upload and might interfere with other operations
+      const errorMsg = event.reason?.message?.toLowerCase() || '';
+      if (errorMsg.includes('upload') || errorMsg.includes('photo') || errorMsg.includes('image')) {
+        console.warn('Photo/upload related error detected, preventing propagation to avoid misleading messages');
+        event.preventDefault(); // Prevent the default error handling
+      }
+    };
+    
+    const handleError = (event: ErrorEvent) => {
+      console.error('Global error:', event.error);
+      
+      // Similar handling for regular errors
+      const errorMsg = event.error?.message?.toLowerCase() || '';
+      if (errorMsg.includes('upload') || errorMsg.includes('photo') || errorMsg.includes('image')) {
+        console.warn('Photo/upload related error detected in global handler');
+      }
+    };
+    
+    // Add event listeners
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    window.addEventListener('error', handleError);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      window.removeEventListener('error', handleError);
+    };
+  }, []);
+  
+  return (
+    <QueryClientProvider client={queryClient}>
     {/* Helmet for managing document head */}
     <HelmetProvider>
       {/* UI component providers */}
@@ -142,6 +181,7 @@ const App: React.FC = () => (
       </TooltipProvider>
     </HelmetProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;

@@ -16,6 +16,31 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 const isDevelopment = import.meta.env.MODE === 'development';
 
+// Validate S3 configuration in production
+if (!isDevelopment) {
+  const requiredEnvVars = {
+    VITE_AWS_DEFAULT_REGION: import.meta.env.VITE_AWS_DEFAULT_REGION,
+    VITE_AWS_ACCESS_KEY_ID: import.meta.env.VITE_AWS_ACCESS_KEY_ID,
+    VITE_AWS_SECRET_ACCESS_KEY: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
+    VITE_AWS_BUCKET: import.meta.env.VITE_AWS_BUCKET,
+  };
+
+  const missingVars = Object.entries(requiredEnvVars)
+    .filter(([_, value]) => !value)
+    .map(([key]) => key);
+
+  if (missingVars.length > 0) {
+    console.error('❌ Missing required S3 environment variables:', missingVars.join(', '));
+  } else {
+    console.log('✅ S3 configuration loaded:', {
+      region: import.meta.env.VITE_AWS_DEFAULT_REGION,
+      bucket: import.meta.env.VITE_AWS_BUCKET,
+      hasAccessKey: !!import.meta.env.VITE_AWS_ACCESS_KEY_ID,
+      hasSecretKey: !!import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
+    });
+  }
+}
+
 const s3Client = !isDevelopment ? new S3Client({
   region: import.meta.env.VITE_AWS_DEFAULT_REGION,
   credentials: {
@@ -196,6 +221,16 @@ export async function uploadFileToS3(
   folder: string = 'uploads'
 ): Promise<UploadResult> {
   try {
+    // Check if SKU deletion is in progress and prevent uploads that might interfere
+    const windowWithFlags = window as Window & { __skuDeletionInProgress?: boolean };
+    if (windowWithFlags.__skuDeletionInProgress) {
+      console.warn('Upload blocked: SKU deletion in progress');
+      return {
+        success: false,
+        error: 'Upload temporarily blocked due to system operation in progress. Please try again in a moment.'
+      };
+    }
+    
     // Check if file is too large (before compression)
     if (file.size > MAX_UNCOMPRESSED_SIZE) {
       const sizeMB = (file.size / 1024 / 1024).toFixed(2);
@@ -267,9 +302,14 @@ export async function uploadFileToS3(
         // Convert to data URL only AFTER compression and cleanup
         const dataURL = await fileToDataURL(processedFile);
         
+        // Validate data URL before storing
+        if (!dataURL || !dataURL.startsWith('data:')) {
+          throw new Error('Invalid data URL generated');
+        }
+        
         // Store in localStorage
         localStorage.setItem(storageKey, dataURL);
-        console.log(`[DEV] File stored in localStorage: ${storageKey}`);
+        console.log(`[DEV] File stored in localStorage: ${storageKey} (${(dataURL.length / 1024).toFixed(2)}KB)`);
       } catch (error) {
         console.error('[DEV] Failed to store file in localStorage:', error);
         
@@ -311,6 +351,15 @@ export async function uploadFileToS3(
       throw new Error('S3 client not initialized');
     }
 
+    // Validate S3 configuration
+    if (!BUCKET_NAME) {
+      throw new Error('S3 bucket name is not configured. Please check VITE_AWS_BUCKET environment variable.');
+    }
+
+    if (!import.meta.env.VITE_AWS_DEFAULT_REGION) {
+      throw new Error('AWS region is not configured. Please check VITE_AWS_DEFAULT_REGION environment variable.');
+    }
+
     // Convert file to ArrayBuffer
     const arrayBuffer = await fileToArrayBuffer(processedFile);
     const buffer = new Uint8Array(arrayBuffer);
@@ -321,18 +370,46 @@ export async function uploadFileToS3(
     const fileExtension = processedFile.name.split('.').pop();
     const fileName = `${folder}/${timestamp}-${randomString}.${fileExtension}`;
 
-    // Prepare upload parameters
+    console.log('📤 Uploading to S3:', {
+      bucket: BUCKET_NAME,
+      key: fileName,
+      size: `${(processedFile.size / 1024).toFixed(2)}KB`,
+      type: processedFile.type,
+    });
+
+    // Prepare upload parameters (removed ACL - relying on bucket policy instead)
     const uploadParams = {
       Bucket: BUCKET_NAME,
       Key: fileName,
       Body: buffer,
       ContentType: processedFile.type,
-      // ACL removed - bucket should use bucket policy for public access instead
+      // Note: ACL removed - ensure your S3 bucket has proper bucket policy for public access
+      // or configure based on your security requirements
     };
 
     // Upload to S3
-    const command = new PutObjectCommand(uploadParams);
-    await s3Client.send(command);
+    try {
+      const command = new PutObjectCommand(uploadParams);
+      await s3Client.send(command);
+      console.log('✅ Successfully uploaded to S3:', fileName);
+    } catch (s3Error) {
+      console.error('❌ S3 upload failed:', s3Error);
+      
+      // Provide more specific error messages
+      if (s3Error instanceof Error) {
+        if (s3Error.message.includes('AccessDenied')) {
+          throw new Error('Access denied to S3 bucket. Please check AWS credentials and bucket permissions.');
+        } else if (s3Error.message.includes('NoSuchBucket')) {
+          throw new Error(`S3 bucket '${BUCKET_NAME}' does not exist or is not accessible.`);
+        } else if (s3Error.message.includes('InvalidAccessKeyId')) {
+          throw new Error('Invalid AWS Access Key ID. Please check your credentials.');
+        } else if (s3Error.message.includes('SignatureDoesNotMatch')) {
+          throw new Error('Invalid AWS Secret Access Key. Please check your credentials.');
+        }
+      }
+      
+      throw s3Error;
+    }
 
     // Construct the public URL
     const url = `https://${BUCKET_NAME}.s3.${import.meta.env.VITE_AWS_DEFAULT_REGION}.amazonaws.com/${fileName}`;
@@ -374,14 +451,39 @@ export async function uploadProductImage(file: File): Promise<UploadResult> {
  * @returns The actual URL or data URL to display
  */
 export function getImageUrl(storageKey: string | null | undefined): string | null {
-  if (!storageKey) return null;
+  if (!storageKey) {
+    console.warn('getImageUrl: No storage key provided');
+    return null;
+  }
+  
+  console.log('getImageUrl called with:', storageKey);
+  console.log('isDevelopment:', isDevelopment);
   
   // Development mode - retrieve from localStorage
   if (isDevelopment && !storageKey.startsWith('http')) {
+    console.log('Development mode: Retrieving from localStorage');
     const dataURL = localStorage.getItem(storageKey);
-    return dataURL || null;
+    console.log('Retrieved data URL length:', dataURL?.length || 0);
+    
+    if (!dataURL) {
+      console.error('Failed to retrieve data URL from localStorage for key:', storageKey);
+      console.log('Available localStorage keys:', Object.keys(localStorage).filter(k => k.includes(storageKey.split('/')[0])));
+      return null;
+    }
+    
+    // Validate the stored data URL
+    if (!dataURL.startsWith('data:')) {
+      console.error(`[DEV] Invalid data URL format in localStorage: ${storageKey}`);
+      localStorage.removeItem(storageKey); // Clean up invalid data
+      return null;
+    }
+    
+    console.log(`[DEV] Successfully retrieved valid data URL from localStorage: ${storageKey} (${(dataURL.length / 1024).toFixed(2)}KB)`);
+    return dataURL;
   }
   
   // Production mode - return S3 URL as-is
+  console.log('Production mode: Returning S3 URL as-is');
   return storageKey;
 }
+

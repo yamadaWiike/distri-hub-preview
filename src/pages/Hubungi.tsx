@@ -1,15 +1,24 @@
+// React & Router
+import { useState, useEffect } from "react";
+
+// External Libraries & Icons
+import { AtSign, Building, Loader2, Mail, MapPin, MessageSquare, Phone, Users } from "lucide-react";
+
+// UI Components
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
-import { AtSign, Building, Loader2, Mail, MapPin, MessageSquare, Phone, Users } from "lucide-react";
+
+// Hooks
 import { useLanguage } from "@/hooks/use-language";
+
+// Utils & Data
 import { translations } from "@/lib/translations";
 
 export default function Hubungi() {

@@ -1,9 +1,16 @@
+// External Libraries & Icons
+import { Building2, CheckCircle, Globe, LineChart, ShieldCheck, Users } from "lucide-react";
+
+// UI Components
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import { Building2, CheckCircle, Globe, LineChart, ShieldCheck, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+
+// Hooks
 import { useLanguage } from "@/hooks/use-language";
+
+// Utils & Data
 import { translations } from "@/lib/translations";
 
 export default function Tentang() {

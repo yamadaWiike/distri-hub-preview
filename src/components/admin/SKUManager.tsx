@@ -1495,40 +1495,200 @@ const SKUManager = () => {
     }
   };
 
-  // Delete a SKU
+  // Delete a SKU with comprehensive error handling and debugging
   const deleteSKU = async () => {
-    if (!currentSKU) return;
+    if (!currentSKU) {
+      console.error('SKU deletion failed: No SKU selected');
+      return;
+    }
+    
+    // Clear any existing toasts that might be showing misleading messages
+    const existingToasts = document.querySelectorAll('[data-sonner-toast]');
+    existingToasts.forEach(toast => toast.remove());
+    
+    // Prevent any concurrent operations that might interfere
+    console.log('=== PREVENTING CONCURRENT OPERATIONS ===');
+    
+    // Clear any pending upload operations that might be running
+    const windowWithFlags = window as Window & { __pendingUploads?: unknown[]; __skuDeletionInProgress?: boolean };
+    const pendingUploads = windowWithFlags.__pendingUploads || [];
+    if (pendingUploads.length > 0) {
+      console.warn('Found pending upload operations, clearing them:', pendingUploads.length);
+      pendingUploads.forEach((upload: any) => {
+        try {
+          if (upload.cancel) upload.cancel();
+          if (upload.abort) upload.abort();
+        } catch (e) {
+          console.warn('Could not cancel pending upload:', e);
+        }
+      });
+      windowWithFlags.__pendingUploads = [];
+    }
+    
+    // Prevent new upload operations during deletion
+    windowWithFlags.__skuDeletionInProgress = true;
     
     try {
-      // First delete all regions for this SKU
-      await supabase
+      console.log('=== SKU DELETION PROCESS STARTED ===');
+      console.log('SKU Details:', {
+        id: currentSKU.id,
+        name: currentSKU.name,
+        sku: currentSKU.sku || 'N/A'
+      });
+      
+      // Delete all related data in the correct order (foreign key dependencies)
+      
+      // 1. Delete UOM pricing for this SKU
+      console.log('Step 1: Deleting UOM pricing records...');
+      const { error: uomPricingError, count: uomPricingCount } = await supabase
+        .from('uom_pricing')
+        .delete()
+        .eq('product_id', currentSKU.id);
+      
+      if (uomPricingError) {
+        console.error('UOM pricing deletion failed:', uomPricingError);
+        // Only fail if it's a critical error, not a "not found" error
+        if (uomPricingError.code !== 'PGRST116') { // PGRST116 is "not found"
+          throw new Error(`UOM pricing deletion failed: ${uomPricingError.message}`);
+        }
+      } else {
+        console.log(`UOM pricing deleted successfully (${uomPricingCount || 0} records)`);
+      }
+      
+      // 2. Delete UOM conversions for this SKU  
+      console.log('Step 2: Deleting UOM conversion records...');
+      const { error: uomConversionError, count: uomConversionCount } = await supabase
+        .from('uom_conversions')
+        .delete()
+        .eq('product_id', currentSKU.id);
+      
+      if (uomConversionError) {
+        console.error('UOM conversion deletion failed:', uomConversionError);
+        if (uomConversionError.code !== 'PGRST116') {
+          throw new Error(`UOM conversion deletion failed: ${uomConversionError.message}`);
+        }
+      } else {
+        console.log(`UOM conversions deleted successfully (${uomConversionCount || 0} records)`);
+      }
+      
+      // 3. Delete product variants for this SKU
+      console.log('Step 3: Deleting product variant records...');
+      const { error: variantError, count: variantCount } = await supabase
+        .from('product_variants')
+        .delete()
+        .eq('product_id', currentSKU.id);
+      
+      if (variantError) {
+        console.error('Product variant deletion failed:', variantError);
+        if (variantError.code !== 'PGRST116') {
+          throw new Error(`Product variant deletion failed: ${variantError.message}`);
+        }
+      } else {
+        console.log(`Product variants deleted successfully (${variantCount || 0} records)`);
+      }
+      
+      // 4. Delete regional pricing for this SKU
+      console.log('Step 4: Deleting regional pricing records...');
+      const { error: regionError, count: regionCount } = await supabase
         .from('region_pricing')
         .delete()
         .eq('product_id', currentSKU.id);
       
-      // Then delete the SKU itself from the products table
-      const { error } = await supabase
+      if (regionError) {
+        console.error('Regional pricing deletion failed:', regionError);
+        if (regionError.code !== 'PGRST116') {
+          throw new Error(`Regional pricing deletion failed: ${regionError.message}`);
+        }
+      } else {
+        console.log(`Regional pricing deleted successfully (${regionCount || 0} records)`);
+      }
+      
+      // 5. Finally delete the SKU itself from the products table
+      console.log('Step 5: Deleting main product record...');
+      const { error: mainProductError, count: productCount } = await supabase
         .from('products')
         .delete()
         .eq('id', currentSKU.id);
       
-      if (error) throw error;
+      if (mainProductError) {
+        console.error('Main product deletion failed:', mainProductError);
+        throw new Error(`Main product deletion failed: ${mainProductError.message}`);
+      }
       
+      console.log(`Main product deleted successfully (${productCount || 0} records)`);
+      console.log('=== SKU DELETION COMPLETED SUCCESSFULLY ===');
+      
+      // Show success message (NOT related to photo upload!)
       toast({
-        title: t.skuDeleted,
-        description: t.skuDeletedDesc,
+        title: lang === 'id' ? 'SKU Berhasil Dihapus' : 'SKU Deleted Successfully',
+        description: lang === 'id' 
+          ? `${currentSKU.name} telah berhasil dihapus dari sistem`
+          : `${currentSKU.name} has been successfully removed from the system`,
+        variant: "default",
       });
       
-      // Refresh the SKU list
-      fetchSKUs();
+      // Refresh the SKU list and close dialog
+      await fetchSKUs();
       setIsDeleteDialogOpen(false);
+      setCurrentSKU(null);
+      
     } catch (error) {
-      console.error('Error deleting SKU:', error);
+      console.error('=== SKU DELETION FAILED ===');
+      console.error('Full error object:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error constructor:', error?.constructor?.name);
+      
+      // Provide more specific and helpful error messages
+      let errorTitle = lang === 'id' ? 'Gagal Menghapus SKU' : 'SKU Deletion Failed';
+      let errorMessage = lang === 'id' ? 'Terjadi kesalahan saat menghapus SKU' : 'An error occurred while deleting the SKU';
+      
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        
+        // Handle specific database errors
+        const errorMsg = error.message.toLowerCase();
+        
+        if (errorMsg.includes('foreign key') || errorMsg.includes('violates')) {
+          errorTitle = lang === 'id' ? 'Tidak Dapat Menghapus SKU' : 'Cannot Delete SKU';
+          errorMessage = lang === 'id' 
+            ? 'SKU ini masih memiliki data terkait (order, transaksi). Hubungi administrator untuk bantuan.'
+            : 'This SKU has related data (orders, transactions). Contact administrator for assistance.';
+        } else if (errorMsg.includes('permission') || errorMsg.includes('denied') || errorMsg.includes('unauthorized')) {
+          errorTitle = lang === 'id' ? 'Akses Ditolak' : 'Access Denied';
+          errorMessage = lang === 'id'
+            ? 'Anda tidak memiliki izin untuk menghapus SKU ini.'
+            : 'You do not have permission to delete this SKU.';
+        } else if (errorMsg.includes('network') || errorMsg.includes('fetch') || errorMsg.includes('connection')) {
+          errorTitle = lang === 'id' ? 'Koneksi Bermasalah' : 'Connection Error';
+          errorMessage = lang === 'id'
+            ? 'Koneksi internet bermasalah. Periksa koneksi dan coba lagi.'
+            : 'Network connection issue. Please check your connection and try again.';
+        } else {
+          // Show the actual error message for debugging
+          errorMessage = `${errorMessage}: ${error.message}`;
+        }
+      } else if (typeof error === 'object' && error !== null) {
+        const errorObj = error as any;
+        console.error('Non-Error object:', errorObj);
+        if (errorObj.message) {
+          errorMessage = `${errorMessage}: ${errorObj.message}`;
+        } else if (errorObj.code) {
+          errorMessage = `${errorMessage} (Code: ${errorObj.code})`;
+        }
+      }
+      
+      // Show error toast (definitely NOT a photo upload error!)
       toast({
-        title: t.errorDeleting,
-        description: error instanceof Error ? error.message : String(error),
+        title: errorTitle,
+        description: errorMessage,
         variant: "destructive"
       });
+    } finally {
+      // Always clean up the operation flag to allow uploads to resume
+      const windowWithFlags = window as Window & { __skuDeletionInProgress?: boolean };
+      windowWithFlags.__skuDeletionInProgress = false;
+      console.log('=== SKU DELETION PROCESS CLEANUP COMPLETE ===');
     }
   };
   

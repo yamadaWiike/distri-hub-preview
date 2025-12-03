@@ -1,14 +1,23 @@
+// React & Router
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+
+// External Libraries & Icons
+import { ArrowLeft, Filter } from "lucide-react";
+
+// UI Components
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import AdminSidebar from "@/components/layout/AdminSidebar";
-import { useLanguage } from "@/hooks/use-language";
-import { useAuth } from "@/hooks/use-auth";
-import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+
+// Hooks
+import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/use-auth";
+
+// Integrations
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, Filter } from "lucide-react";
 
 interface Activity {
   id: string;

@@ -1,5 +1,11 @@
+// React & Router
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+
+// External Libraries & Icons
+import { ArrowLeft, Plus, Trash2, X, Save, AlertCircle } from "lucide-react";
+
+// UI Components
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import AdminSidebar from "@/components/layout/AdminSidebar";
@@ -12,11 +18,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { Checkbox } from "@/components/ui/checkbox";
+
+// Hooks
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, Plus, Trash2, X, Save, AlertCircle } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
+
+// Integrations
+import { supabase } from "@/integrations/supabase/client";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

@@ -1,6 +1,11 @@
+// React & Router
 import { useState, useEffect, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+
+// External Libraries & Icons
 import { Minus, Plus } from "lucide-react";
+
+// UI Components
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
@@ -9,13 +14,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { formatIDR } from "@/lib/utils";
-import { useCart } from "@/hooks/use-cart";
-import { CartItem } from "@/contexts/CartContextDefinition";
 import { useToast } from "@/components/ui/use-toast";
+
+// Hooks
+import { useCart } from "@/hooks/use-cart";
 import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/hooks/use-language";
+
+// Utils, Data & API
+import { formatIDR } from "@/lib/utils";
 import { translations } from "@/lib/translations";
+import { createOrder } from "@/lib/baskitApiOrder";
+import { getInventory } from "@/lib/baskitApiInventory";
+
+// Integrations & Types
+import { supabase } from "@/integrations/supabase/client";
+import { CartItem } from "@/contexts/CartContextDefinition";
 
 // Address type selection
 type AddressType = 'default' | 'warehouse';
@@ -149,9 +163,6 @@ export default function Checkout() {
       if (!user || !user.id) return;
       
       try {
-        // Import supabase client
-        const { supabase } = await import('@/integrations/supabase/client');
-        
         // Fetch profile data
         const { data, error } = await supabase
           .from('distributor_profiles')
@@ -205,8 +216,9 @@ export default function Checkout() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
-    // Validate the form
-    if (!deliveryDetails.fullName || !deliveryDetails.phone || !deliveryDetails.address || !deliveryDetails.city) {
+    // ========== Validate Form ==========
+    const { fullName, phone, address, city, postalCode, notes, addressType } = deliveryDetails;
+    if (!fullName || !phone || !address || !city) {
       toast({
         title: "Error",
         description: t.requiredField,
@@ -215,64 +227,62 @@ export default function Checkout() {
       return;
     }
     
-    try {
-      // Import supabase client, bypass external APIs
-      const { supabase } = await import('@/integrations/supabase/client');
-      // const { createOrder } = await import('@/lib/baskitApiOrder'); // BYPASSED
-      // const { getInventory } = await import('@/lib/baskitApiInventory'); // BYPASSED
-
-      // [BYPASSED] Fetch inventory data for all cart items
-      console.log('[BYPASSED] Inventory API call - using fallback validation');
+    try {    
+      // ========== Fetch & Validate Inventory ==========
+      console.log('Fetching inventory data for cart items...');
       const productIds = items.map(item => item.id);
       
-      // Start with original items, will be enriched if inventory data is available
-      let enrichedItems = items;
-      
-      try {
-        // [BYPASSED] getInventory API call to prevent blocking orders
-        // const inventoryResponse = await getInventory({
-        //   inventoryId: productIds,
-        //   active: true,
-        //   $limit: 100
-        // });
+      const inventoryResponse = await getInventory({
+        inventoryId: productIds,
+        active: true,
+        $limit: 100
+      });
 
-        console.log('[BYPASSED] Inventory response - using mock validation');
-
-        // [BYPASSED] Mock successful inventory response to allow orders
-        const mockInventoryResponse = { statusCode: 200, data: [] };
-
-        if (mockInventoryResponse.statusCode === 200) {
-          // [BYPASSED] Skip inventory validation - assume stock is available
-          // Create fallback inventory data for order processing
-          const itemsWithInventory = items.map(item => {
-            console.log(`[BYPASSED] Assuming stock available for product ${item.id}`);
-            
-            return {
-              ...item,
-              inventoryId: item.id, // Use product ID as inventory ID
-              // Mock inventory data for external API compatibility
-              inventoryPriceTierId: item.inventoryPriceTierId || 'default-tier',
-              qtyOnHand: item.qty + 100 // Mock sufficient stock
-            };
-          });
-
-          // [BYPASSED] Skip stock validation to allow orders
-          enrichedItems = itemsWithInventory;
-          console.log('[BYPASSED] Items processed with mock inventory data:', enrichedItems);
-        } else {
-          console.warn('Inventory API returned non-200 status or no data, proceeding with fallback');
-        }
-      } catch (inventoryError) {
-        console.error('Error fetching inventory:', inventoryError);
-        // If it's a stock validation error, re-throw it
-        if (inventoryError instanceof Error && inventoryError.message.includes('Stok tidak cukup')) {
-          throw inventoryError;
-        }
-        // Otherwise, log and continue with fallback (product IDs)
-        console.warn('Continuing with product IDs as fallback for inventoryId');
+      if (!inventoryResponse?.data?.length) {
+        throw new Error(
+          lang === 'id'
+            ? 'Gagal mendapatkan data inventory. Silakan coba lagi atau hubungi admin.'
+            : 'Failed to fetch inventory data. Please try again or contact admin.'
+        );
       }
 
-      // Get distributor profile ID
+      // Enrich items and check stock
+      const enrichedItems = items.map(item => {
+        const inventoryItem = inventoryResponse.data.find(inv => 
+          inv.inventoryId === item.id && 
+          (item.variant ? inv.variantId === item.variant.id : true)
+        );
+
+        const itemDesc = item.variant ? `${item.name} (${item.variant.name})` : item.name;
+
+        if (!inventoryItem) {
+          throw new Error(
+            lang === 'id' 
+              ? `Data inventory tidak ditemukan untuk ${itemDesc}. Silakan hubungi admin.`
+              : `Inventory data not found for ${itemDesc}. Please contact admin.`
+          );
+        }
+
+        if (inventoryItem.qtyOnHand < item.qty) {
+          throw new Error(
+            lang === 'id'
+              ? `Stok tidak cukup untuk ${itemDesc}. Tersedia: ${inventoryItem.qtyOnHand}, Diminta: ${item.qty}`
+              : `Insufficient stock for ${itemDesc}. Available: ${inventoryItem.qtyOnHand}, Requested: ${item.qty}`
+          );
+        }
+
+        return {
+          ...item,
+          inventoryId: inventoryItem.id,
+          inventoryPriceTierId: item.inventoryPriceTierId || 'default-tier',
+          sku: inventoryItem.sku,
+          qtyOnHand: inventoryItem.qtyOnHand
+        };
+      });
+      
+      console.log('Cart items enriched with inventory data successfully');
+
+      // ========== Get Distributor Profile ==========
       const { data: distributorProfile, error: profileError } = await supabase
         .from('distributor_profiles')
         .select('id, company_id')
@@ -285,58 +295,58 @@ export default function Checkout() {
 
       const typedDistributorProfile = distributorProfile as DbDistributorProfile & { company_id?: string };
 
-      // Generate unique order number
-      let orderNumber: string;
+      // ========== Generate Unique Order Number ==========
+      let orderNumber: string = '';
+      let isUnique = false;
       let attempts = 0;
       const maxAttempts = 5;
-      do {
-        const now = new Date();
-        const dateStr = now.getFullYear().toString() + 
-                      (now.getMonth() + 1).toString().padStart(2, '0') + 
-                      now.getDate().toString().padStart(2, '0');
+
+      while (!isUnique && attempts < maxAttempts) {
+        const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
         const randomNum = Math.floor(Math.random() * 99999).toString().padStart(5, '0');
         orderNumber = `ORD-${dateStr}-${randomNum}`;
+        
         const { data: existingOrder } = await supabase
           .from('orders')
           .select('id')
           .eq('order_number', orderNumber)
           .single();
-        if (!existingOrder) {
-          break;
-        }
+          
+        if (!existingOrder) isUnique = true;
         attempts++;
-      } while (attempts < maxAttempts);
-      if (attempts >= maxAttempts) {
+      }
+
+      if (!isUnique) {
         throw new Error('Unable to generate unique order number. Please try again.');
       }
 
-      // Calculate order totals
+      // ========== Calculate Totals ==========
       const subTotal = totalAmount;
-      const taxRate = 0.11; // 11% tax
+      const taxRate = 0.11;
       const taxAmount = Math.round(subTotal * taxRate);
-      const shippingCost = 0; // Can be updated based on shipping selection
+      const shippingCost = 0;
       const orderTotal = subTotal + taxAmount + shippingCost;
 
-      // Build external API payload
+      // ========== Build & Send External API Order ========== 
       const orderPayload = {
         customerId: user?.id || '',
         companyId: typedDistributorProfile.company_id || '',
-        paymentTypeId: '', // Optional - can be added later
+        paymentTypeId: '',
         orderType: 'SHOP',
         wareHouse: 1,
-        shippingCost: shippingCost,
+        shippingCost,
         tax: taxAmount,
-        subTotal: subTotal,
+        subTotal,
         total: orderTotal,
         refCode: orderNumber,
-        paymentNotes: deliveryDetails.notes || '',
-        notes: deliveryDetails.notes || '',
+        paymentNotes: notes || '',
+        notes: notes || '',
         deliveryType: 'REGULAR',
-        expeditionName: '', // Optional - can be added later
+        expeditionName: '',
         products: enrichedItems.map(item => ({
           productId: item.id,
           companyId: typedDistributorProfile.company_id || '',
-          inventoryId: item.inventoryId || item.id, // Fallback to product ID if inventoryId not available
+          inventoryId: item.inventoryId,
           qty: item.qty,
           neededQty: item.qty,
           price: item.unitPrice,
@@ -347,28 +357,12 @@ export default function Checkout() {
         }))
       };
 
-      // [BYPASSED] Call external order API to prevent blocking orders
-      console.log('[BYPASSED] Order API call for order:', orderNumber);
-      // const apiResponse = await createOrder(orderPayload);
-      // const statusCode = apiResponse?.statusCode;
-
-      // [BYPASSED] Mock successful API response
-      const mockApiResponse = { statusCode: 200, orderCode: orderNumber, message: 'Success' };
-      const statusCode = mockApiResponse?.statusCode;
-
-      if (statusCode && statusCode !== 200) {
-        // This should never happen with mock response, but keeping for safety
+      const apiResponse = await createOrder(orderPayload);
+      if (apiResponse?.statusCode !== 200) {
         throw new Error('Order API failed. Please try again.');
       }
 
-      console.log('[BYPASSED] Order API call successful:', mockApiResponse);
-
-      // Calculate shipping address based on address type
-      const shippingAddress = deliveryDetails.address;
-      const shippingCity = deliveryDetails.city;
-      const shippingNotes = deliveryDetails.notes || null;
-
-      // Insert order into database
+      // ========== Create Supabase Order ==========
       const { data: orderData, error: orderError } = await (supabase
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from('orders') as any)
@@ -377,9 +371,9 @@ export default function Checkout() {
           order_number: orderNumber,
           status: 'pending',
           total_amount: totalAmount,
-          shipping_address: shippingAddress,
-          shipping_city: shippingCity,
-          shipping_notes: shippingNotes,
+          shipping_address: address,
+          shipping_city: city,
+          shipping_notes: notes || null,
           payment_status: 'unpaid'
         })
         .select()
@@ -389,47 +383,38 @@ export default function Checkout() {
         throw new Error('Failed to create order: ' + (orderError?.message || 'Unknown error'));
       }
 
-      // Insert order items with type assertion
       const typedOrderData = orderData as DbOrder;
 
-      // Create order items
+      // ========== Create Order Items ==========
       const orderItems = items.map(item => ({
         order_id: typedOrderData.id,
-        product_id: item.id, // assuming cart item.id is the product UUID
+        product_id: item.id,
         quantity: item.qty,
         unit_price: item.unitPrice,
-        consumer_price: item.consumerPrice || item.unitPrice, // fallback to unit price if consumer price not available
+        consumer_price: item.consumerPrice || item.unitPrice,
         subtotal: item.qty * item.unitPrice
       }));
 
-      // Insert order items with type assertion
       const { error: itemsError } = await (supabase
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from('order_items') as any)
         .insert(orderItems);
 
       if (itemsError) {
-        // If order items insertion fails, we should delete the order to maintain data integrity
         await supabase.from('orders').delete().eq('id', typedOrderData.id);
         throw new Error('Failed to create order items: ' + itemsError.message);
       }
 
-      // Prepare order details for email
-      const orderItemsText = items.map(item => 
-        `• ${item.name} - ${item.size} (${item.province})
-  Qty: ${item.qty} x ${formatIDR(item.unitPrice)} = ${formatIDR(item.qty * item.unitPrice)}`
-      ).join('\n');
-
-      const addressTypeText = deliveryDetails.addressType === 'default' 
+      // ========== Send Email Notification ==========
+      const addressTypeText = addressType === 'default' 
         ? (lang === 'id' ? 'Alamat Utama' : 'Default Address')
         : (lang === 'id' ? 'Alamat Gudang' : 'Warehouse Address');
 
-      // Prepare email data for Web3Forms
-      const emailData = {
-        access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY,
-        subject: `[Baskit] New Order #${orderNumber} from ${deliveryDetails.fullName}`,
-        from_name: "Baskit Order System",
-        message: `
+      const orderItemsText = items.map(item => 
+        `• ${item.name} - ${item.size} (${item.province})\n   Qty: ${item.qty} x ${formatIDR(item.unitPrice)} = ${formatIDR(item.qty * item.unitPrice)}`
+      ).join('\n');
+
+      const emailMessage = `
 === NEW ORDER RECEIVED ===
 
 Order Information:
@@ -437,16 +422,16 @@ Order Information:
 - Order ID: ${typedOrderData.id}
 
 Customer Information:
-- Name: ${deliveryDetails.fullName}
-- Phone: ${deliveryDetails.phone}
+- Name: ${fullName}
+- Phone: ${phone}
 - Email: ${user?.email || 'N/A'}
 
 Shipping Information:
 - Address Type: ${addressTypeText}
-- Address: ${deliveryDetails.address}
-- City: ${deliveryDetails.city}
-- Postal Code: ${deliveryDetails.postalCode || 'N/A'}
-- Additional Notes: ${deliveryDetails.notes || 'None'}
+- Address: ${address}
+- City: ${city}
+- Postal Code: ${postalCode || 'N/A'}
+- Additional Notes: ${notes || 'None'}
 
 Order Details:
 ${orderItemsText}
@@ -457,58 +442,44 @@ Order Summary:
 - Payment Status: Unpaid
 
 Please process this order and contact the customer for shipping arrangements.
-
 You can view this order in the admin panel using Order Number: ${orderNumber}
-        `,
-        // Additional fields for better email formatting
-        "Order Number": orderNumber,
-        "Customer Name": deliveryDetails.fullName,
-        "Phone Number": deliveryDetails.phone,
-        "Customer Email": user?.email || 'N/A',
-        "Shipping Address": deliveryDetails.address,
-        "City": deliveryDetails.city,
-        "Total Amount": formatIDR(totalAmount),
-        "Order Items": orderItemsText
-      };
+      `.trim();
 
-      // Send email via Web3Forms
-      const response = await fetch("https://api.web3forms.com/submit", {
+      const emailResponse = await fetch("https://api.web3forms.com/submit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
-        body: JSON.stringify(emailData)
+        body: JSON.stringify({
+          access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY,
+          subject: `[Baskit] New Order #${orderNumber} from ${fullName}`,
+          from_name: "Baskit Order System",
+          message: emailMessage,
+          "Order Number": orderNumber,
+          "Customer Name": fullName,
+          "Phone Number": phone,
+          "Customer Email": user?.email || 'N/A',
+          "Shipping Address": address,
+          "City": city,
+          "Total Amount": formatIDR(totalAmount),
+          "Order Items": orderItemsText
+        })
       });
 
-      const result = await response.json();
+      const result = await emailResponse.json();
 
-      if (result.success) {
-        toast({
-          title: t.orderSuccess,
-          description: `${t.orderProcessed} Order #${orderNumber}`,
-        });
+      // ========== Success & Redirect ==========
+      toast({
+        title: t.orderSuccess,
+        description: result.success 
+          ? `${t.orderProcessed} Order #${orderNumber}`
+          : `Order #${orderNumber} ${t.orderProcessed} (Email notification may have failed)`,
+      });
 
-        // Clear the cart
-        clear();
+      clear();
+      setTimeout(() => navigate("/"), 2000);
 
-        // Redirect to homepage after a brief delay
-        setTimeout(() => {
-          navigate("/");
-        }, 2000);
-      } else {
-        console.warn('Email failed to send, but order was saved:', result);
-        toast({
-          title: t.orderSuccess,
-          description: `Order #${orderNumber} ${t.orderProcessed} (Email notification may have failed)`,
-        });
-
-        // Still clear cart and redirect even if email fails
-        clear();
-        setTimeout(() => {
-          navigate("/");
-        }, 2000);
-      }
     } catch (error) {
       console.error('Error submitting order:', error);
       
