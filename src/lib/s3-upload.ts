@@ -16,6 +16,31 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 const isDevelopment = import.meta.env.MODE === 'development';
 
+// Validate S3 configuration in production
+if (!isDevelopment) {
+  const requiredEnvVars = {
+    VITE_AWS_DEFAULT_REGION: import.meta.env.VITE_AWS_DEFAULT_REGION,
+    VITE_AWS_ACCESS_KEY_ID: import.meta.env.VITE_AWS_ACCESS_KEY_ID,
+    VITE_AWS_SECRET_ACCESS_KEY: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
+    VITE_AWS_BUCKET: import.meta.env.VITE_AWS_BUCKET,
+  };
+
+  const missingVars = Object.entries(requiredEnvVars)
+    .filter(([_, value]) => !value)
+    .map(([key]) => key);
+
+  if (missingVars.length > 0) {
+    console.error('❌ Missing required S3 environment variables:', missingVars.join(', '));
+  } else {
+    console.log('✅ S3 configuration loaded:', {
+      region: import.meta.env.VITE_AWS_DEFAULT_REGION,
+      bucket: import.meta.env.VITE_AWS_BUCKET,
+      hasAccessKey: !!import.meta.env.VITE_AWS_ACCESS_KEY_ID,
+      hasSecretKey: !!import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
+    });
+  }
+}
+
 const s3Client = !isDevelopment ? new S3Client({
   region: import.meta.env.VITE_AWS_DEFAULT_REGION,
   credentials: {
@@ -311,6 +336,15 @@ export async function uploadFileToS3(
       throw new Error('S3 client not initialized');
     }
 
+    // Validate S3 configuration
+    if (!BUCKET_NAME) {
+      throw new Error('S3 bucket name is not configured. Please check VITE_AWS_BUCKET environment variable.');
+    }
+
+    if (!import.meta.env.VITE_AWS_DEFAULT_REGION) {
+      throw new Error('AWS region is not configured. Please check VITE_AWS_DEFAULT_REGION environment variable.');
+    }
+
     // Convert file to ArrayBuffer
     const arrayBuffer = await fileToArrayBuffer(processedFile);
     const buffer = new Uint8Array(arrayBuffer);
@@ -321,18 +355,46 @@ export async function uploadFileToS3(
     const fileExtension = processedFile.name.split('.').pop();
     const fileName = `${folder}/${timestamp}-${randomString}.${fileExtension}`;
 
-    // Prepare upload parameters
+    console.log('📤 Uploading to S3:', {
+      bucket: BUCKET_NAME,
+      key: fileName,
+      size: `${(processedFile.size / 1024).toFixed(2)}KB`,
+      type: processedFile.type,
+    });
+
+    // Prepare upload parameters (removed ACL - relying on bucket policy instead)
     const uploadParams = {
       Bucket: BUCKET_NAME,
       Key: fileName,
       Body: buffer,
       ContentType: processedFile.type,
-      // ACL removed - bucket should use bucket policy for public access instead
+      // Note: ACL removed - ensure your S3 bucket has proper bucket policy for public access
+      // or configure based on your security requirements
     };
 
     // Upload to S3
-    const command = new PutObjectCommand(uploadParams);
-    await s3Client.send(command);
+    try {
+      const command = new PutObjectCommand(uploadParams);
+      await s3Client.send(command);
+      console.log('✅ Successfully uploaded to S3:', fileName);
+    } catch (s3Error) {
+      console.error('❌ S3 upload failed:', s3Error);
+      
+      // Provide more specific error messages
+      if (s3Error instanceof Error) {
+        if (s3Error.message.includes('AccessDenied')) {
+          throw new Error('Access denied to S3 bucket. Please check AWS credentials and bucket permissions.');
+        } else if (s3Error.message.includes('NoSuchBucket')) {
+          throw new Error(`S3 bucket '${BUCKET_NAME}' does not exist or is not accessible.`);
+        } else if (s3Error.message.includes('InvalidAccessKeyId')) {
+          throw new Error('Invalid AWS Access Key ID. Please check your credentials.');
+        } else if (s3Error.message.includes('SignatureDoesNotMatch')) {
+          throw new Error('Invalid AWS Secret Access Key. Please check your credentials.');
+        }
+      }
+      
+      throw s3Error;
+    }
 
     // Construct the public URL
     const url = `https://${BUCKET_NAME}.s3.${import.meta.env.VITE_AWS_DEFAULT_REGION}.amazonaws.com/${fileName}`;
@@ -385,3 +447,4 @@ export function getImageUrl(storageKey: string | null | undefined): string | nul
   // Production mode - return S3 URL as-is
   return storageKey;
 }
+

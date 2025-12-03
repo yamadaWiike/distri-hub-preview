@@ -21,9 +21,14 @@ import { useCart } from "@/hooks/use-cart";
 import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/hooks/use-language";
 
-// Utils & Data
+// Utils, Data & API
 import { formatIDR } from "@/lib/utils";
 import { translations } from "@/lib/translations";
+import { createOrder } from "@/lib/baskitApiOrder";
+import { getInventory } from "@/lib/baskitApiInventory";
+
+// Integrations & Types
+import { supabase } from "@/integrations/supabase/client";
 import { CartItem } from "@/contexts/CartContextDefinition";
 
 // Address type selection
@@ -158,9 +163,6 @@ export default function Checkout() {
       if (!user || !user.id) return;
       
       try {
-        // Import supabase client
-        const { supabase } = await import('@/integrations/supabase/client');
-        
         // Fetch profile data
         const { data, error } = await supabase
           .from('distributor_profiles')
@@ -224,6 +226,7 @@ export default function Checkout() {
       return;
     }
     
+<<<<<<< HEAD
     try {
       // Import supabase client, bypass external APIs
       const { supabase } = await import('@/integrations/supabase/client');
@@ -232,6 +235,11 @@ export default function Checkout() {
 
       // [BYPASSED] Fetch inventory data for all cart items
       console.log('[BYPASSED] Inventory API call - using fallback validation');
+=======
+    try {    
+      // Fetch inventory data for all cart items
+      console.log('Fetching inventory data for cart items...');
+>>>>>>> 460fa00 (fix: s3 upload)
       const productIds = items.map(item => item.id);
       
       // Start with original items, will be enriched if inventory data is available

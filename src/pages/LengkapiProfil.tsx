@@ -395,46 +395,6 @@ export default function LengkapiProfil() {
     try {
       setIsLoading(true);
 
-      const companyTypeId = "9cd7553a-1e03-4ed1-86d2-967cdf185bdb"; // ID for Distributor Type on ERP
-      const customerPayload: CustomerPayload = {
-        companyName: form.nama_perusahaan,
-        phone: form.nomor_kontak_perusahaan,
-        email: form.email_perusahaan,
-        companyTypeId: companyTypeId,
-        assignedUsersId: null, // TODO: Add assigned user
-        parentCompanyId: null, // TODO: Add parent company selection if needed
-        childType: null, // TODO: Default to distributor
-        districtId: parseInt(form.districtId),
-        detailAddress: form.alamat_perusahaan,
-        companyWebsite: form.companyWebsite,
-        notes: "",
-        postalCode: existingData?.postal_code ?? "",
-        billingAddress: {
-          address: form.alamat_perusahaan,
-          district: form.districtId,
-          city: form.regencyId,
-          province: form.provinsiId,
-          zipcode: existingData?.postal_code ?? "",
-        },
-        shippingAddress: {
-          address: `${form.alamat_gudang}, ${form.districtName}, ${form.regencyName}, ${form.provinsiName}`,
-          district: form.districtId,
-          city: form.regencyId,
-          province: form.provinsiId,
-          zipcode: existingData?.postal_code ?? "",
-        },
-        primaryContact: {
-          name: form.nama_pic ?? form.nama_pemilik,
-          email: form.email_pic ?? form.email_pemilik,
-          phone: form.nomor_kontak_pic ?? form.kontak_pemilik,
-          jobTitle: form.posisi_pic ?? "Owner",
-          leadSource: "distributor-hub",
-        },
-      };
-
-      // Call the createCustomer API
-      await createCustomer(customerPayload);
-
       // Update profile data
       const updateData = {
         nama_bisnis: form.nama_perusahaan,
@@ -476,6 +436,46 @@ export default function LengkapiProfil() {
         .eq("user_id", user!.id);
 
       if (error) throw error;
+
+      const companyTypeId = "9cd7553a-1e03-4ed1-86d2-967cdf185bdb"; // ID for Distributor Type on ERP
+      const customerPayload: CustomerPayload = {
+        companyName: form.nama_perusahaan,
+        phone: form.nomor_kontak_perusahaan,
+        email: form.email_perusahaan,
+        companyTypeId: companyTypeId,
+        assignedUsersId: null, // TODO: Add assigned user
+        parentCompanyId: null, // TODO: Add parent company selection if needed
+        childType: null, // TODO: Default to distributor
+        districtId: parseInt(form.districtId),
+        detailAddress: form.alamat_perusahaan,
+        companyWebsite: form.companyWebsite,
+        notes: "",
+        postalCode: existingData?.postal_code ?? "",
+        billingAddress: {
+          address: form.alamat_perusahaan,
+          district: form.districtId,
+          city: form.regencyId,
+          province: form.provinsiId,
+          zipcode: existingData?.postal_code ?? "",
+        },
+        shippingAddress: {
+          address: `${form.alamat_gudang}, ${form.districtName}, ${form.regencyName}, ${form.provinsiName}`,
+          district: form.districtId,
+          city: form.regencyId,
+          province: form.provinsiId,
+          zipcode: existingData?.postal_code ?? "",
+        },
+        primaryContact: {
+          name: form.nama_pic ?? form.nama_pemilik,
+          email: form.email_pic ?? form.email_pemilik,
+          phone: form.nomor_kontak_pic ?? form.kontak_pemilik,
+          jobTitle: form.posisi_pic ?? "Owner",
+          leadSource: "distributor-hub",
+        },
+      };
+
+      // Call the createCustomer API
+      await createCustomer(customerPayload);
 
       toast({
         title: lang === "id" ? "Profil Lengkap" : "Profile Complete",
