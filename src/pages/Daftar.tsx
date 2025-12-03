@@ -1,28 +1,37 @@
+// React & Router
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+
+// External Libraries & Icons
+import { Upload, X, Loader2, Eye, EyeOff } from "lucide-react";
+
+// UI Components
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/use-auth";
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useLanguage } from "@/hooks/use-language";
-import { translations } from "@/lib/translations";
 import { toast } from "@/components/ui/use-toast";
-import { Upload, X, Loader2, Eye, EyeOff } from "lucide-react";
-import { uploadStorePhoto, getImageUrl } from "@/lib/s3-upload";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
-import { 
-  fetchProvinces, 
-  fetchRegenciesByProvince, 
+
+// Hooks
+import { useAuth } from "@/hooks/use-auth";
+import { useLanguage } from "@/hooks/use-language";
+
+// Utils, Data & API
+import { translations } from "@/lib/translations";
+import { uploadStorePhoto, getImageUrl } from "@/lib/s3-upload";
+import {
+  fetchProvinces,
+  fetchRegenciesByProvince,
   fetchDistrictsByRegency,
   Province,
   Regency,
-  District
+  District,
 } from "@/data/indonesiaRegions";
 
 export default function Daftar() {

@@ -1,14 +1,21 @@
+// React & Router
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+
+// External Libraries & Icons
+import { AlertTriangle } from "lucide-react";
+
+// UI Components
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import AdminSidebar from "@/components/layout/AdminSidebar";
 import SKUManager from "@/components/admin/SKUManager";
-import { useLanguage } from "@/hooks/use-language";
-import { useAuth } from "@/hooks/use-auth";
-import { useNavigate } from "react-router-dom";
-import { AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+
+// Hooks
+import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function AdminSKUManager() {
   const { lang } = useLanguage();

@@ -1,6 +1,11 @@
+// React & Router
 import { useState, useEffect, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+
+// External Libraries & Icons
 import { Minus, Plus } from "lucide-react";
+
+// UI Components
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
@@ -9,13 +14,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { formatIDR } from "@/lib/utils";
-import { useCart } from "@/hooks/use-cart";
-import { CartItem } from "@/contexts/CartContextDefinition";
 import { useToast } from "@/components/ui/use-toast";
+
+// Hooks
+import { useCart } from "@/hooks/use-cart";
 import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/hooks/use-language";
+
+// Utils & Data
+import { formatIDR } from "@/lib/utils";
 import { translations } from "@/lib/translations";
+import { CartItem } from "@/contexts/CartContextDefinition";
 
 // Address type selection
 type AddressType = 'default' | 'warehouse';

@@ -1,28 +1,38 @@
+// React & Router
+import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 
+// External Libraries & Icons
+import { AlertCircle, MapPin } from "lucide-react";
+import type { PostgrestResponse } from '@supabase/supabase-js';
+import 'leaflet/dist/leaflet.css';
+
+// UI Components
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/use-auth";
-import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { AlertCircle, MapPin } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/components/ui/use-toast";
-import { Database } from "@/integrations/supabase/types";
-import type { PostgrestResponse } from '@supabase/supabase-js';
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import MapSelector from "@/components/ui/map-selector";
-import 'leaflet/dist/leaflet.css';
+
+// Hooks
+import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/hooks/use-language";
+
+// Utils & API
 import { translations } from "@/lib/translations";
 import { uploadFileToS3, getImageUrl } from '@/lib/s3-upload';
+
+// Integrations & Types
+import { Database } from "@/integrations/supabase/types";
 
 // Indonesian Cities and Regencies
 const INDONESIAN_AREAS = [

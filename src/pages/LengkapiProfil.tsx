@@ -1,26 +1,17 @@
+// React & Router
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+
+// External Libraries & Icons
+import { ArrowLeft, MapPin } from "lucide-react";
+import "leaflet/dist/leaflet.css";
+
+// UI Components
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/use-auth";
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useLanguage } from "@/hooks/use-language";
-import { translations } from "@/lib/translations";
 import { toast } from "@/components/ui/use-toast";
-import { ArrowLeft, MapPin } from "lucide-react";
 import MapSelector from "@/components/ui/map-selector";
-import "leaflet/dist/leaflet.css";
-import { Database } from "@/integrations/supabase/types";
-// import { createCustomer, CustomerPayload } from "@/lib/baskitApiCustomer"; // BYPASSED
-import { 
-  fetchProvinces, 
-  fetchRegenciesByProvince, 
-  fetchDistrictsByRegency,
-  fetchAllRegencies,
-  type Province,
-  type Regency,
-  type District
-} from "@/data/indonesiaRegions";
 import {
   Select,
   SelectContent,
@@ -28,7 +19,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+// Hooks
+import { useAuth } from "@/hooks/use-auth";
+import { useLanguage } from "@/hooks/use-language";
+
+// Utils, Data & API
+import { translations } from "@/lib/translations";
+import { createCustomer, CustomerPayload } from "@/lib/baskitApiCustomer";
+import {
+  fetchProvinces,
+  fetchRegenciesByProvince,
+  fetchDistrictsByRegency,
+  fetchAllRegencies,
+  type Province,
+  type Regency,
+  type District,
+} from "@/data/indonesiaRegions";
+
+// Integrations & Types
 import { supabase } from "@/integrations/supabase/client";
+import { Database } from "@/integrations/supabase/types";
 
 type ExtendedDistributorProfile =
   Database["public"]["Tables"]["distributor_profiles"]["Row"] & {

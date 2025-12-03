@@ -1,10 +1,17 @@
+// React & Router
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+
+// UI Components
 import SEO from "@/components/seo/SEO";
 import Navbar from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
+
+// Hooks
 import { useAuth } from "@/hooks/use-auth";
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
 import { useLanguage } from "@/hooks/use-language";
+
+// Utils & Data
 import { translations } from "@/lib/translations";
 
 export default function Masuk() {
