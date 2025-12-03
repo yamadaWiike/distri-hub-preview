@@ -221,6 +221,16 @@ export async function uploadFileToS3(
   folder: string = 'uploads'
 ): Promise<UploadResult> {
   try {
+    // Check if SKU deletion is in progress and prevent uploads that might interfere
+    const windowWithFlags = window as Window & { __skuDeletionInProgress?: boolean };
+    if (windowWithFlags.__skuDeletionInProgress) {
+      console.warn('Upload blocked: SKU deletion in progress');
+      return {
+        success: false,
+        error: 'Upload temporarily blocked due to system operation in progress. Please try again in a moment.'
+      };
+    }
+    
     // Check if file is too large (before compression)
     if (file.size > MAX_UNCOMPRESSED_SIZE) {
       const sizeMB = (file.size / 1024 / 1024).toFixed(2);
@@ -292,9 +302,14 @@ export async function uploadFileToS3(
         // Convert to data URL only AFTER compression and cleanup
         const dataURL = await fileToDataURL(processedFile);
         
+        // Validate data URL before storing
+        if (!dataURL || !dataURL.startsWith('data:')) {
+          throw new Error('Invalid data URL generated');
+        }
+        
         // Store in localStorage
         localStorage.setItem(storageKey, dataURL);
-        console.log(`[DEV] File stored in localStorage: ${storageKey}`);
+        console.log(`[DEV] File stored in localStorage: ${storageKey} (${(dataURL.length / 1024).toFixed(2)}KB)`);
       } catch (error) {
         console.error('[DEV] Failed to store file in localStorage:', error);
         
@@ -436,15 +451,39 @@ export async function uploadProductImage(file: File): Promise<UploadResult> {
  * @returns The actual URL or data URL to display
  */
 export function getImageUrl(storageKey: string | null | undefined): string | null {
-  if (!storageKey) return null;
+  if (!storageKey) {
+    console.warn('getImageUrl: No storage key provided');
+    return null;
+  }
+  
+  console.log('getImageUrl called with:', storageKey);
+  console.log('isDevelopment:', isDevelopment);
   
   // Development mode - retrieve from localStorage
   if (isDevelopment && !storageKey.startsWith('http')) {
+    console.log('Development mode: Retrieving from localStorage');
     const dataURL = localStorage.getItem(storageKey);
-    return dataURL || null;
+    console.log('Retrieved data URL length:', dataURL?.length || 0);
+    
+    if (!dataURL) {
+      console.error('Failed to retrieve data URL from localStorage for key:', storageKey);
+      console.log('Available localStorage keys:', Object.keys(localStorage).filter(k => k.includes(storageKey.split('/')[0])));
+      return null;
+    }
+    
+    // Validate the stored data URL
+    if (!dataURL.startsWith('data:')) {
+      console.error(`[DEV] Invalid data URL format in localStorage: ${storageKey}`);
+      localStorage.removeItem(storageKey); // Clean up invalid data
+      return null;
+    }
+    
+    console.log(`[DEV] Successfully retrieved valid data URL from localStorage: ${storageKey} (${(dataURL.length / 1024).toFixed(2)}KB)`);
+    return dataURL;
   }
   
   // Production mode - return S3 URL as-is
+  console.log('Production mode: Returning S3 URL as-is');
   return storageKey;
 }
 

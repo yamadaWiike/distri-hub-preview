@@ -335,14 +335,26 @@ export default function Daftar() {
       // Upload to S3 or localStorage
       setIsUploadingPhoto(true);
       try {
+        console.log('Starting photo upload:', file.name, file.size);
         const result = await uploadStorePhoto(file);
+        
+        console.log('Upload result:', result);
         
         if (result.success && result.url) {
           // Get the actual URL for preview
           const previewUrl = getImageUrl(result.url);
+          console.log('Preview URL generated:', previewUrl);
+          
+          // Always create a fallback object URL as backup
+          let finalPreviewUrl = previewUrl;
+          if (!previewUrl || previewUrl === 'null' || previewUrl === 'undefined') {
+            console.warn('Preview URL is invalid, using object URL fallback');
+            finalPreviewUrl = URL.createObjectURL(file);
+          }
+          console.log('Final preview URL:', finalPreviewUrl);
           
           setForm({ ...form, fotoToko: file, fotoTokoUrl: result.url });
-          setPhotoPreview(previewUrl);
+          setPhotoPreview(finalPreviewUrl);
           
           toast({
             title: lang === 'id' ? "Foto Berhasil Diunggah" : "Photo Uploaded Successfully",
@@ -366,6 +378,10 @@ export default function Daftar() {
   };
 
   const removePhoto = () => {
+    // Clean up object URL if it exists to prevent memory leaks
+    if (photoPreview && photoPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(photoPreview);
+    }
     setForm({ ...form, fotoToko: null, fotoTokoUrl: "" });
     setPhotoPreview(null);
   };
@@ -634,6 +650,19 @@ export default function Daftar() {
                         src={photoPreview} 
                         alt="Store preview" 
                         className="rounded-lg border border-gray-200 w-full max-w-xs h-48 object-cover"
+                        onError={(e) => {
+                          console.error('Image failed to load:', photoPreview);
+                          console.error('Image error event:', e);
+                          // Try to create a fallback URL from the original file if available
+                          if (form.fotoToko) {
+                            const fallbackUrl = URL.createObjectURL(form.fotoToko);
+                            console.log('Setting fallback URL:', fallbackUrl);
+                            setPhotoPreview(fallbackUrl);
+                          }
+                        }}
+                        onLoad={() => {
+                          console.log('Image loaded successfully:', photoPreview);
+                        }}
                       />
                       <button
                         type="button"
