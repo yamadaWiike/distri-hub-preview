@@ -185,10 +185,12 @@ export default function ProductManagement() {
 
       setProducts(productsWithStatus);
       setFilteredProducts(productsWithStatus);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      console.error('Error loading products:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: t.error,
-        description: error.message,
+        description: `Failed to load products: ${errorMessage}`,
         variant: "destructive",
       });
     } finally {

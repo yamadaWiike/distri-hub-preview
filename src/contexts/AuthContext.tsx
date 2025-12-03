@@ -272,8 +272,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         try {
           // Create profile with proper error logging
-          const { data: insertResult, error } = await supabase
-            .from('distributor_profiles')
+          const { data: insertResult, error } = await (supabase
+            .from('distributor_profiles') as unknown as {
+              insert: (data: typeof profileData | typeof profileData[]) => {
+                select: () => Promise<{ data: unknown; error: unknown }>;
+              };
+            })
             .insert(profileData)
             .select();
             
