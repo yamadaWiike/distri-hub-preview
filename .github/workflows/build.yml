@@ -29,8 +29,18 @@ jobs:
     - name: Build
       run: pnpm run build:jenkins
       env:
+        # Core Supabase Configuration
         VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
         VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
+        # External Services (optional for bypassed APIs)
+        VITE_WEB3FORMS_KEY: ${{ secrets.VITE_WEB3FORMS_KEY }}
+        VITE_AWS_ACCESS_KEY_ID: ${{ secrets.VITE_AWS_ACCESS_KEY_ID }}
+        VITE_AWS_SECRET_ACCESS_KEY: ${{ secrets.VITE_AWS_SECRET_ACCESS_KEY }}
+        VITE_AWS_BUCKET: ${{ secrets.VITE_AWS_BUCKET }}
+        VITE_AWS_DEFAULT_REGION: ${{ secrets.VITE_AWS_DEFAULT_REGION }}
+        VITE_BASKIT_API_KEY: ${{ secrets.VITE_BASKIT_API_KEY }}
+        VITE_BASKIT_API_URL: ${{ secrets.VITE_BASKIT_API_URL }}
       
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
