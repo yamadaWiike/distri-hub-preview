@@ -147,6 +147,9 @@ export default function Checkout() {
     addressType: "default",
   });
 
+  // Loading state for submit
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Check for user authentication, cart items, and fetch profile data
   useEffect(() => {
     if (!user) {
@@ -235,6 +238,7 @@ export default function Checkout() {
   // Handle form submission
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
     // ========== Validate Form ==========
     const { fullName, phone, address, city, postalCode, notes, addressType } =
@@ -537,7 +541,7 @@ You can view this order in the admin panel using Order Number: ${orderNumber}
           Accept: "application/json",
         },
         body: JSON.stringify({
-          access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY,
+          access_key: import.meta.env.VITE_WEB3FORMS_KEY,
           subject: `[Baskit] New Order #${orderNumber} from ${fullName}`,
           from_name: "Baskit Order System",
           message: emailMessage,
@@ -581,6 +585,8 @@ You can view this order in the admin panel using Order Number: ${orderNumber}
         description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -921,8 +927,19 @@ You can view this order in the admin panel using Order Number: ${orderNumber}
               </div>
 
               <div className="mt-8 pt-6 border-t">
-                <Button type="submit" size="lg" className="w-full">
-                  {lang === "id" ? "Pesan Sekarang" : "Place Order"}
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting
+                    ? lang === "id"
+                      ? "Memproses Pesanan..."
+                      : "Processing Order..."
+                    : lang === "id"
+                    ? "Pesan Sekarang"
+                    : "Place Order"}
                 </Button>
               </div>
             </form>
