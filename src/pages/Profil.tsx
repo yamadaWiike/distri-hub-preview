@@ -1192,7 +1192,11 @@ export default function Profil() {
                 {/* Map Display */}
                 {form.koordinat && (() => {
                   try {
-                    const coords = JSON.parse(form.koordinat);
+                    // Ensure koordinat is a string before parsing
+                    const koordinatStr = typeof form.koordinat === 'string' ? form.koordinat.trim() : '';
+                    if (!koordinatStr) return null;
+                    
+                    const coords = JSON.parse(koordinatStr);
                     if (coords.lat && coords.lng) {
                       return (
                         <div className="sm:col-span-2 mt-4 pt-4 border-t border-gray-200">
@@ -1211,8 +1215,10 @@ export default function Profil() {
                         </div>
                       );
                     }
+                    return null;
                   } catch (e) {
-                    console.error('Error parsing coordinates:', e);
+                    // Silently fail for invalid coordinate data
+                    return null;
                   }
                   return null;
                 })()}

@@ -30,14 +30,7 @@ if (!isDevelopment) {
     .map(([key]) => key);
 
   if (missingVars.length > 0) {
-    console.error('❌ Missing required S3 environment variables:', missingVars.join(', '));
-  } else {
-    console.log('✅ S3 configuration loaded:', {
-      region: import.meta.env.VITE_AWS_DEFAULT_REGION,
-      bucket: import.meta.env.VITE_AWS_BUCKET,
-      hasAccessKey: !!import.meta.env.VITE_AWS_ACCESS_KEY_ID,
-      hasSecretKey: !!import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
-    });
+    console.warn('Missing S3 environment variables:', missingVars.join(', '));
   }
 }
 
@@ -456,18 +449,12 @@ export function getImageUrl(storageKey: string | null | undefined): string | nul
     return null;
   }
   
-  console.log('getImageUrl called with:', storageKey);
-  console.log('isDevelopment:', isDevelopment);
-  
   // Development mode - retrieve from localStorage
   if (isDevelopment && !storageKey.startsWith('http')) {
-    console.log('Development mode: Retrieving from localStorage');
     const dataURL = localStorage.getItem(storageKey);
-    console.log('Retrieved data URL length:', dataURL?.length || 0);
     
     if (!dataURL) {
-      console.error('Failed to retrieve data URL from localStorage for key:', storageKey);
-      console.log('Available localStorage keys:', Object.keys(localStorage).filter(k => k.includes(storageKey.split('/')[0])));
+      // Silently return null - file not in localStorage is expected in dev mode
       return null;
     }
     
@@ -478,12 +465,10 @@ export function getImageUrl(storageKey: string | null | undefined): string | nul
       return null;
     }
     
-    console.log(`[DEV] Successfully retrieved valid data URL from localStorage: ${storageKey} (${(dataURL.length / 1024).toFixed(2)}KB)`);
     return dataURL;
   }
   
   // Production mode - return S3 URL as-is
-  console.log('Production mode: Returning S3 URL as-is');
   return storageKey;
 }
 

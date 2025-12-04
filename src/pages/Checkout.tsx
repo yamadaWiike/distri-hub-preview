@@ -230,67 +230,110 @@ export default function Checkout() {
     
     try {    
       // ========== Fetch & Validate Inventory ==========
-      const productIds = items.map(item => item.id);
-      const inventoryResponse = await getInventory({
-        inventoryId: productIds,
-        active: true,
-        $limit: 100
-      });
+      const bypassEnabled = import.meta.env.VITE_BASKIT_API_BYPASS === 'true';
+      let enrichedItems;
 
-      if (!inventoryResponse?.data?.length) {
-        throw new Error(
-          lang === 'id'
-            ? 'Gagal mendapatkan data inventory. Silakan coba lagi atau hubungi admin.'
-            : 'Failed to fetch inventory data. Please try again or contact admin.'
-        );
-      }
+      if (bypassEnabled) {
+        console.log('[BASKIT API BYPASS] Inventory validation bypassed in checkout');
+        // When bypassed, use cart items as-is with default values
+        enrichedItems = items.map(item => ({
+          ...item,
+          inventoryId: item.id, // Use product ID as inventory ID
+          inventoryPriceTierId: item.inventoryPriceTierId || 'default-tier',
+          sku: item.sku || `SKU-${item.id}`,
+          qtyOnHand: 9999 // Mock large stock
+        }));
+      } else {
+        const productIds = items.map(item => item.id);
+        const inventoryResponse = await getInventory({
+          inventoryId: productIds,
+          active: true,
+          $limit: 100
+        });
 
-      // Enrich items and check stock
-      const enrichedItems = items.map(item => {
-        const inventoryItem = inventoryResponse.data.find(inv => 
-          inv.inventoryId === item.id && 
-          (item.variant ? inv.variantId === item.variant.id : true)
-        );
-
-        const itemDesc = item.variant ? `${item.name} (${item.variant.name})` : item.name;
-
-        if (!inventoryItem) {
-          throw new Error(
-            lang === 'id' 
-              ? `Data inventory tidak ditemukan untuk ${itemDesc}. Silakan hubungi admin.`
-              : `Inventory data not found for ${itemDesc}. Please contact admin.`
-          );
-        }
-
-        if (inventoryItem.qtyOnHand < item.qty) {
+        if (!inventoryResponse?.data?.length) {
           throw new Error(
             lang === 'id'
-              ? `Stok tidak cukup untuk ${itemDesc}. Tersedia: ${inventoryItem.qtyOnHand}, Diminta: ${item.qty}`
-              : `Insufficient stock for ${itemDesc}. Available: ${inventoryItem.qtyOnHand}, Requested: ${item.qty}`
+              ? 'Gagal mendapatkan data inventory. Silakan coba lagi atau hubungi admin.'
+              : 'Failed to fetch inventory data. Please try again or contact admin.'
           );
         }
 
-        return {
-          ...item,
-          inventoryId: inventoryItem.id,
-          inventoryPriceTierId: item.inventoryPriceTierId || 'default-tier',
-          sku: inventoryItem.sku,
-          qtyOnHand: inventoryItem.qtyOnHand
-        };
-      });
+        // Enrich items and check stock
+        enrichedItems = items.map(item => {
+          const inventoryItem = inventoryResponse.data.find(inv => 
+            inv.inventoryId === item.id && 
+            (item.variant ? inv.variantId === item.variant.id : true)
+          );
+
+          const itemDesc = item.variant ? `${item.name} (${item.variant.name})` : item.name;
+
+          if (!inventoryItem) {
+            throw new Error(
+              lang === 'id' 
+                ? `Data inventory tidak ditemukan untuk ${itemDesc}. Silakan hubungi admin.`
+                : `Inventory data not found for ${itemDesc}. Please contact admin.`
+            );
+          }
+
+          if (inventoryItem.qtyOnHand < item.qty) {
+            throw new Error(
+              lang === 'id'
+                ? `Stok tidak cukup untuk ${itemDesc}. Tersedia: ${inventoryItem.qtyOnHand}, Diminta: ${item.qty}`
+                : `Insufficient stock for ${itemDesc}. Available: ${inventoryItem.qtyOnHand}, Requested: ${item.qty}`
+            );
+          }
+
+          return {
+            ...item,
+            inventoryId: inventoryItem.id,
+            inventoryPriceTierId: item.inventoryPriceTierId || 'default-tier',
+            sku: inventoryItem.sku,
+            qtyOnHand: inventoryItem.qtyOnHand
+          };
+        });
+      }
       
       // ========== Get Distributor Profile ==========
       const { data: distributorProfile, error: profileError } = await supabase
         .from('distributor_profiles')
-        .select('id, company_id')
+        .select('id, npwp_number, nib_number, ktp_url, npwp_url, akta_url')
         .eq('user_id', user?.id)
         .single();
 
-      if (profileError || !distributorProfile) {
-        throw new Error('Distributor profile not found. Please complete your profile first.');
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+        throw new Error(
+          lang === 'id'
+            ? 'Gagal mengambil profil distributor. Silakan coba lagi.'
+            : 'Failed to fetch distributor profile. Please try again.'
+        );
       }
 
-      const typedDistributorProfile = distributorProfile as DbDistributorProfile & { company_id?: string };
+      if (!distributorProfile) {
+        throw new Error(
+          lang === 'id'
+            ? 'Profil distributor tidak ditemukan. Silakan lengkapi profil Anda terlebih dahulu.'
+            : 'Distributor profile not found. Please complete your profile first.'
+        );
+      }
+
+      // Check if profile is sufficiently complete (has legal documents - either numbers or uploaded files)
+      const hasLegalDocs = distributorProfile.npwp_number || 
+                          distributorProfile.nib_number || 
+                          distributorProfile.ktp_url || 
+                          distributorProfile.npwp_url || 
+                          distributorProfile.akta_url;
+      
+      if (!hasLegalDocs) {
+        throw new Error(
+          lang === 'id'
+            ? 'Silakan lengkapi dokumen legal (NPWP/NIB/KTP) di profil Anda sebelum melakukan pemesanan.'
+            : 'Please complete your legal documents (NPWP/NIB/KTP) in your profile before placing orders.'
+        );
+      }
+
+      const typedDistributorProfile = distributorProfile as DbDistributorProfile;
 
       // ========== Generate Unique Order Number ==========
       let orderNumber: string = '';
@@ -325,9 +368,12 @@ export default function Checkout() {
       const orderTotal = subTotal + taxAmount + shippingCost;
 
       // ========== Build & Send External API Order ========== 
+      // Use distributor profile ID as company ID since company_id column doesn't exist
+      const companyId = typedDistributorProfile.id;
+      
       const orderPayload = {
         customerId: user?.id || '',
-        companyId: typedDistributorProfile.company_id || '',
+        companyId: companyId,
         paymentTypeId: '',
         orderType: 'SHOP',
         wareHouse: 1,
@@ -342,7 +388,7 @@ export default function Checkout() {
         expeditionName: '',
         products: enrichedItems.map(item => ({
           productId: item.id,
-          companyId: typedDistributorProfile.company_id || '',
+          companyId: companyId,
           inventoryId: item.inventoryId,
           qty: item.qty,
           neededQty: item.qty,

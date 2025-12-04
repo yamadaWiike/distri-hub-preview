@@ -78,23 +78,6 @@ export default function AllActivities() {
       setIsLoading(true);
       const allActivities: Activity[] = [];
 
-      // Fetch all users for mapping
-      const { data: users } = await supabase
-        .from('profiles')
-        .select('id, email, full_name');
-
-      const getUserName = (userId: string | null) => {
-        if (!userId) return 'System';
-        const user = users?.find((u: any) => u.id === userId);
-        return (user as any)?.full_name || (user as any)?.email || 'Unknown User';
-      };
-
-      const getUserEmail = (userId: string | null) => {
-        if (!userId) return undefined;
-        const user = users?.find((u: any) => u.id === userId);
-        return (user as any)?.email;
-      };
-
       // Fetch distributor approvals
       const { data: distributors } = await supabase
         .from('distributor_profiles')
@@ -131,7 +114,7 @@ export default function AllActivities() {
       // Fetch products
       const { data: products } = await supabase
         .from('products')
-        .select('id, name, created_at, created_by')
+        .select('id, name, created_at')
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -144,8 +127,8 @@ export default function AllActivities() {
             detail: product.name || 'Unknown Product',
             time: getTimeAgo(product.created_at),
             timestamp: new Date(product.created_at),
-            actor: getUserName(product.created_by) || 'Admin',
-            actorEmail: getUserEmail(product.created_by) || 'admin@baskit.co.id'
+            actor: 'Admin',
+            actorEmail: 'admin@baskit.co.id'
           });
         }
       });
@@ -171,7 +154,7 @@ export default function AllActivities() {
             : (lang === 'id' ? 'Pesanan selesai' : 'Order completed');
 
           const orderDist = orderDistributors?.find((d: any) => d.id === order.distributor_id);
-          const actorName = (orderDist as any)?.nama_bisnis || getUserName((orderDist as any)?.user_id) || 'Unknown';
+          const actorName = (orderDist as any)?.nama_bisnis || 'Unknown';
 
           allActivities.push({
             id: `order-${order.id}`,
