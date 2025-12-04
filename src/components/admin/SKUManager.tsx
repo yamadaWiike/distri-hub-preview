@@ -1510,11 +1510,15 @@ const SKUManager = () => {
     console.log('=== PREVENTING CONCURRENT OPERATIONS ===');
     
     // Clear any pending upload operations that might be running
-    const windowWithFlags = window as Window & { __pendingUploads?: unknown[]; __skuDeletionInProgress?: boolean };
+    interface UploadOperation {
+      cancel?: () => void;
+      abort?: () => void;
+    }
+    const windowWithFlags = window as Window & { __pendingUploads?: UploadOperation[]; __skuDeletionInProgress?: boolean };
     const pendingUploads = windowWithFlags.__pendingUploads || [];
     if (pendingUploads.length > 0) {
       console.warn('Found pending upload operations, clearing them:', pendingUploads.length);
-      pendingUploads.forEach((upload: any) => {
+      pendingUploads.forEach((upload: UploadOperation) => {
         try {
           if (upload.cancel) upload.cancel();
           if (upload.abort) upload.abort();
@@ -1669,7 +1673,11 @@ const SKUManager = () => {
           errorMessage = `${errorMessage}: ${error.message}`;
         }
       } else if (typeof error === 'object' && error !== null) {
-        const errorObj = error as any;
+        interface ErrorObject {
+          message?: string;
+          code?: string;
+        }
+        const errorObj = error as ErrorObject;
         console.error('Non-Error object:', errorObj);
         if (errorObj.message) {
           errorMessage = `${errorMessage}: ${errorObj.message}`;

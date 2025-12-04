@@ -257,10 +257,8 @@ export default function AdminEditProduct() {
           consumer_price: (product as any).consumer_price || 0,
           retail_price: (product as any).retail_price || 0,
           distributor_price: (product as any).distributor_price || 0,
-          base_distributor_price: (product as any).base_distributor_price || 0,
           stock_quantity: (product as any).stock_quantity || 0,
           moq: (product as any).moq || 1,
-          base_moq: (product as any).base_moq || 1,
           unit_per_package: (product as any).unit_per_package || 1,
           is_active: (product as any).is_active ?? true,
           allow_negative_stock: (product as any).allow_negative_stock ?? false,
@@ -472,7 +470,7 @@ export default function AdminEditProduct() {
   };
 
   const generateVariantPricing = () => {
-    const basePrice = formData.distributor_price || formData.base_distributor_price || Math.round(formData.consumer_price * 0.8);
+    const basePrice = formData.distributor_price || Math.round(formData.consumer_price * 0.8);
     const newVariantPricing: any[] = [];
     
     productVariants.forEach(variant => {
@@ -486,7 +484,7 @@ export default function AdminEditProduct() {
             variant_name: variant.variant_name,
             area: area,
             distributor_price: basePrice + variant.additional_price,
-            moq: formData.moq || formData.base_moq
+            moq: formData.moq
           });
         }
       });
@@ -612,8 +610,7 @@ export default function AdminEditProduct() {
       setIsSubmitting(true);
 
       // Auto-calculate prices if not set
-      const distPrice = formData.distributor_price || formData.base_distributor_price || Math.round(formData.consumer_price * 0.8);
-      const baseDistPrice = formData.base_distributor_price || distPrice;
+      const distPrice = formData.distributor_price || Math.round(formData.consumer_price * 0.8);
       const retailPrice = formData.retail_price || Math.round(formData.consumer_price * 1.2);
 
       // Update products table
@@ -628,10 +625,8 @@ export default function AdminEditProduct() {
         consumer_price: formData.consumer_price,
         retail_price: retailPrice,
         distributor_price: distPrice,
-        base_distributor_price: baseDistPrice,
         stock_quantity: formData.stock_quantity,
         moq: formData.moq,
-        base_moq: formData.base_moq,
         unit_per_package: formData.unit_per_package,
         is_active: formData.is_active,
         allow_negative_stock: formData.allow_negative_stock,
@@ -698,7 +693,7 @@ export default function AdminEditProduct() {
         
         const regionPricingToInsert = Object.entries(areaGroups).map(([area, prices]: [string, any]) => {
           const basePrice = Math.min(...prices.map((p: any) => p.distributor_price));
-          const baseMoq = prices[0]?.moq || formData.moq || formData.base_moq;
+          const baseMoq = prices[0]?.moq || formData.moq;
           
           return {
             product_id: id,

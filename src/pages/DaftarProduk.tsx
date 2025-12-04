@@ -37,11 +37,12 @@ import { trackCatalogExport, trackDeniedCatalogExport } from "@/utils/analytics"
 // Integrations & Types
 import { supabase } from "@/integrations/supabase/client";
 import { CartItem } from "@/contexts/CartContextDefinition";
+import { User } from "@/contexts/AuthContextDefinition";
 
 // Cache duration constant
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 
-const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = '' }: { product: ProductWithVariant; loggedIn: boolean; user: any; selectedFilterArea?: string }) => {
+const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = '' }: { product: ProductWithVariant; loggedIn: boolean; user: User | null; selectedFilterArea?: string }) => {
   
   // Get cart functions and items
   const { addItem, items } = useCart();
@@ -323,7 +324,7 @@ const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = 
   }
   
   // Card for active users with incomplete profile - show prices but can't order
-  if (loggedIn && distributorAccess.canSeePrices && !user?.profileComplete) {
+  if (loggedIn && distributorAccess.canViewPrices && !user?.profileComplete) {
     return (
       <article className="border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow h-full flex flex-col">
         {/* Product Image with Area Badge */}

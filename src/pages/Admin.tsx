@@ -59,23 +59,6 @@ export default function Admin() {
       try {
         setLoadingData(true);
 
-        // Fetch all users for activity audit trail
-        const { data: users } = await supabase
-          .from('profiles')
-          .select('id, email, full_name');
-
-        const getUserName = (userId: string | null) => {
-          if (!userId) return 'System';
-          const user = users?.find((u: any) => u.id === userId);
-          return (user as any)?.full_name || (user as any)?.email || 'Unknown User';
-        };
-
-        const getUserEmail = (userId: string | null) => {
-          if (!userId) return undefined;
-          const user = users?.find((u: any) => u.id === userId);
-          return (user as any)?.email;
-        };
-
         // Fetch distributors
         const { data: distributors } = await supabase
           .from('distributor_profiles')
@@ -88,7 +71,7 @@ export default function Admin() {
         // Fetch products
         const { data: products } = await supabase
           .from('products')
-          .select('id, name, created_at, created_by');
+          .select('id, name, created_at');
 
         // Fetch orders
         const { data: orders } = await supabase
@@ -212,8 +195,8 @@ export default function Admin() {
             activity: 'Produk baru ditambahkan',
             detail: product.name || 'Unknown Product',
             time: getTimeAgo(product.created_at),
-            actor: getUserName(product.created_by) || 'Admin',
-            actorEmail: getUserEmail(product.created_by) || 'admin@baskit.co.id',
+            actor: 'Admin',
+            actorEmail: 'admin@baskit.co.id',
             timestamp: new Date(product.created_at)
           });
         });
@@ -231,7 +214,7 @@ export default function Admin() {
             : 'Pesanan selesai';
 
           const orderDist: any = distributors?.find((d: any) => d.id === order.distributor_id);
-          const actorName = orderDist?.nama_bisnis || getUserName(orderDist?.user_id) || 'Unknown';
+          const actorName = orderDist?.nama_bisnis || 'Unknown';
 
           activities.push({
             type: 'Order',
@@ -239,7 +222,7 @@ export default function Admin() {
             detail: `Order #${order.id?.slice(0, 8)} • ${order.total ? `Rp ${(order.total / 1000000).toFixed(1)} jt` : 'N/A'}`,
             time: getTimeAgo(order.created_at),
             actor: actorName,
-            actorEmail: getUserEmail(orderDist?.user_id),
+            actorEmail: orderDist?.email_pemilik,
             timestamp: new Date(order.created_at)
           });
         });

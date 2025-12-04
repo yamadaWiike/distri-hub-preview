@@ -26,6 +26,7 @@ import { useLanguage } from "@/hooks/use-language";
 
 // Utils, Data & API
 import { translations } from "@/lib/translations";
+import { uploadFileToS3 } from "@/lib/s3-upload";
 import { createCustomer, CustomerPayload } from "@/lib/baskitApiCustomer";
 import {
   fetchProvinces,
@@ -41,19 +42,80 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 
-type ExtendedDistributorProfile =
-  Database["public"]["Tables"]["distributor_profiles"]["Row"] & {
-    email_pemilik?: string;
-    email_perusahaan?: string;
-    nomor_telp_perusahaan?: string;
-    nama_direktur?: string;
-    status_pkp?: string;
-    npwp_number?: string;
-    nib_number?: string;
-    alamat_gudang?: string;
-    companyWebsite?: string;
-    postal_code?: string;
-  };
+type ExtendedDistributorProfile = {
+  // Core fields from database
+  id?: string;
+  user_id?: string;
+  nama_bisnis?: string;
+  alamat_lengkap?: string;
+  kota?: string;
+  nama_pemilik?: string;
+  kontak_pemilik?: string;
+  created_at?: string;
+  updated_at?: string;
+  omzet?: number | null;
+  alamat_kantor?: string | null;
+  alamat_gudang?: string;
+  bentuk_usaha?: string | null;
+  foto_gudang?: string | null;
+  koordinat?: string;
+  bank?: string;
+  norek?: string;
+  nama_rek?: string;
+  nib?: string;
+  status?: string;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  email?: string;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  province?: string | null;
+  postal_code?: string | null;
+  business_type?: string | null;
+  distributor_license?: string | null;
+  tax_id?: string | null;
+  bank_account?: string | null;
+  bank_name?: string | null;
+  role?: string;
+  store_photo_url?: string | null;
+  ktp_url?: string | null;
+  akta_url?: string | null;
+  npwp_url?: string | null;
+  npwp?: string;
+  province_id?: string;
+  regency_id?: string;
+  district_id?: string;
+  province_name?: string;
+  regency_name?: string;
+  district_name?: string;
+
+  // Extended fields
+  email_pemilik?: string;
+  email_perusahaan?: string;
+  nomor_telp_perusahaan?: string;
+  nama_direktur?: string;
+  status_pkp?: string;
+  npwp_number?: string;
+  nib_number?: string;
+  companyWebsite?: string;
+  website_perusahaan?: string;
+  jumlah_karyawan?: number;
+  nama_pic?: string;
+  posisi_pic?: string;
+  nomor_kontak_pic?: string;
+  email_pic?: string;
+  npwp_file_url?: string;
+  nib_file_url?: string;
+  ktp_file_url?: string;
+  nama_bank?: string;
+  nama_pemilik_akun?: string;
+  nomor_rekening?: string;
+  jumlah_armada_pengiriman?: string | number;
+  metode_pembayaran?: string;
+  aplikasi_pencatatan?: string;
+  area_distribusi?: string;
+};
 
 export default function LengkapiProfil() {
   const { user } = useAuth();
@@ -124,17 +186,25 @@ export default function LengkapiProfil() {
   const [isLocating, setIsLocating] = useState(false);
   const [areaSearch, setAreaSearch] = useState("");
 
-  const [existingData, setExistingData] = useState<ExtendedDistributorProfile | null>(null);
+  const [existingData, setExistingData] =
+    useState<ExtendedDistributorProfile | null>(null);
+
+  // Track existing file URLs
+  const [existingFiles, setExistingFiles] = useState({
+    npwp_file_url: null as string | null,
+    nib_file_url: null as string | null,
+    ktp_file_url: null as string | null,
+  });
 
   // Address Data States
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [regencies, setRegencies] = useState<Regency[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
-  
+
   const [isLoadingProvinces, setIsLoadingProvinces] = useState(false);
   const [isLoadingRegencies, setIsLoadingRegencies] = useState(false);
   const [isLoadingDistricts, setIsLoadingDistricts] = useState(false);
-  
+
   // All regencies for distribution area search
   const [allRegencies, setAllRegencies] = useState<Regency[]>([]);
 
@@ -145,7 +215,7 @@ export default function LengkapiProfil() {
       try {
         const [provincesData, allRegenciesData] = await Promise.all([
           fetchProvinces(),
-          fetchAllRegencies()
+          fetchAllRegencies(),
         ]);
         setProvinces(provincesData);
         setAllRegencies(allRegenciesData);
@@ -165,7 +235,7 @@ export default function LengkapiProfil() {
         setRegencies([]);
         return;
       }
-      
+
       setIsLoadingRegencies(true);
       try {
         const data = await fetchRegenciesByProvince(form.provinsiId);
@@ -176,7 +246,7 @@ export default function LengkapiProfil() {
         setIsLoadingRegencies(false);
       }
     };
-    
+
     loadRegencies();
   }, [form.provinsiId]);
 
@@ -187,7 +257,7 @@ export default function LengkapiProfil() {
         setDistricts([]);
         return;
       }
-      
+
       setIsLoadingDistricts(true);
       try {
         const data = await fetchDistrictsByRegency(form.regencyId);
@@ -198,7 +268,7 @@ export default function LengkapiProfil() {
         setIsLoadingDistricts(false);
       }
     };
-    
+
     loadDistricts();
   }, [form.regencyId]);
 
@@ -214,15 +284,16 @@ export default function LengkapiProfil() {
         navigate("/masuk");
         return;
       }
-      
+
       // Validate user ID is a proper UUID
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(user.id)) {
-        console.error('Invalid user ID format:', user.id);
+        console.error("Invalid user ID format:", user.id);
         toast({
           title: "Error",
           description: "Invalid user session. Please log in again.",
-          variant: "destructive"
+          variant: "destructive",
         });
         navigate("/masuk");
         return;
@@ -236,9 +307,7 @@ export default function LengkapiProfil() {
           .from("distributor_profiles")
           .select("*")
           .eq("user_id", user.id)
-          .maybeSingle<
-            Database["public"]["Tables"]["distributor_profiles"]["Row"]
-          >();
+          .maybeSingle();
 
         if (error && error.code !== "PGRST116") {
           console.error("Error fetching profile:", error);
@@ -246,55 +315,111 @@ export default function LengkapiProfil() {
         }
 
         if (data) {
-          const extendedData = data as ExtendedDistributorProfile;
+          // Type assertion to ExtendedDistributorProfile for full field access
+          const profileData = data as ExtendedDistributorProfile;
 
-          setExistingData({ ...data, ...extendedData });
+          setExistingData(profileData);
+
+          // Set existing file URLs
+          setExistingFiles({
+            npwp_file_url: profileData.npwp_file_url || null,
+            nib_file_url: profileData.nib_file_url || null,
+            ktp_file_url: profileData.ktp_file_url || null,
+          });
 
           setForm({
-            nama_pemilik: data.nama_pemilik || "",
-            kontak_pemilik: data.kontak_pemilik || "",
-            email_pemilik: extendedData.email_pemilik || user.email || "",
-            nama_pic: data.nama_pemilik || "",
-            posisi_pic: "",
-            nomor_kontak_pic: data.kontak_pemilik || "",
-            email_pic: extendedData.email_pemilik || "",
-            alamat_gudang: extendedData.alamat_gudang || "",
-            koordinat: data.koordinat || "",
-            nama_perusahaan: data.nama_bisnis || "",
-            email_perusahaan: extendedData.email_perusahaan || "",
-            alamat_perusahaan: data.alamat_lengkap || "",
-            // Populate address fields
-            provinsiId: data.province_id || "",
-            provinsiName: data.province_name || "",
-            regencyId: data.regency_id || "",
-            regencyName: data.regency_name || "",
-            districtId: data.district_id || "",
-            districtName: data.district_name || "",
-            kota: data.kota || "", // Keep for backward compatibility
-            nomor_kontak_perusahaan: extendedData.nomor_telp_perusahaan || "",
-            nama_direktur: extendedData.nama_direktur || "",
-            status_pkp: extendedData.status_pkp || "",
+            // Informasi Pemilik - mapped from response
+            nama_pemilik: profileData.nama_pemilik || "",
+            kontak_pemilik: profileData.kontak_pemilik || "",
+            email_pemilik:
+              profileData.email_pemilik ||
+              profileData.email ||
+              user.email ||
+              "",
+
+            // Informasi PIC - mapped from response
+            nama_pic: profileData.nama_pic || profileData.nama_pemilik || "",
+            posisi_pic: profileData.posisi_pic || "",
+            nomor_kontak_pic:
+              profileData.nomor_kontak_pic || profileData.kontak_pemilik || "",
+            email_pic: profileData.email_pic || profileData.email_pemilik || "",
+
+            // Lokasi Gudang - mapped from response
+            alamat_gudang: profileData.alamat_gudang || "",
+            koordinat: profileData.koordinat || "",
+
+            // Informasi Perusahaan - mapped from response
+            nama_perusahaan: profileData.nama_bisnis || "",
+            email_perusahaan: profileData.email_perusahaan || "",
+            alamat_perusahaan: profileData.alamat_lengkap || "",
+
+            // Address fields - mapped from response
+            provinsiId: profileData.province_id
+              ? String(profileData.province_id)
+              : "",
+            provinsiName: profileData.province_name || "",
+            regencyId: profileData.regency_id
+              ? String(profileData.regency_id)
+              : "",
+            regencyName: profileData.regency_name || "",
+            districtId: profileData.district_id
+              ? String(profileData.district_id)
+              : "",
+            districtName: profileData.district_name || "",
+            kota: profileData.kota || profileData.regency_name || "",
+
+            // Company details - mapped from response
+            nomor_kontak_perusahaan:
+              profileData.nomor_telp_perusahaan || profileData.phone || "",
+            nama_direktur: profileData.nama_direktur || "",
+            status_pkp: profileData.status_pkp || "",
             status_kepemilikan: "",
-            npwp: extendedData.npwp_number || "",
-            nib: extendedData.nib_number || "",
+            npwp: profileData.npwp || "",
+            nib: profileData.nib || "",
+            companyWebsite: profileData.website_perusahaan || "",
+
+            // Upload files - these will be null for existing data but we track URLs
             npwp_file: null,
             nib_file: null,
             ktp_file: null,
-            nama_bank: "",
-            nama_pemilik_akun: "",
-            nomor_rekening: "",
-            jumlah_karyawan: "",
-            jumlah_armada_pengiriman: "",
-            area_distribusi: [],
-            aplikasi_penjualan: [],
-            metode_pembayaran: [],
-            companyWebsite: "",
+
+            // Banking information - mapped from response
+            nama_bank: profileData.nama_bank || profileData.bank || "",
+            nama_pemilik_akun:
+              profileData.nama_pemilik_akun || profileData.nama_rek || "",
+            nomor_rekening:
+              profileData.nomor_rekening || profileData.norek || "",
+
+            // Operational information - mapped from response
+            jumlah_karyawan: profileData.jumlah_karyawan
+              ? String(profileData.jumlah_karyawan)
+              : "",
+            jumlah_armada_pengiriman: profileData.jumlah_armada_pengiriman
+              ? String(profileData.jumlah_armada_pengiriman)
+              : "",
+
+            // Arrays - safely parse JSON from response
+            area_distribusi: profileData.area_distribusi
+              ? typeof profileData.area_distribusi === "string"
+                ? JSON.parse(profileData.area_distribusi)
+                : profileData.area_distribusi
+              : [],
+            aplikasi_penjualan: profileData.aplikasi_pencatatan
+              ? typeof profileData.aplikasi_pencatatan === "string"
+                ? JSON.parse(profileData.aplikasi_pencatatan)
+                : profileData.aplikasi_pencatatan
+              : [],
+            metode_pembayaran: profileData.metode_pembayaran
+              ? typeof profileData.metode_pembayaran === "string"
+                ? JSON.parse(profileData.metode_pembayaran)
+                : profileData.metode_pembayaran
+              : [],
           });
 
           // Parse coordinates if available
-          if (data.koordinat) {
+          if (profileData.koordinat) {
             try {
-              const coords = JSON.parse(data.koordinat);
+              const coords = JSON.parse(profileData.koordinat);
               if (coords.lat && coords.lng) {
                 setSelectedCoordinates([coords.lat, coords.lng]);
               }
@@ -338,7 +463,7 @@ export default function LengkapiProfil() {
 
   const handleNext = (e?: React.MouseEvent<HTMLButtonElement>) => {
     e?.preventDefault();
-    
+
     console.log("=== handleNext called ===");
     console.log("currentStep:", currentStep);
     console.log("Stack trace:", new Error().stack);
@@ -352,7 +477,7 @@ export default function LengkapiProfil() {
         !form.nama_perusahaan ||
         !form.alamat_perusahaan ||
         !form.regencyId || // Check regency instead of kota
-        !form.districtId   // Check district
+        !form.districtId // Check district
       ) {
         toast({
           title: lang === "id" ? "Data Belum Lengkap" : "Incomplete Data",
@@ -395,32 +520,106 @@ export default function LengkapiProfil() {
     try {
       setIsLoading(true);
 
+      // Upload files if they exist (only upload new files)
+      let npwpFileUrl = existingFiles.npwp_file_url; // Keep existing URL
+      let nibFileUrl = existingFiles.nib_file_url; // Keep existing URL
+      let ktpFileUrl = existingFiles.ktp_file_url; // Keep existing URL
+
+      if (form.npwp_file) {
+        const result = await uploadFileToS3(form.npwp_file, "documents/npwp");
+        if (result.success && result.url) {
+          npwpFileUrl = result.url; // Update with new URL
+        } else {
+          console.error("NPWP upload failed:", result.error);
+        }
+      }
+
+      if (form.nib_file) {
+        const result = await uploadFileToS3(form.nib_file, "documents/nib");
+        if (result.success && result.url) {
+          nibFileUrl = result.url; // Update with new URL
+        } else {
+          console.error("NIB upload failed:", result.error);
+        }
+      }
+
+      if (form.ktp_file) {
+        const result = await uploadFileToS3(form.ktp_file, "documents/ktp");
+        if (result.success && result.url) {
+          ktpFileUrl = result.url; // Update with new URL
+        } else {
+          console.error("KTP upload failed:", result.error);
+        }
+      }
+
       // Update profile data
       const updateData = {
-        nama_bisnis: form.nama_perusahaan,
-        alamat_lengkap: form.alamat_perusahaan,
-        kota: form.regencyName, // Use regency name for backward compatibility
+        // Informasi Pemilik
         nama_pemilik: form.nama_pemilik,
         kontak_pemilik: form.kontak_pemilik,
         email_pemilik: form.email_pemilik,
-        
-        // Extended fields that exist in DB
-        alamat_gudang: form.alamat_gudang,
-        koordinat: form.koordinat,
-        bank: form.nama_bank,
-        norek: form.nomor_rekening,
-        nama_rek: form.nama_pemilik_akun,
-        jumlah_karyawan: form.jumlah_karyawan ? parseInt(form.jumlah_karyawan) : null,
-        npwp: form.npwp,
-        nib: form.nib,
-        
-        // New address fields
+
+        // Informasi Perusahaan
+        nama_bisnis: form.nama_perusahaan,
+        email_perusahaan: form.email_perusahaan,
+        alamat_lengkap: form.alamat_perusahaan,
+
+        // Address fields
         province_id: form.provinsiId,
         province_name: form.provinsiName,
         regency_id: form.regencyId,
         regency_name: form.regencyName,
         district_id: form.districtId,
         district_name: form.districtName,
+        kota: form.regencyName,
+
+        // Company details continuation
+        nomor_telp_perusahaan: form.nomor_kontak_perusahaan,
+        nama_direktur: form.nama_direktur,
+        status_pkp: form.status_pkp,
+        npwp: form.npwp,
+        nib: form.nib,
+        website_perusahaan: form.companyWebsite,
+
+        // Document URLs (uploaded files)
+        npwp_file_url: npwpFileUrl,
+        nib_file_url: nibFileUrl,
+        ktp_file_url: ktpFileUrl,
+
+        // Informasi PIC
+        nama_pic: form.nama_pic,
+        posisi_pic: form.posisi_pic,
+        nomor_kontak_pic: form.nomor_kontak_pic,
+        email_pic: form.email_pic,
+
+        // Lokasi Gudang
+        alamat_gudang: form.alamat_gudang,
+        koordinat: form.koordinat,
+
+        // Keterangan Bank - map form fields ke database fields
+        nama_bank: form.nama_bank,
+        nomor_rekening: form.nomor_rekening,
+        nama_pemilik_akun: form.nama_pemilik_akun,
+
+        // Informasi Operasional
+        jumlah_karyawan: form.jumlah_karyawan
+          ? parseInt(form.jumlah_karyawan)
+          : null,
+        jumlah_armada_pengiriman: form.jumlah_armada_pengiriman
+          ? parseInt(form.jumlah_armada_pengiriman)
+          : null,
+        area_distribusi:
+          form.area_distribusi.length > 0
+            ? JSON.stringify(form.area_distribusi)
+            : null,
+        aplikasi_pencatatan:
+          form.aplikasi_penjualan.length > 0
+            ? JSON.stringify(form.aplikasi_penjualan)
+            : null,
+        metode_pembayaran:
+          form.metode_pembayaran.length > 0
+            ? JSON.stringify(form.metode_pembayaran)
+            : null,
       };
 
       // Update profile data and set status to waiting_activation (KYB completed)
@@ -759,60 +958,82 @@ export default function LengkapiProfil() {
                 <div className="grid grid-cols-1 gap-5">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {lang === 'id' ? "Provinsi" : "Province"} <span className="text-red-500">*</span>
+                      {lang === "id" ? "Provinsi" : "Province"}{" "}
+                      <span className="text-red-500">*</span>
                     </label>
-                    <Select 
-                      value={form.provinsiId} 
+                    <Select
+                      value={form.provinsiId}
                       onValueChange={(value) => {
                         // Convert both to string for comparison to handle type mismatch
-                        const selectedProvince = provinces.find(p => String(p.id) === String(value));
-                        setForm({ 
-                          ...form, 
+                        const selectedProvince = provinces.find(
+                          (p) => String(p.id) === String(value)
+                        );
+                        setForm({
+                          ...form,
                           provinsiId: value,
-                          provinsiName: selectedProvince?.name || ""
+                          provinsiName: selectedProvince?.name || "",
                         });
-                      }} 
+                      }}
                       required
                       disabled={isLoadingProvinces}
                     >
                       <SelectTrigger className="w-full h-10">
-                        <SelectValue placeholder={lang === 'id' ? "Pilih Provinsi" : "Select Province"} />
+                        <SelectValue
+                          placeholder={
+                            lang === "id" ? "Pilih Provinsi" : "Select Province"
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {provinces.map((province) => (
-                          <SelectItem key={province.id} value={String(province.id)}>
+                          <SelectItem
+                            key={province.id}
+                            value={String(province.id)}
+                          >
                             {province.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {lang === 'id' ? "Kota/Kabupaten" : "City/Regency"} <span className="text-red-500">*</span>
+                      {lang === "id" ? "Kota/Kabupaten" : "City/Regency"}{" "}
+                      <span className="text-red-500">*</span>
                     </label>
-                    <Select 
-                      value={form.regencyId} 
+                    <Select
+                      value={form.regencyId}
                       onValueChange={(value) => {
                         // Convert both to string for comparison to handle type mismatch
-                        const selectedRegency = regencies.find(r => String(r.id) === String(value));
-                        setForm({ 
-                          ...form, 
+                        const selectedRegency = regencies.find(
+                          (r) => String(r.id) === String(value)
+                        );
+                        setForm({
+                          ...form,
                           regencyId: value,
                           regencyName: selectedRegency?.name || "",
-                          kota: selectedRegency?.name || "" // For backward compatibility
+                          kota: selectedRegency?.name || "", // For backward compatibility
                         });
-                      }} 
-                      disabled={!form.provinsiId || isLoadingRegencies} 
+                      }}
+                      disabled={!form.provinsiId || isLoadingRegencies}
                       required
                     >
                       <SelectTrigger className="w-full h-10">
-                        <SelectValue placeholder={lang === 'id' ? "Pilih Kota/Kabupaten" : "Select City/Regency"} />
+                        <SelectValue
+                          placeholder={
+                            lang === "id"
+                              ? "Pilih Kota/Kabupaten"
+                              : "Select City/Regency"
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {regencies.map((regency) => (
-                          <SelectItem key={regency.id} value={String(regency.id)}>
+                          <SelectItem
+                            key={regency.id}
+                            value={String(regency.id)}
+                          >
                             {regency.name}
                           </SelectItem>
                         ))}
@@ -822,28 +1043,40 @@ export default function LengkapiProfil() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {lang === 'id' ? "Kecamatan" : "District"} <span className="text-red-500">*</span>
+                      {lang === "id" ? "Kecamatan" : "District"}{" "}
+                      <span className="text-red-500">*</span>
                     </label>
-                    <Select 
-                      value={form.districtId} 
+                    <Select
+                      value={form.districtId}
                       onValueChange={(value) => {
                         // Convert both to string for comparison to handle type mismatch
-                        const selectedDistrict = districts.find(d => String(d.id) === String(value));
-                        setForm({ 
-                          ...form, 
+                        const selectedDistrict = districts.find(
+                          (d) => String(d.id) === String(value)
+                        );
+                        setForm({
+                          ...form,
                           districtId: value,
-                          districtName: selectedDistrict?.name || ""
+                          districtName: selectedDistrict?.name || "",
                         });
-                      }} 
-                      disabled={!form.regencyId || isLoadingDistricts} 
+                      }}
+                      disabled={!form.regencyId || isLoadingDistricts}
                       required
                     >
                       <SelectTrigger className="w-full h-10">
-                        <SelectValue placeholder={lang === 'id' ? "Pilih Kecamatan" : "Select District"} />
+                        <SelectValue
+                          placeholder={
+                            lang === "id"
+                              ? "Pilih Kecamatan"
+                              : "Select District"
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {districts.map((district) => (
-                          <SelectItem key={district.id} value={String(district.id)}>
+                          <SelectItem
+                            key={district.id}
+                            value={String(district.id)}
+                          >
                             {district.name}
                           </SelectItem>
                         ))}
@@ -1015,6 +1248,8 @@ export default function LengkapiProfil() {
                         <p className="text-sm font-medium text-gray-700">
                           {form.npwp_file
                             ? form.npwp_file.name
+                            : existingFiles.npwp_file_url
+                            ? "File sudah ada ✓"
                             : lang === "id"
                             ? "Pilih file"
                             : "Choose file"}
@@ -1022,6 +1257,13 @@ export default function LengkapiProfil() {
                         <p className="text-xs text-gray-500 mt-1">
                           PDF, JPG, PNG
                         </p>
+                        {existingFiles.npwp_file_url && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {lang === "id"
+                              ? "Sudah terupload"
+                              : "Already uploaded"}
+                          </p>
+                        )}
                       </label>
                     </div>
                   </div>
@@ -1044,6 +1286,8 @@ export default function LengkapiProfil() {
                         <p className="text-sm font-medium text-gray-700">
                           {form.nib_file
                             ? form.nib_file.name
+                            : existingFiles.nib_file_url
+                            ? "File sudah ada ✓"
                             : lang === "id"
                             ? "Pilih file"
                             : "Choose file"}
@@ -1051,6 +1295,13 @@ export default function LengkapiProfil() {
                         <p className="text-xs text-gray-500 mt-1">
                           PDF, JPG, PNG
                         </p>
+                        {existingFiles.nib_file_url && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {lang === "id"
+                              ? "Sudah terupload"
+                              : "Already uploaded"}
+                          </p>
+                        )}
                       </label>
                     </div>
                   </div>
@@ -1073,6 +1324,8 @@ export default function LengkapiProfil() {
                         <p className="text-sm font-medium text-gray-700">
                           {form.ktp_file
                             ? form.ktp_file.name
+                            : existingFiles.ktp_file_url
+                            ? "File sudah ada ✓"
                             : lang === "id"
                             ? "Pilih file"
                             : "Choose file"}
@@ -1080,6 +1333,13 @@ export default function LengkapiProfil() {
                         <p className="text-xs text-gray-500 mt-1">
                           PDF, JPG, PNG
                         </p>
+                        {existingFiles.ktp_file_url && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {lang === "id"
+                              ? "Sudah terupload"
+                              : "Already uploaded"}
+                          </p>
+                        )}
                       </label>
                     </div>
                   </div>
@@ -1430,9 +1690,12 @@ export default function LengkapiProfil() {
                     />
                     {areaSearch && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                        {allRegencies.filter((area) =>
-                          area.name.toLowerCase().includes(areaSearch.toLowerCase())
-                        )
+                        {allRegencies
+                          .filter((area) =>
+                            area.name
+                              .toLowerCase()
+                              .includes(areaSearch.toLowerCase())
+                          )
                           .slice(0, 50)
                           .map((area) => (
                             <button
@@ -1456,7 +1719,9 @@ export default function LengkapiProfil() {
                             </button>
                           ))}
                         {allRegencies.filter((area) =>
-                          area.name.toLowerCase().includes(areaSearch.toLowerCase())
+                          area.name
+                            .toLowerCase()
+                            .includes(areaSearch.toLowerCase())
                         ).length === 0 && (
                           <div className="px-3 py-2 text-sm text-gray-500">
                             {lang === "id" ? "Tidak ada hasil" : "No results"}
