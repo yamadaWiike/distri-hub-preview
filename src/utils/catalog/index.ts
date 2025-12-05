@@ -222,19 +222,26 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     const imgW = pxToMm(72);
 
     try {
-      doc.setFillColor(white);
-      doc.roundedRect(leftX, leftY, imgW, imgH, pxToMm(10), pxToMm(10), "F");
-      doc.addImage(
-        p.image || "/placeholder.svg",
-        "JPEG",
-        leftX + 1,
-        leftY + 1,
-        imgW - 2,
-        imgH - 2
-      );
+      doc.setDrawColor(lightGray);
+      doc.setLineWidth(pxToMm(0.5));
+      doc.setFillColor(softGray);
+      doc.roundedRect(leftX, leftY, imgW, imgH, pxToMm(10), pxToMm(10), "DF");
+
+      if (p?.image) {
+        doc.addImage(
+          safeString(p.image, '/placeholder.svg'),
+          "JPEG",
+          leftX + 1,
+          leftY + 1,
+          imgW - 2,
+          imgH - 2
+        );
+      }
     } catch {
-      doc.setFillColor(255, 186, 122);
-      doc.roundedRect(leftX, leftY, imgW, imgH, 3, 3, "F");
+      doc.setDrawColor(lightGray);
+      doc.setLineWidth(pxToMm(0.5));
+      doc.setFillColor(softGray);
+      doc.roundedRect(leftX, leftY, imgW, imgH, pxToMm(10), pxToMm(10), "DF");
     }
 
     // Product Info
