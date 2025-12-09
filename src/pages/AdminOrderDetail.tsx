@@ -1,5 +1,24 @@
+// React & Router
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+
+// External Libraries
+import {
+  ArrowLeft,
+  Package, 
+  MapPin, 
+  Clock, 
+  User,
+  Phone,
+  Mail,
+  FileText,
+  Save,
+  Trash2,
+  Plus,
+  Pencil
+} from "lucide-react";
+
+// UI Components
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,26 +40,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  ArrowLeft,
-  Package, 
-  MapPin, 
-  Clock, 
-  User,
-  Phone,
-  Mail,
-  FileText,
-  Save,
-  Trash2,
-  Plus,
-  Pencil
-} from "lucide-react";
-import { useLanguage } from "@/hooks/use-language";
+import { Separator } from "@/components/ui/separator";
 import Navbar from "@/components/layout/Navbar";
 import AdminSidebar from "@/components/layout/AdminSidebar";
 import SEO from "@/components/seo/SEO";
-import { Separator } from "@/components/ui/separator";
+
+// Hooks
+import { useLanguage } from "@/hooks/use-language";
+
+// Integrations
+import { supabase } from "@/integrations/supabase/client";
 
 interface OrderItem {
   id: string;

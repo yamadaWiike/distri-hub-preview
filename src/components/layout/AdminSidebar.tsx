@@ -1,4 +1,7 @@
+// React & Router
 import { NavLink } from "react-router-dom";
+
+// External Libraries
 import { 
   LayoutDashboard, 
   Users, 
@@ -9,6 +12,8 @@ import {
   BarChart3,
   FileText
 } from "lucide-react";
+
+// Utils
 import { cn } from "@/lib/utils";
 
 const menuItems = [

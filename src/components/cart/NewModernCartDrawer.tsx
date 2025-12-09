@@ -1,5 +1,11 @@
+// React & Router
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+// External Libraries
+import { ShoppingCart, X, Minus, Plus, Trash2, AlertCircle } from "lucide-react";
+
+// UI Components
 import {
   Sheet,
   SheetContent,
@@ -10,14 +16,19 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShoppingCart, X, Minus, Plus, Trash2, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+// Hooks
 import { useCart } from "@/hooks/use-cart";
 import { useLanguage } from "@/hooks/use-language";
-import { translations } from "@/lib/translations";
-import { Badge } from "@/components/ui/badge";
-import { formatIDR } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+// Utils
+import { translations } from "@/lib/translations";
+import { formatIDR } from '@/lib/utils';
+
+// Types
 import { CartItem } from "@/contexts/CartContextDefinition";
 
 // Helper function to check if there are enough mixed variants in the cart to meet MOQ

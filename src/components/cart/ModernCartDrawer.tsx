@@ -1,13 +1,21 @@
+// React & Router
 import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+
+// External Libraries
 import { X, Plus, Minus, Trash2 } from 'lucide-react';
+
+// UI Components
 import { Button } from '@/components/ui/button';
-import { useCart } from '@/hooks/use-cart';
-import { formatIDR } from '@/lib/utils';
-import { useLanguage } from '@/hooks/use-language';
-import { translations } from '@/lib/translations';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
-import { useNavigate } from 'react-router-dom';
-import { Link } from 'react-router-dom';
+
+// Hooks
+import { useCart } from '@/hooks/use-cart';
+import { useLanguage } from '@/hooks/use-language';
+
+// Utils
+import { formatIDR } from '@/lib/utils';
+import { translations } from '@/lib/translations';
 
 interface CartDrawerProps {
   open: boolean;

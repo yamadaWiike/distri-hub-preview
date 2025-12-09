@@ -1,4 +1,7 @@
+// React & Router
 import { Link } from "react-router-dom";
+
+// Hooks
 import { useLanguage } from "@/hooks/use-language";
 
 export default function Footer() {

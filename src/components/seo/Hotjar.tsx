@@ -1,4 +1,7 @@
+// React
 import React, { useEffect } from 'react';
+
+// Hooks
 import { useAuth } from '@/hooks/use-auth';
 
 declare global {

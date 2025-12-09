@@ -1,7 +1,11 @@
+// React
 import * as React from "react"
+
+// External Libraries
 import * as AccordionPrimitive from "@radix-ui/react-accordion"
 import { ChevronDown } from "lucide-react"
 
+// Utils
 import { cn } from "@/lib/utils"
 
 const Accordion = AccordionPrimitive.Root

@@ -209,7 +209,6 @@ export default function Daftar() {
         }
       }
       
-      setIsSubmitting(false);
     }
   };
 

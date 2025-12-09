@@ -1,6 +1,10 @@
+// React
 import * as React from "react"
+
+// External Libraries
 import { Drawer as DrawerPrimitive } from "vaul"
 
+// Utils
 import { cn } from "@/lib/utils"
 
 const Drawer = ({

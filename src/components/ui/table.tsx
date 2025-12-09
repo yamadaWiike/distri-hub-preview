@@ -1,5 +1,7 @@
+// React
 import * as React from "react"
 
+// Utils
 import { cn } from "@/lib/utils"
 
 const Table = React.forwardRef<

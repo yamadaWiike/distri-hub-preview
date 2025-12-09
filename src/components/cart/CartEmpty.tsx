@@ -1,9 +1,18 @@
+// React & Router
 import React from 'react';
-import { useLanguage } from '@/hooks/use-language';
-import { translations } from '@/lib/translations';
-import { Button } from '@/components/ui/button';
-import { ShoppingBasket } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
+// External Libraries
+import { ShoppingBasket } from 'lucide-react';
+
+// UI Components
+import { Button } from '@/components/ui/button';
+
+// Hooks
+import { useLanguage } from '@/hooks/use-language';
+
+// Utils
+import { translations } from '@/lib/translations';
 
 export function CartEmpty() {
   const { lang } = useLanguage();

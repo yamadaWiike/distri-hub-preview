@@ -14,8 +14,13 @@ export type User = {
   email: string;
   namaBisnis?: string;
   kota?: string;
-  role: 'user' | 'admin';
-  status?: 'pending' | 'active' | 'inactive' | 'rejected' | 'waiting_activation';
+  role: "user" | "admin";
+  status?:
+    | "pending"
+    | "active"
+    | "inactive"
+    | "rejected"
+    | "waiting_activation";
   isApproved?: boolean; // Computed field for easy access
   profileComplete?: boolean; // Profile completion status
 };
@@ -23,16 +28,17 @@ export type User = {
 /**
  * Type representing distributor profile data from database
  */
-export type DistributorProfile = Database['public']['Tables']['distributor_profiles']['Row'];
+export type DistributorProfile =
+  Database["public"]["Tables"]["distributor_profiles"]["Row"];
 
 /**
  * Registration data type for new user accounts
  */
-export type RegistrationData = { 
-  email: string; 
-  password: string; 
-  namaBisnis: string; 
-  alamatLengkap: string; 
+export type RegistrationData = {
+  email: string;
+  password: string;
+  namaBisnis: string;
+  alamatLengkap: string;
   provinsiId: string;
   provinceName?: string;
   regencyId?: string;
@@ -40,7 +46,7 @@ export type RegistrationData = {
   districtId?: string;
   districtName?: string;
   kota: string; // Keep for backward compatibility
-  namaPemilik: string; 
+  namaPemilik: string;
   kontakPemilik: string;
   // Additional company information
   emailPerusahaan?: string;
@@ -64,10 +70,12 @@ export type AuthContextType = {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegistrationData) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 };
 
 /**
  * Auth context object
  */
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(
+  undefined
+);

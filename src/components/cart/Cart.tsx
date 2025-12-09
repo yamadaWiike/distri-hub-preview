@@ -1,10 +1,17 @@
+// React
 import React from 'react';
-import { useCart } from '@/hooks/use-cart';
-import { formatIDR } from '@/lib/utils';
+
+// UI Components
 import { Button } from '@/components/ui/button';
-import { useLanguage } from '@/hooks/use-language';
-import { translations } from '@/lib/translations';
 import { CartItem } from '@/components/cart/CartItem';
+
+// Hooks
+import { useCart } from '@/hooks/use-cart';
+import { useLanguage } from '@/hooks/use-language';
+
+// Utils
+import { formatIDR } from '@/lib/utils';
+import { translations } from '@/lib/translations';
 
 interface CartProps {
   onCheckout?: () => void;

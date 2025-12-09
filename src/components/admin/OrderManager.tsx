@@ -1,8 +1,10 @@
+// React
 import React, { useState, useEffect, useCallback } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { Database } from '@/integrations/supabase/types';
-import { updateOrder } from '@/utils/supabase-helpers';
+
+// External Libraries
+import { Eye, Package, MapPin, Clock, User, Phone, Mail } from "lucide-react";
+
+// UI Components
 import {
   Table,
   TableBody,
@@ -23,7 +25,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Eye, Package, MapPin, Clock, User, Phone, Mail } from "lucide-react";
+
+// Hooks
+import { useToast } from '@/hooks/use-toast';
+
+// Integrations
+import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
+
+// Utils
+import { updateOrder } from '@/utils/supabase-helpers';
 
 interface OrderFromDB {
   id: string;

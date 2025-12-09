@@ -1,5 +1,18 @@
+// React & Router
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+// External Libraries
+import {
+  Search,
+  Eye,
+  Edit,
+  Shield,
+  User,
+  FileCheck,
+} from 'lucide-react';
+
+// UI Components
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -21,16 +34,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
-import {
-  Search,
-  Eye,
-  Edit,
-  Shield,
-  User,
-  FileCheck,
-} from 'lucide-react';
+
+// Hooks
 import { useLanguage } from '@/hooks/use-language';
+
+// Integrations
+import { supabase } from '@/integrations/supabase/client';
 // Customer API calls removed - handled in DistributorManager only
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

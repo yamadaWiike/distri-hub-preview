@@ -1,11 +1,15 @@
+// React & Router
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+// External Libraries
+import { Eye, Edit, Trash2, Search, Loader2, Calendar, MoreVertical } from 'lucide-react';
+
+// UI Components
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { Eye, Edit, Trash2, Search, Loader2, Calendar, MoreVertical } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,9 +24,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-// import { createCustomer, type CustomerPayload } from '@/lib/baskitApiCustomer'; // BYPASSED
-import { useLanguage } from '@/hooks/use-language';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
+// Hooks
+import { useLanguage } from '@/hooks/use-language';
+
+// Integrations
+import { supabase } from '@/integrations/supabase/client';
 
 
 // Define distributor profile type based on actual database schema

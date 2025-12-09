@@ -1,5 +1,11 @@
+// React & Router
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+
+// External Libraries
+import { Plus, Search, MoreVertical, Package, Eye, Edit, Trash2, X } from "lucide-react";
+
+// UI Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -27,9 +33,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { Plus, Search, MoreVertical, Package, Eye, Edit, Trash2 } from "lucide-react";
-import { useLanguage } from "@/hooks/use-language";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -39,8 +42,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X } from "lucide-react";
+
+// Hooks
+import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/use-auth";
+
+// Integrations
+import { supabase } from "@/integrations/supabase/client";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

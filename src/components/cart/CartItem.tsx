@@ -1,11 +1,22 @@
+// React
 import React from 'react';
-import { CartItem as CartItemType } from '@/contexts/CartContextDefinition';
-import { useCart } from '@/hooks/use-cart';
-import { formatIDR } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+
+// External Libraries
 import { MinusIcon, PlusIcon, TrashIcon } from 'lucide-react';
+
+// UI Components
+import { Button } from '@/components/ui/button';
+
+// Hooks
+import { useCart } from '@/hooks/use-cart';
 import { useLanguage } from '@/hooks/use-language';
+
+// Utils
+import { formatIDR } from '@/lib/utils';
 import { translations } from '@/lib/translations';
+
+// Types
+import { CartItem as CartItemType } from '@/contexts/CartContextDefinition';
 
 interface CartItemProps {
   item: CartItemType;

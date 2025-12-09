@@ -1,3 +1,7 @@
+// External Libraries
+import { ShoppingCart, X } from "lucide-react";
+
+// UI Components
 import {
   Sheet,
   SheetContent,
@@ -8,13 +12,16 @@ import {
   SheetClose
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, X } from "lucide-react";
-import { useCart } from "@/hooks/use-cart";
-import { useLanguage } from "@/hooks/use-language";
-import { translations } from "@/lib/translations";
+import { Badge } from "@/components/ui/badge";
 import { Cart } from './Cart';
 import { CartEmpty } from './CartEmpty';
-import { Badge } from "@/components/ui/badge";
+
+// Hooks
+import { useCart } from "@/hooks/use-cart";
+import { useLanguage } from "@/hooks/use-language";
+
+// Utils
+import { translations } from "@/lib/translations";
 
 interface CartDrawerProps {
   onCheckout?: () => void;

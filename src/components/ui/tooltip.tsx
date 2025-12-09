@@ -1,6 +1,10 @@
+// React
 import * as React from "react"
+
+// External Libraries
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 
+// Utils
 import { cn } from "@/lib/utils"
 
 const TooltipProvider = TooltipPrimitive.Provider
