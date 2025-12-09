@@ -156,23 +156,32 @@ export default function ProdukDetail() {
   }, [product]);
   
   // Create product images array - use product.images if available, fallback to single image
-  // Use S3 bucket and region from environment variables for relative image paths
-  const envBucket = import.meta.env.VITE_AWS_BUCKET;
-  const envRegion = import.meta.env.VITE_AWS_DEFAULT_REGION;
-  const S3_BASE_URL = envBucket && envRegion
-    ? `https://${envBucket}.s3.${envRegion}.amazonaws.com/`
-    : '';
+  // Use image_url if available (already processed), otherwise use getImageUrl for proper S3 URL handling
   const productImages = product && product.images && product.images.length > 0
-    ? product.images.map(img =>
-        img.startsWith('http') || img.startsWith('https') || !S3_BASE_URL
-          ? img
-          : S3_BASE_URL + img
-      )
-    : [product && product.image
-        ? (product.image.startsWith('http') || product.image.startsWith('https') || !S3_BASE_URL
-            ? product.image
-            : S3_BASE_URL + product.image)
-        : '/placeholder.svg'];
+    ? product.images.map(img => {
+        // If already a full URL, use as is, otherwise process through getImageUrl for S3
+        if (img.startsWith('http') || img.startsWith('https')) {
+          return img;
+        }
+        const s3Url = getImageUrl(img);
+        return s3Url || img; // Fallback to original if getImageUrl returns null
+      })
+    : [(() => {
+        // Check for image_url field first (from database, already processed)
+        const productWithImageUrl = product as Product & { image_url?: string };
+        if (productWithImageUrl?.image_url) {
+          return productWithImageUrl.image_url;
+        }
+        // Fallback to processing image field
+        if (product?.image) {
+          if (product.image.startsWith('http') || product.image.startsWith('https')) {
+            return product.image;
+          }
+          const s3Url = getImageUrl(product.image);
+          return s3Url || product.image;
+        }
+        return '/placeholder.svg';
+      })()];
   // Debug: log productImages array to check image URLs
   console.log('ProdukDetail productImages:', productImages);
   

@@ -2,6 +2,75 @@ import { jsPDF } from "jspdf";
 import { format } from 'date-fns';
 import { formatRp, pxToMm, pxToPt, safeNumber, safeString } from "./Funtions";
 import { ProductWithVariant } from "@/services/product-service";
+import { getImageUrl } from "@/lib/s3-upload";
+
+/**
+ * Convert image URL to base64 data URL for PDF compatibility
+ */
+async function imageToBase64(url: string): Promise<string | null> {
+  try {
+    // Skip if already a data URL
+    if (url.startsWith('data:')) {
+      return url;
+    }
+    
+    // Add timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    console.log(`🔄 Fetching image: ${url}`);
+    
+    const response = await fetch(url, { 
+      signal: controller.signal,
+      mode: 'cors', // Try CORS first
+      credentials: 'omit'
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      console.warn(`❌ Failed to fetch image: ${url} - ${response.status} ${response.statusText}`);
+      // Try to provide more specific error info
+      if (response.status === 403) {
+        console.warn('  → Access forbidden - possible CORS or permissions issue');
+      } else if (response.status === 404) {
+        console.warn('  → Image not found - URL may be incorrect');
+      }
+      return null;
+    }
+    
+    console.log(`✅ Image fetch successful: ${url} - ${response.headers.get('content-type')}`);
+    
+    const contentType = response.headers.get('content-type');
+    if (contentType && !contentType.startsWith('image/')) {
+      console.warn(`❌ Response is not an image: ${url} - content-type: ${contentType}`);
+      return null;
+    }
+    
+    const blob = await response.blob();
+    
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        console.log(`Successfully converted image to base64: ${url} (${blob.type}, ${(result.length / 1024).toFixed(1)}KB)`);
+        resolve(result);
+      };
+      reader.onerror = () => {
+        console.warn('Failed to convert image to base64:', url);
+        resolve(null);
+      };
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.warn('Image fetch timeout:', url);
+    } else {
+      console.warn('Error converting image to base64:', url, error);
+    }
+    return null;
+  }
+}
 
 /**
  * Today's date formatted as dd/MM/yy.
@@ -196,7 +265,7 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
    * @param x X coordinate (mm)
    * @param y Y coordinate (mm)
    */
-  function renderCard(p: ProductWithVariant, x: number, y: number) {
+  async function renderCard(p: ProductWithVariant, x: number, y: number) {
     const cardW = cardWidth;
     const cardH = cardHeight;
     const cardPad = pxToMm(15);
@@ -227,17 +296,59 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
       doc.setFillColor(softGray);
       doc.roundedRect(leftX, leftY, imgW, imgH, pxToMm(10), pxToMm(10), "DF");
 
-      if (p?.image) {
-        doc.addImage(
-          safeString(p.image, '/placeholder.svg'),
-          "JPEG",
-          leftX + 1,
-          leftY + 1,
-          imgW - 2,
-          imgH - 2
-        );
+      if (p?.image_url || p?.image) {
+        // Use image_url if available (already processed with S3 URL), otherwise process image field
+        let imageUrl = p.image_url || p.image;
+        
+        // If using original image field and not already a full URL, try to get S3 URL
+        if (!p.image_url && p.image && !p.image.startsWith('http') && !p.image.startsWith('https')) {
+          const s3Url = getImageUrl(p.image);
+          if (s3Url) {
+            imageUrl = s3Url;
+          }
+        }
+        
+        console.log(`Processing image for product: ${p.name}`, {
+          image_url: p.image_url,
+          image: p.image,
+          finalImageUrl: imageUrl,
+          isValidUrl: !(!imageUrl || imageUrl === '/placeholder.svg' || imageUrl === 'null' || imageUrl.trim() === '')
+        });
+
+        // Skip invalid URLs
+        if (!imageUrl || imageUrl === '/placeholder.svg' || imageUrl === 'null' || imageUrl.trim() === '') {
+          console.warn('Skipping invalid image URL for product:', p.name, imageUrl);
+        } else {
+          // Convert image to base64 for PDF compatibility
+          const base64Image = await imageToBase64(imageUrl);
+          
+          if (base64Image) {
+            // Determine image format from URL or data URL
+            const imageFormat = imageUrl.toLowerCase().includes('.png') || base64Image.includes('data:image/png') ? 'PNG' : 
+                               imageUrl.toLowerCase().includes('.gif') || base64Image.includes('data:image/gif') ? 'GIF' : 'JPEG';
+            
+            console.log(`✅ Successfully adding image to PDF: ${p.name} - ${imageFormat} (${(base64Image.length / 1024).toFixed(1)}KB)`);
+            
+            doc.addImage(
+              base64Image,
+              imageFormat,
+              leftX + 1,
+              leftY + 1,
+              imgW - 2,
+              imgH - 2
+            );
+          } else {
+            console.warn('❌ Failed to convert image to base64 for product:', p.name, imageUrl);
+          }
+        }
+      } else {
+        console.warn('No image found for product:', p.name);
       }
-    } catch {
+    } catch (error) {
+      console.error('Failed to add product image to PDF for:', p?.name || 'unknown product', {
+        imageUrl: p?.image_url || p?.image,
+        error: error
+      });
       doc.setDrawColor(lightGray);
       doc.setLineWidth(pxToMm(0.5));
       doc.setFillColor(softGray);
@@ -428,6 +539,8 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
   doc.addPage();
 
   // Loop through products and render cards, paginating as needed
+  console.log(`Starting to render ${products.length} products to PDF...`);
+  
   for (let i = 0; i < products.length; i++) {
     const pageIndex = Math.floor(i / perPage);
     const indexInPage = i % perPage;
@@ -439,11 +552,18 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
       renderHeader();
     }
 
+    // Show progress
+    if (i % 10 === 0) {
+      console.log(`Processing product ${i + 1} of ${products.length}...`);
+    }
+
     // compute top-left coordinates for this card
     const startX = margin + col * (cardWidth + gap);
     const startY = margin + headerHeight + row * (cardHeight + gap);
-    renderCard(products[i], startX, startY);
+    await renderCard(products[i], startX, startY);
   }
+  
+  console.log('Finished rendering all products to PDF.');
 
   // If no products, still render header and an empty page
   if (products.length === 0) {
