@@ -5,14 +5,14 @@ import { Link, NavLink } from "react-router-dom";
 // External Libraries & Icons
 import {
   Menu,
-  X,
   User,
   Home,
   Package,
   Info,
   Phone,
   LogOut,
-  Globe,
+  Languages,
+  LogIn,
 } from "lucide-react";
 
 // UI Components
@@ -29,6 +29,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ModernCartDrawer } from "../cart/NewModernCartDrawer";
@@ -89,7 +90,7 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 shadow-sm">
       <div className="container max-w-7xl mx-auto flex h-16 items-center justify-between px-4">
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-4">
           {isMobile && (
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <Button
@@ -106,11 +107,6 @@ export default function Navbar() {
                 <SheetHeader className="border-b p-4">
                   <div className="flex items-center justify-between">
                     <SheetTitle>Menu</SheetTitle>
-                    <SheetClose asChild>
-                      <Button variant="ghost" size="icon">
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </SheetClose>
                   </div>
                 </SheetHeader>
 
@@ -118,97 +114,32 @@ export default function Navbar() {
                 <div className="py-3 flex flex-col">
                   <SheetClose asChild>
                     <NavLink to="/" className={mobileNavLinkClass}>
-                      <Home className="h-4 w-4" /> {t.home}
+                      <div className="flex justify-start items-center">
+                        <Home className="h-4 w-4 me-3" /> {t.home}
+                      </div>
                     </NavLink>
                   </SheetClose>
                   <SheetClose asChild>
                     <NavLink to="/daftar-produk" className={mobileNavLinkClass}>
-                      <Package className="h-4 w-4" /> {t.productList}
+                      <div className="flex justify-start items-center">
+                        <Package className="h-4 w-4 me-3" /> {t.productList}
+                      </div>
                     </NavLink>
                   </SheetClose>
                   <SheetClose asChild>
                     <NavLink to="/tentang" className={mobileNavLinkClass}>
-                      <Info className="h-4 w-4" /> {t.about}
+                      <div className="flex justify-start items-center">
+                        <Info className="h-4 w-4 me-3" /> {t.about}
+                      </div>
                     </NavLink>
                   </SheetClose>
                   <SheetClose asChild>
                     <NavLink to="/hubungi" className={mobileNavLinkClass}>
-                      <Phone className="h-4 w-4" /> {t.contact}
+                      <div className="flex justify-start items-center">
+                        <Phone className="h-4 w-4 me-3" /> {t.contact}
+                      </div>
                     </NavLink>
                   </SheetClose>
-                </div>
-
-                {/* Language Selector (Mobile) */}
-                <div className="border-t py-4 px-4">
-                  <div className="text-sm font-medium mb-2 text-muted-foreground">
-                    {lang === "id" ? "Bahasa" : "Language"}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={`flex-1 ${lang === "id" ? "bg-accent" : ""}`}
-                      onClick={() => setLang("id")}
-                    >
-                      Bahasa Indonesia
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={`flex-1 ${lang === "en" ? "bg-accent" : ""}`}
-                      onClick={() => setLang("en")}
-                    >
-                      English
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Auth Actions (Mobile) */}
-                <div className="border-t py-4 px-4">
-                  <div className="flex flex-col gap-2">
-                    {user ? (
-                      <>
-                        <SheetClose asChild>
-                          <Link to="/profil" className="w-full">
-                            <Button
-                              variant="outline"
-                              className="w-full flex items-center justify-start gap-2"
-                            >
-                              <User className="h-4 w-4" /> {t.profile}
-                            </Button>
-                          </Link>
-                        </SheetClose>
-                        <ModernCartDrawer />
-                        <Button
-                          variant="outline"
-                          className="w-full flex items-center justify-start gap-2 text-destructive"
-                          onClick={async () => {
-                            await logout();
-                            setMobileMenuOpen(false);
-                          }}
-                        >
-                          <LogOut className="h-4 w-4" /> {t.logout}
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <SheetClose asChild>
-                          <Link to="/masuk" className="w-full">
-                            <Button variant="outline" className="w-full">
-                              {t.login}
-                            </Button>
-                          </Link>
-                        </SheetClose>
-                        <SheetClose asChild>
-                          <Link to="/daftar" className="w-full">
-                            <Button variant="hero" className="w-full">
-                              {t.register}
-                            </Button>
-                          </Link>
-                        </SheetClose>
-                      </>
-                    )}
-                  </div>
                 </div>
               </SheetContent>
             </Sheet>
@@ -265,7 +196,7 @@ export default function Navbar() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon">
-                  <Globe className="h-4 w-4" />
+                  <Languages className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -312,21 +243,32 @@ export default function Navbar() {
           {/* Auth Actions (Desktop) - Only show if logged in */}
           {!isMobile && user ? (
             <>
-              <Link to="/profil">
-                <Button
-                  variant="ghost"
-                  className="hidden sm:inline-flex text-gray-700 hover:text-orange-600"
-                >
-                  {t.profile}
-                </Button>
-              </Link>
-              <Button
-                variant="outline"
-                onClick={() => logout()}
-                className="hidden sm:inline-flex text-gray-700 hover:text-orange-600"
-              >
-                {t.logout}
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="default">
+                    <span className="text-sm">{user.email}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild className="cursor-pointer">
+                    <div className="w-full flex justify-start items-center font-normal">
+                      <User className="h-4 w-4 me-2" />
+                      <Link to="/profil">{t.profile}</Link>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => logout()}
+                    className="text-destructive cursor-pointer"
+                  >
+                    <div className="w-full flex justify-start items-center font-normal">
+                      <LogOut className="h-4 w-4 me-2" />
+                      {t.logout}
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           ) : null}
 
@@ -335,28 +277,50 @@ export default function Navbar() {
             (user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon">
-                    <User className="h-4 w-4" />
+                  <Button variant="outline" size="default">
+                    <span className="text-sm overflow-hidden text-ellipsis whitespace-nowrap max-w-20">
+                      {user.email}
+                    </span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem asChild>
-                    <Link to="/profil">{t.profile}</Link>
+                    <div className="w-full flex justify-start items-center font-normal">
+                      <User className="h-4 w-4 me-2" />
+                      <Link to="/profil">{t.profile}</Link>
+                    </div>
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => logout()}
                     className="text-destructive"
                   >
-                    {t.logout}
+                    <div className="w-full flex justify-start items-center font-normal">
+                      <LogOut className="h-4 w-4 me-2" />
+                      {t.logout}
+                    </div>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Link to="/masuk">
-                <Button variant="outline" size="icon">
-                  <User className="h-4 w-4" />
-                </Button>
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link to="/masuk">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-700 hover:text-orange-600"
+                  >
+                    {t.login}
+                  </Button>
+                </Link>
+                <Link to="/daftar">
+                  <Button
+                    size="sm"
+                    className="bg-orange-500 hover:bg-orange-600 text-white rounded-lg"
+                  >
+                    {lang === "id" ? "Daftar" : "Register"}
+                  </Button>
+                </Link>
+              </div>
             ))}
         </div>
       </div>
