@@ -137,7 +137,7 @@ async function compressImage(file: File, maxSizeInBytes: number = MAX_FILE_SIZE)
                     lastModified: Date.now(),
                   });
                   
-                  console.log(`Compression result: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB (${(compressedFile.size / file.size * 100).toFixed(1)}%)`);
+
                   resolve(compressedFile);
                 } else {
                   // Try lower quality
@@ -302,7 +302,6 @@ export async function uploadFileToS3(
         
         // Store in localStorage
         localStorage.setItem(storageKey, dataURL);
-        console.log(`[DEV] File stored in localStorage: ${storageKey} (${(dataURL.length / 1024).toFixed(2)}KB)`);
       } catch (error) {
         console.error('[DEV] Failed to store file in localStorage:', error);
         
@@ -384,7 +383,7 @@ export async function uploadFileToS3(
     try {
       const command = new PutObjectCommand(uploadParams);
       await s3Client.send(command);
-      console.log('✅ Successfully uploaded to S3:', fileName);
+
     } catch (s3Error) {
       console.error('❌ S3 upload failed:', s3Error);
       

@@ -18,8 +18,6 @@ async function imageToBase64(url: string): Promise<string | null> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
     
-    console.log(`🔄 Fetching image: ${url}`);
-    
     const response = await fetch(url, { 
       signal: controller.signal,
       mode: 'cors', // Try CORS first
@@ -39,8 +37,6 @@ async function imageToBase64(url: string): Promise<string | null> {
       return null;
     }
     
-    console.log(`✅ Image fetch successful: ${url} - ${response.headers.get('content-type')}`);
-    
     const contentType = response.headers.get('content-type');
     if (contentType && !contentType.startsWith('image/')) {
       console.warn(`❌ Response is not an image: ${url} - content-type: ${contentType}`);
@@ -53,7 +49,7 @@ async function imageToBase64(url: string): Promise<string | null> {
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result as string;
-        console.log(`Successfully converted image to base64: ${url} (${blob.type}, ${(result.length / 1024).toFixed(1)}KB)`);
+
         resolve(result);
       };
       reader.onerror = () => {
@@ -327,7 +323,7 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
             const imageFormat = imageUrl.toLowerCase().includes('.png') || base64Image.includes('data:image/png') ? 'PNG' : 
                                imageUrl.toLowerCase().includes('.gif') || base64Image.includes('data:image/gif') ? 'GIF' : 'JPEG';
             
-            console.log(`✅ Successfully adding image to PDF: ${p.name} - ${imageFormat} (${(base64Image.length / 1024).toFixed(1)}KB)`);
+
             
             doc.addImage(
               base64Image,
@@ -563,7 +559,7 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     await renderCard(products[i], startX, startY);
   }
   
-  console.log('Finished rendering all products to PDF.');
+
 
   // If no products, still render header and an empty page
   if (products.length === 0) {

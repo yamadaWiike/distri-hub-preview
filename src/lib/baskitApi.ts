@@ -18,10 +18,6 @@ export async function baskitApiRequest<T>(
   const bypassEnabled = import.meta.env.VITE_BASKIT_API_BYPASS === 'true';
   
   if (bypassEnabled) {
-    console.log('[BASKIT API BYPASS] Bypassing API call to:', endpoint);
-    console.log('[BASKIT API BYPASS] Method:', options.method || 'POST');
-    console.log('[BASKIT API BYPASS] Payload:', options.body);
-    
     // Return mock success response
     return {
       statusCode: 200,
