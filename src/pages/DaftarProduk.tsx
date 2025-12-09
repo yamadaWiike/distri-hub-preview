@@ -38,6 +38,7 @@ import { trackCatalogExport, trackDeniedCatalogExport } from "@/utils/analytics"
 import { supabase } from "@/integrations/supabase/client";
 import { CartItem } from "@/contexts/CartContextDefinition";
 import { User } from "@/contexts/AuthContextDefinition";
+import { safeNumber, safeString } from "@/utils/catalog/Funtions";
 
 // Cache duration constant
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
@@ -49,7 +50,7 @@ const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = 
   const { toast } = useToast();
   const { lang } = useLanguage();
   const t = translations[lang];
-  
+
   // Get distributor approval status
   const distributorAccess = useDistributorApproval();
 
@@ -67,25 +68,25 @@ const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = 
   const regional = product.regions.find((r) => r.area === selectedArea) || product.regions[0];
   const basePrice = regional?.distributorPrice ?? product.distributorPrice;
   const usedMoq = regional?.moq ?? product.moq;
-  
+
   // Determine if this product allows mixing variants to meet MOQ
   // IMPORTANT: Make absolutely sure we're checking correctly - use explicit boolean checks
   const allowMixVariants = Boolean(regional?.allowMixVariants === true || product.allowMixVariants === true);
   const skuLevelMoq = Number(regional?.skuLevelMoq || product.singleSkuMoq || 0);
-  
+
   // If we have SKU-level MOQ and allow mixing variants, use it; otherwise use standard MOQ
   const displayMoq = (allowMixVariants && skuLevelMoq > 0) ? skuLevelMoq : usedMoq;
-  
+
   // UOM conversion properties (not displayed on frontend)
   const moqUom = product.moq_uom && product.moq_uom !== 'pcs' ? product.moq_uom : (regional?.moq_uom || 'pcs');
   const pricingUom = product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (regional?.price_uom || 'pcs');
   const baseUom = product.base_uom || 'pcs';
-  
+
   // UOM conversion factors (for backend processing/calculations)
   const moqConversionFactor = product.moq_conversion_factor || regional?.moq_conversion_factor || 1;
   const pricingConversionFactor = product.pricing_conversion_factor || regional?.pricing_conversion_factor || 1;
   const baseConversionFactor = product.base_conversion_factor || 1;
-  
+
   // Conversion ratios for UOM calculations
   const uomConversions = {
     moq: {
@@ -103,18 +104,18 @@ const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = 
       factor: baseConversionFactor
     }
   };
-  
+
   // Helper function to check how many more items are needed to reach MOQ
   const getMixedVariantsStatus = () => {
     if (!allowMixVariants || !product.isVariant || !skuLevelMoq) return null;
-    
+
     const { hasEnoughItems, currentTotal, neededToReachMOQ } = checkMixedVariantsMOQ(
       items,
       product.baseProductId,
       regional?.area || '',
       skuLevelMoq
     );
-    
+
     return {
       hasEnoughItems,
       currentTotal,
@@ -122,14 +123,14 @@ const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = 
       skuLevelMoq
     };
   };
-  
+
   // Initialize quantity state - if mixed variants are allowed, always start with 1
   // otherwise use the standard MOQ
   // Force the condition check to be explicit to avoid falsy/truthy issues
   const canMixVariants = Boolean(allowMixVariants === true && product.isVariant === true);
   const initialQty = canMixVariants ? 1 : usedMoq;
   const [qty, setQty] = useState(initialQty);
-  
+
   // Update area and quantity if filter area changes
   useEffect(() => {
     if (selectedFilterArea && product.regions.some(r => r.area === selectedFilterArea)) {
@@ -144,7 +145,7 @@ const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = 
   const handleAddToCart = () => {
     let finalQty = qty;
     let moqMessage = '';
-    
+
     if (allowMixVariants && skuLevelMoq > 0 && product.isVariant) {
       const { hasEnoughItems, currentTotal } = checkMixedVariantsMOQ(
         items,
@@ -152,9 +153,9 @@ const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = 
         regional?.area || '',
         skuLevelMoq
       );
-      
+
       const newTotal = currentTotal + qty;
-      
+
       if (hasEnoughItems || newTotal >= skuLevelMoq) {
         moqMessage = lang === 'id'
           ? ` (Total varian: ${newTotal}/${skuLevelMoq})`
@@ -165,12 +166,12 @@ const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = 
           ? ` (${newTotal}/${skuLevelMoq}, perlu ${stillNeeded} lagi)`
           : ` (${newTotal}/${skuLevelMoq}, need ${stillNeeded} more)`;
       }
-      
+
       finalQty = qty;
     } else if (qty < usedMoq) {
       finalQty = usedMoq;
     }
-    
+
     addItem({
       id: product.baseProductId,
       name: product.name,
@@ -198,19 +199,19 @@ const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = 
 
     toast({
       title: `${product.displayName} ${product.size}`,
-      description: lang === 'id' 
-        ? `${finalQty} item ditambahkan ke keranjang${moqMessage}` 
+      description: lang === 'id'
+        ? `${finalQty} item ditambahkan ke keranjang${moqMessage}`
         : `${finalQty} items added to cart${moqMessage}`,
       duration: 3000,
     });
   };
 
   const canAddToCart = distributorAccess.canPlaceOrders && basePrice > 0 && regional && user?.profileComplete === true;
-  
+
   // Calculate margin and profit for a single unit to avoid qty-related issues
   const unitProfit = Math.max(0, product.consumerPrice - basePrice);
   const unitMargin = product.consumerPrice > 0 ? (unitProfit / product.consumerPrice) * 100 : 0;
-  
+
   // Also calculate total values based on quantity
   const subtotalDistributor = qty * basePrice;
   const potentialRevenue = qty * product.consumerPrice;
@@ -261,7 +262,7 @@ const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = 
             <div className="text-xs text-gray-600 mb-2 blur-sm select-none">
               Harga per karton
             </div>
-            
+
             {/* Distributor Price - Blurred with Orange Background */}
             <div className="mb-1 -mx-3 px-3 py-1.5 bg-orange-50 blur-sm select-none">
               <div className="flex justify-between items-center">
@@ -308,13 +309,13 @@ const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = 
           {/* Login/Approval Message */}
           <div className="mt-auto mb-3 p-3 bg-orange-50 border border-orange-300 rounded-md">
             <p className="text-xs text-orange-800 text-center font-medium">
-              {!loggedIn 
-                ? (lang === 'id' 
-                    ? 'Silakan login untuk mengakses harga dan melakukan pemesanan.' 
-                    : 'Please login to access prices and place orders.')
+              {!loggedIn
+                ? (lang === 'id'
+                  ? 'Silakan login untuk mengakses harga dan melakukan pemesanan.'
+                  : 'Please login to access prices and place orders.')
                 : (lang === 'id'
-                    ? 'Menunggu approval admin untuk mengakses harga dan melakukan pemesanan.'
-                    : 'Waiting for admin approval to access prices and place orders.')
+                  ? 'Menunggu approval admin untuk mengakses harga dan melakukan pemesanan.'
+                  : 'Waiting for admin approval to access prices and place orders.')
               }
             </p>
           </div>
@@ -322,7 +323,7 @@ const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = 
       </article>
     );
   }
-  
+
   // Card for active users with incomplete profile - show prices but can't order
   if (loggedIn && distributorAccess.canViewPrices && !user?.profileComplete) {
     return (
@@ -367,7 +368,7 @@ const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = 
             <div className="text-xs text-gray-600 mb-2">
               {lang === 'id' ? "Harga per karton" : "Price per carton"}
             </div>
-            
+
             {/* Distributor Price with Orange Background */}
             <div className="mb-1 -mx-3 px-3 py-1.5 bg-orange-50">
               <div className="flex justify-between items-center">
@@ -416,12 +417,12 @@ const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = 
           {/* Complete Profile Message */}
           <div className="mt-auto mb-3 p-3 bg-blue-50 border border-blue-300 rounded-md">
             <p className="text-xs text-blue-800 text-center font-medium mb-2">
-              {lang === 'id' 
-                ? 'Lengkapi profil Anda untuk dapat memesan barang.' 
+              {lang === 'id'
+                ? 'Lengkapi profil Anda untuk dapat memesan barang.'
                 : 'Complete your profile to place orders.'}
             </p>
-            <Link 
-              to="/profil" 
+            <Link
+              to="/profil"
               className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-2 px-4 rounded transition"
             >
               {lang === 'id' ? 'Lengkapi Profil Disini' : 'Complete Profile Here'}
@@ -475,7 +476,7 @@ const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = 
           <div className="text-xs text-gray-600 mb-2">
             {lang === 'id' ? "Harga per karton" : "Price per carton"}
           </div>
-          
+
           {/* Distributor Price with Orange Background */}
           <div className="mb-1 -mx-3 px-3 py-1.5 bg-orange-50">
             <div className="flex justify-between items-center">
@@ -535,11 +536,10 @@ const ProductCard = React.memo(({ product, loggedIn, user, selectedFilterArea = 
           <button
             onClick={handleAddToCart}
             disabled={!canAddToCart}
-            className={`w-full py-2.5 text-sm font-medium text-white rounded-md transition-colors flex items-center justify-center gap-2 ${
-              canAddToCart 
-                ? 'bg-orange-500 hover:bg-orange-600' 
-                : 'bg-gray-300 cursor-not-allowed'
-            }`}
+            className={`w-full py-2.5 text-sm font-medium text-white rounded-md transition-colors flex items-center justify-center gap-2 ${canAddToCart
+              ? 'bg-orange-500 hover:bg-orange-600'
+              : 'bg-gray-300 cursor-not-allowed'
+              }`}
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -571,7 +571,7 @@ export default function DaftarProduk() {
   const { lang } = useLanguage();
   const t = translations[lang];
   const { toast } = useToast();
-  
+
   // Get distributor approval status
   const distributorAccess = useDistributorApproval();
 
@@ -829,8 +829,8 @@ export default function DaftarProduk() {
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {
-    return !!(searchQuery.trim() || area || selectedBrand || 
-             priceRange[0] > 0 || priceRange[1] < 1000000);
+    return !!(searchQuery.trim() || area || selectedBrand ||
+      priceRange[0] > 0 || priceRange[1] < 1000000);
   }, [searchQuery, area, selectedBrand, priceRange]);
 
   // Export catalog function that respects filters
@@ -840,39 +840,39 @@ export default function DaftarProduk() {
       // Track the denied export attempt
       trackDeniedCatalogExport()
         .catch(err => console.error("Failed to track denied catalog export:", err));
-      
+
       // Show error toast
       toast({
         title: lang === 'id' ? 'Akses Ditolak' : 'Access Denied',
-        description: lang === 'id' 
-          ? 'Silakan masuk terlebih dahulu untuk mengunduh katalog produk.' 
+        description: lang === 'id'
+          ? 'Silakan masuk terlebih dahulu untuk mengunduh katalog produk.'
           : 'Please sign in first to download the product catalog.',
         variant: "destructive"
       });
-      
+
       // Redirect to login page after a short delay
       setTimeout(() => {
         window.location.href = '/masuk';
       }, 1500);
-      
+
       return;
     }
-    
+
     // Check distributor approval status
     if (!distributorAccess.canDownloadCatalog) {
       toast({
         title: lang === 'id' ? 'Akses Ditolak' : 'Access Denied',
-        description: lang === 'id' 
-          ? 'Akun Anda belum disetujui. Silakan tunggu persetujuan admin untuk mengunduh katalog.' 
+        description: lang === 'id'
+          ? 'Akun Anda belum disetujui. Silakan tunggu persetujuan admin untuk mengunduh katalog.'
           : 'Your account is not yet approved. Please wait for admin approval to download catalogs.',
         variant: "destructive"
       });
       return;
     }
-    
+
     try {
       let productsToExport: ProductWithVariant[];
-      
+
       if (hasActiveFilters) {
         // Use filtered products if filters are active
         productsToExport = filteredProducts;
@@ -883,20 +883,22 @@ export default function DaftarProduk() {
       }
 
       // Generate the catalog with the appropriate product set
-      const fileName = hasActiveFilters 
+      const fileName = hasActiveFilters
         ? `baskit-catalog-filtered-${new Date().toISOString().slice(0, 10)}`
         : `baskit-catalog-complete-${new Date().toISOString().slice(0, 10)}`;
-        
-      await generateCatalogPDF({ 
-        products: productsToExport, 
-        distributionArea: area || 'Semua Area',
+
+      await generateCatalogPDF({
+        products: productsToExport,
+        distributionArea: safeString(area, 'Semua Area'),
+        brand: safeString(selectedBrand, 'Semua Brand'),
+        priceRange: { min: safeNumber(priceBounds[0]), max: safeNumber(priceBounds[1]) },
         fileName: fileName
       });
 
       // Show success toast
       toast({
         title: lang === 'id' ? 'Katalog Berhasil Diunduh' : 'Catalog Successfully Downloaded',
-        description: lang === 'id' 
+        description: lang === 'id'
           ? `Katalog ${hasActiveFilters ? 'terfilter' : 'lengkap'} dengan ${productsToExport.length} produk berhasil diunduh`
           : `${hasActiveFilters ? 'Filtered' : 'Complete'} catalog with ${productsToExport.length} products successfully downloaded`,
       });
@@ -1019,7 +1021,7 @@ export default function DaftarProduk() {
     pdf.setFontSize(7.5);
     let sizeText = `${product.size} • SKU: ${product.baseProductId}`;
     if (product.isVariant && product.variantInfo) {
-      sizeText += ` • Variant: ${product.variantInfo.variantName}`;
+      sizeText += `Variant: ${product?.variantInfo?.variantName}`;
     }
     pdf.text(sizeText, x + 7, detailsY + 20 + (nameLines.length * 5) + 3);
 
@@ -1062,7 +1064,7 @@ export default function DaftarProduk() {
     pdf.setTextColor(COLORS.tealGreen[0], COLORS.tealGreen[1], COLORS.tealGreen[2]);
     pdf.setFont('helvetica', 'bold');
     pdf.text(formatIDR(usedPrice), x + 12, row1Y + 10);
-    
+
     // Right column - Customer Price with improved styling
     pdf.setFillColor(COLORS.orange[0], COLORS.orange[1], COLORS.orange[2], 0.08);
     pdf.roundedRect(x + (width / 2) + 3, row1Y - 5, (width / 2) - 10, 25, 3, 3, 'F');
@@ -1072,8 +1074,8 @@ export default function DaftarProduk() {
     pdf.setFont('helvetica', 'normal');
     const consumerPriceUom = product.pricing_uom || 'pcs';
     const consumerLabel = consumerPriceUom !== 'pcs' ? `Harga Pelanggan (per ${consumerPriceUom})` : 'Harga Pelanggan';
-    pdf.text(consumerLabel, x + (width/2) + 8, row1Y);
-    
+    pdf.text(consumerLabel, x + (width / 2) + 8, row1Y);
+
     pdf.setFontSize(10);
     pdf.setTextColor(COLORS.orange[0], COLORS.orange[1], COLORS.orange[2]);
     pdf.setFont('helvetica', 'bold');
@@ -1173,11 +1175,11 @@ export default function DaftarProduk() {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      
+
       // Track catalog export for analytics
       try {
         const { data: userData, error: userError } = await supabase.auth.getUser();
-        
+
         if (userError) {
           console.error('Error getting user for analytics:', userError);
         } else if (userData?.user) {
@@ -1193,7 +1195,7 @@ export default function DaftarProduk() {
       } catch (error) {
         console.error('Error in catalog export analytics:', error);
       }
-      
+
       // Group products by category
       const groupedProducts: Record<string, ProductWithVariant[]> = {};
 
@@ -1491,10 +1493,10 @@ export default function DaftarProduk() {
       <SEO
         title={lang === 'id' ? "Daftar Produk | Baskit Distributor Hub" : "Product List | Baskit Distributor Hub"}
         description={
-          lang === 'id' 
-            ? "Lihat katalog produk Baskit, harga pelanggan, MOQ, dan harga distributor (setelah masuk)." 
+          lang === 'id'
+            ? "Lihat katalog produk Baskit, harga pelanggan, MOQ, dan harga distributor (setelah masuk)."
             : "View Baskit product catalog, customer prices, MOQ, and distributor prices (after login)."
-        } 
+        }
       />
       <Navbar />
       <main className="container max-w-6xl mx-auto py-8 space-y-6">
@@ -1514,14 +1516,14 @@ export default function DaftarProduk() {
                 <AlertDescription className="text-sm font-medium">
                   {lang === 'id' ? (
                     distributorAccess.isPending ? 'Akun Anda sedang menunggu persetujuan admin. Anda dapat melihat produk namun tidak dapat mengakses harga atau melakukan pemesanan sampai akun disetujui.' :
-                    distributorAccess.isRejected ? 'Akun Anda telah ditolak. Silakan hubungi admin untuk informasi lebih lanjut.' :
-                    distributorAccess.isInactive ? 'Akun Anda tidak aktif. Silakan hubungi admin untuk mengaktifkan kembali akun Anda.' :
-                    'Status akun tidak diketahui. Silakan hubungi admin.'
+                      distributorAccess.isRejected ? 'Akun Anda telah ditolak. Silakan hubungi admin untuk informasi lebih lanjut.' :
+                        distributorAccess.isInactive ? 'Akun Anda tidak aktif. Silakan hubungi admin untuk mengaktifkan kembali akun Anda.' :
+                          'Status akun tidak diketahui. Silakan hubungi admin.'
                   ) : (
                     distributorAccess.isPending ? 'Your account is pending admin approval. You can view products but cannot access prices or place orders until approved.' :
-                    distributorAccess.isRejected ? 'Your account has been rejected. Please contact admin for more information.' :
-                    distributorAccess.isInactive ? 'Your account is inactive. Please contact admin to reactivate your account.' :
-                    'Account status unknown. Please contact admin.'
+                      distributorAccess.isRejected ? 'Your account has been rejected. Please contact admin for more information.' :
+                        distributorAccess.isInactive ? 'Your account is inactive. Please contact admin to reactivate your account.' :
+                          'Account status unknown. Please contact admin.'
                   )}
                 </AlertDescription>
               </div>
@@ -1536,8 +1538,8 @@ export default function DaftarProduk() {
               <AlertTriangle className="h-4 w-4 text-orange-600" />
               <div className="flex-1">
                 <AlertDescription className="text-sm font-medium text-orange-800">
-                  {lang === 'id' 
-                    ? 'Masuk untuk menggunakan simulasi dan melihat harga distributor.' 
+                  {lang === 'id'
+                    ? 'Masuk untuk menggunakan simulasi dan melihat harga distributor.'
                     : 'Login to use simulation and view distributor prices.'}
                 </AlertDescription>
               </div>
@@ -1670,12 +1672,12 @@ export default function DaftarProduk() {
             <span className="font-semibold text-foreground">{filteredProducts.length}</span>
             {lang === 'id' ? " produk" : " products"}
           </div>
-          
+
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={exportFilteredCatalog}
                   disabled={!distributorAccess.canDownloadCatalog}
@@ -1701,7 +1703,7 @@ export default function DaftarProduk() {
             </Tooltip>
           </TooltipProvider>
         </div>
-        
+
         {/* Informational text for non-logged-in or pending users */}
         {!user && (
           <p className="text-muted-foreground text-sm italic">
@@ -1719,7 +1721,7 @@ export default function DaftarProduk() {
             }
           </p>
         )}
-        
+
         {/* Alert for active users with incomplete profile */}
         {user && distributorAccess.isActive && !user.profileComplete && (
           <Alert className="bg-orange-50 border-orange-300">
@@ -1737,7 +1739,7 @@ export default function DaftarProduk() {
             </AlertDescription>
           </Alert>
         )}
-        
+
         <div ref={ref} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {loading ? (
@@ -1763,16 +1765,16 @@ export default function DaftarProduk() {
           {filteredProducts.length > productsPerPage && (
             <div className="flex flex-wrap items-center justify-center mt-6 gap-2">
               {/* Previous button */}
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className="h-8 px-3"
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
               >
                 {lang === 'id' ? "Sebelumnya" : "Previous"}
               </Button>
-              
+
               {/* Page number buttons with simplified logic */}
               <div className="flex items-center gap-1">
                 {/* Show a simpler, fixed-width pagination with consistent display */}
@@ -1780,7 +1782,7 @@ export default function DaftarProduk() {
                   // Determine which pages to show based on total pages
                   const pages = [];
                   const maxVisible = 5; // Maximum number of page buttons to show
-                  
+
                   if (paginationTotalPages <= maxVisible) {
                     // If total pages is less than or equal to maxVisible, show all pages
                     for (let i = 1; i <= paginationTotalPages; i++) {
@@ -1789,7 +1791,7 @@ export default function DaftarProduk() {
                   } else {
                     // Always show first page
                     pages.push(1);
-                    
+
                     // Determine middle pages based on current page
                     if (currentPage <= 3) {
                       // Near the start, show 2,3,4
@@ -1809,7 +1811,7 @@ export default function DaftarProduk() {
                         pages.push(currentPage + 1);
                       }
                     }
-                    
+
                     // Always show last page if more than one page
                     if (paginationTotalPages > 1 && !pages.includes(paginationTotalPages)) {
                       // Add ellipsis if there's a gap
@@ -1819,14 +1821,14 @@ export default function DaftarProduk() {
                       pages.push(paginationTotalPages);
                     }
                   }
-                  
+
                   // Render the page buttons
                   return pages.map((page, index) => {
                     if (page === -1) {
                       // Render ellipsis
                       return <span key={`ellipsis-${index}`} className="px-2 text-muted-foreground">...</span>;
                     }
-                    
+
                     return (
                       <Button
                         key={`page-${page}`}
@@ -1841,18 +1843,18 @@ export default function DaftarProduk() {
                   });
                 })()}
               </div>
-              
+
               {/* Next button */}
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className="h-8 px-3"
                 onClick={() => setCurrentPage(prev => Math.min(paginationTotalPages, prev + 1))}
                 disabled={currentPage === paginationTotalPages}
               >
                 {lang === 'id' ? "Selanjutnya" : "Next"}
               </Button>
-              
+
               {/* Items per page selector */}
               <select
                 className="rounded-md border bg-background px-3 py-1 text-xs"

@@ -1,65 +1,47 @@
-/**
- * Catalog PDF generation utilities.
- * 
- * This module provides a function to generate a product catalog PDF using jsPDF.
- * Each product is rendered as a card with image, details, and pricing.
- * 
- * - Uses A4 portrait layout, with configurable columns and card sizes.
- * - Renders a header with logo, area, and date.
- * - Each product card displays product image, name, brand, prices, and other details.
- * - Handles multi-page catalogs and page numbering.
- * - Outputs the PDF in a new browser window.
- * 
- * Dependencies:
- *   - jsPDF
- *   - date-fns (for date formatting)
- *   - Product type from @/data/products
- */
-
 import { jsPDF } from "jspdf";
 import { format } from 'date-fns';
-import { calculateMargin, capitalizeFirst, getRegionByArea } from "./Funtions";
+import { formatRp, pxToMm, pxToPt, safeNumber, safeString } from "./Funtions";
 import { ProductWithVariant } from "@/services/product-service";
 
 /**
- * Format a number as Indonesian Rupiah currency.
- * @param n Number to format
- * @returns Formatted string (e.g., "Rp10.000")
+ * Today's date formatted as dd/MM/yy.
  */
-const formatRp = (n?: number) =>
-  n === undefined ? "-" : `Rp${n.toLocaleString("id-ID")}`;
-
-/**
- * Get the appropriate UOM for MOQ display
- * @param product - Product object
- * @param region - Optional region data
- * @returns UOM string for MOQ
- */
-const getMoqUom = (product: ProductWithVariant, region?: { moq_uom?: string }) => {
-  return product.moq_uom && product.moq_uom !== 'pcs' ? product.moq_uom : (region?.moq_uom || 'pcs');
-};
-
-/**
- * Get the appropriate UOM for pricing display
- * @param product - Product object  
- * @param region - Optional region data
- * @returns UOM string for pricing
- */
-const getPricingUom = (product: ProductWithVariant, region?: { price_uom?: string }) => {
-  return product.pricing_uom && product.pricing_uom !== 'pcs' ? product.pricing_uom : (region?.price_uom || 'pcs');
-};
-
 const today = format(new Date(), 'dd/MM/yy');
 
+// Colors
 /**
- * Parameters for generating a catalog PDF.
- * @property products - Array of ProductWithVariant objects to include in the catalog.
- * @property distributionArea - (Optional) The area where the catalog will be distributed.
- * @property fileName - (Optional) The desired name for the generated PDF file.
+ * Color palette used for PDF styling.
+ */
+const lightGray = '#D1D5DC';
+const softGray = '#F9FAFB'
+const baseDarker = '#383B46'
+const baseLight = '#9B9CA1';
+const primary = '#FF8B00';
+const lightPrimary = '#FFC580';
+const lightPeach = '#FFF4E6';
+const white = '#FFFFFF';
+
+/**
+ * Path to the Baskit logo image.
+ */
+const logoUrl = '/assets/logo-full.png';
+
+/**
+ * Represents a price range with minimum and maximum values.
+ */
+type PriceRange = {
+  min: number;
+  max: number;
+};
+
+/**
+ * Parameters required to generate the catalog PDF.
  */
 type GenerateCatalogPDF = {
   products: ProductWithVariant[];
   distributionArea?: string;
+  brand?: string;
+  priceRange?: PriceRange;
   fileName?: string;
 }
 
@@ -70,8 +52,10 @@ type GenerateCatalogPDF = {
  */
 export async function generateCatalogPDF(props: GenerateCatalogPDF) {
   const products = props.products || [];
-  const distributionArea = props.distributionArea || '-';
-  const fileName = props.fileName || 'catalog.pdf';
+  const distributionArea = safeString(props.distributionArea, '-');
+  const brand = safeString(props.brand, '-');
+  const priceRange = props.priceRange || { min: 0, max: 0 };
+  const fileName = safeString(props.fileName, 'catalog.pdf');
 
   // Create jsPDF instance (A4 portrait, units = mm)
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
@@ -80,15 +64,15 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
   const pageHeight = doc.internal.pageSize.getHeight(); // 297
 
   // Layout configuration
-  const margin = 12; // left & right margin
-  const gap = 2; // space between cards
-  const cols = 4;
-  const headerHeight = 25;
-  const footerBottom = 12;
+  const margin = pxToMm(40);
+  const gap = pxToMm(20);
+  const cols = 1;
+  const headerHeight = pxToMm(82);
+  const footerBottom = pxToMm(20);
 
   // compute card width and height
-  const cardWidth = (pageWidth - margin * 2 - gap * (cols - 1)) / cols;
-  const cardHeight = 85; // mm (adjust if want taller/shorter)
+  const cardWidth = (pageWidth - (margin * 2));
+  const cardHeight = pxToMm(360);
   const availHeight = pageHeight - margin - headerHeight - footerBottom;
   const rowsPerPage = Math.floor((availHeight + gap) / (cardHeight + gap));
   const perPage = cols * rowsPerPage;
@@ -99,46 +83,110 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
   doc.setFont("helvetica");
 
   /**
-   * Render the catalog header on each page.
-   * @param pageNo Current page number (1-based)
+   * Renders the cover page of the catalog PDF.
+   */
+  function renderCoverPage() {
+    let coverY = (pageHeight * 1 / 4);
+    const coverX = margin;
+    const coverW = pageWidth - (margin * 2);
+    coverY += pxToMm(8);
+
+    // Secret
+    const secretW = pxToMm(70);
+    const secretX = margin + coverW - secretW;
+    doc.setDrawColor(primary);
+    doc.setLineWidth(pxToMm(1));
+    doc.setFillColor(white);
+    doc.roundedRect(secretX, margin, secretW, pxToMm(25), pxToMm(4), pxToMm(4), "DF");
+    const secretPad = pxToMm(8)
+    const secretContentY = margin + (secretPad * 2);
+    const secretContentX = secretX + secretPad;
+    doc.setFontSize(pxToPt(12));
+    doc.setTextColor(primary);
+    doc.text('RAHASIA', secretContentX, secretContentY);
+
+    // Baskit Logo
+    const logoH = pxToMm(60);
+    doc.addImage(logoUrl, 'PNG', coverX, coverY, pxToMm(180), logoH);
+
+    // Catalog
+    coverY += logoH + pxToMm(60);
+    doc.setFontSize(pxToPt(34));
+    doc.setTextColor(primary);
+    doc.text("Katalog Distributor", coverX, coverY);
+
+    // Catalog description
+    coverY += pxToMm(30);
+    doc.setFontSize(pxToPt(14));
+    doc.setTextColor(baseLight);
+    doc.text('Katalog Resmi: Harga & Stok Terkini', coverX, coverY);
+
+    // Divider
+    coverY += pxToMm(50);
+    doc.setFillColor(primary);
+    doc.roundedRect(coverX, coverY, pxToMm(128), pxToMm(5), pxToMm(3), pxToMm(3), "F");
+
+    // Distributor Area Label
+    coverY += pxToMm(50);
+    doc.setFontSize(pxToPt(12));
+    doc.setTextColor(baseLight);
+    doc.text('Area Distribusi', coverX, coverY);
+
+    // Brand Label
+    const brandX = coverX + pxToMm(160);
+    doc.setFontSize(pxToPt(12));
+    doc.setTextColor(baseLight);
+    doc.text('Brand', brandX, coverY);
+
+    // Distributor Area Value
+    coverY += pxToMm(30);
+    doc.setFontSize(pxToPt(18));
+    doc.setTextColor(baseDarker);
+    doc.text(distributionArea, coverX, coverY);
+
+    // Distributor Brand Value
+    doc.text(brand, brandX, coverY);
+
+    // Distributor Area Label
+    coverY += pxToMm(50);
+    doc.setFontSize(pxToPt(12));
+    doc.setTextColor(baseLight);
+    doc.text('Rentang Harga per Karton', coverX, coverY)
+
+    coverY += pxToMm(30);
+    doc.setFontSize(pxToPt(18));
+    doc.setTextColor(baseDarker);
+    doc.text(`${formatRp(priceRange.min)} - ${formatRp(priceRange.max)}`, coverX, coverY)
+  }
+
+  /**
+   * Renders the header section on each catalog page.
    */
   function renderHeader() {
-    // Logo + Title left
-    const logoUrl = '/assets/logo-full.png';
-    doc.addImage(logoUrl, 'PNG', margin, margin + 3, 28, 9);
+    let headerY = margin;
+    const headerX = headerY;
+    const headerW = pageWidth - (margin * 2);
 
-    doc.setFontSize(16);
-    doc.setTextColor(242, 101, 34);
-    doc.text("Distributor Catalog", margin, margin + 18);
+    // Baskit Logo
+    const logoH = pxToMm(40);
+    doc.addImage(logoUrl, 'PNG', headerX, headerY, pxToMm(110), logoH);
 
-    // Right area texts
-    doc.setFontSize(9);
-    doc.setTextColor(33);
-    doc.text("Area Distribusi", pageWidth - margin - 30, margin + 12, { align: "right" });
-    doc.setFontSize(16);
-    doc.setTextColor(0, 104, 90);
-    doc.text(distributionArea, pageWidth - margin - 30, margin + 18, { align: "right" });
+    // Catalog
+    headerY += logoH + pxToMm(16);
+    doc.setFontSize(pxToPt(12));
+    doc.setTextColor(primary);
+    doc.text("Distributor Catalog", headerX, headerY);
 
-    // Get unique areas from all products
-    // const allAreas = [...new Set(products.flatMap(p => p.regions.map(r => r.area)))];
-    // const areasText = allAreas.length > 0 ? allAreas.join(", ") : "Semua Area";
+    // Distributor Area
+    doc.setFontSize(pxToPt(12));
+    doc.setTextColor(baseDarker);
+    doc.text(`Area Distribusi: ${distributionArea}`, headerX + headerW, margin, { align: "right" });
+    doc.text(`Tanggal: ${today}`, headerX + headerW, margin + pxToMm(16), { align: "right" });
 
-    // Truncate if too long for display
-    // const maxLen = 30;
-    // const displayText = areasText.length > maxLen ? areasText.substring(0, maxLen) + "..." : areasText;
-    //doc.text(displayText, pageWidth - margin - 60, margin + 18);
-
-    doc.setFontSize(9);
-    doc.setTextColor(33);
-    doc.text("Tanggal Katalog", pageWidth - margin, margin + 12, { align: "right" });
-    doc.setFontSize(16);
-    doc.setTextColor(0, 104, 90);
-    doc.text(today, pageWidth - margin, margin + 18, { align: "right" });
-
-    // small line under header
-    doc.setDrawColor(220);
-    doc.setLineWidth(0.5);
-    doc.line(margin, headerHeight + margin - 2, pageWidth - margin, headerHeight + margin - 2);
+    // Divider
+    headerY += pxToMm(8);
+    doc.setFillColor(primary);
+    doc.rect(headerX, headerY, headerW, pxToMm(2), "F");
   }
 
   /**
@@ -149,125 +197,235 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
    * @param y Y coordinate (mm)
    */
   function renderCard(p: ProductWithVariant, x: number, y: number) {
-    const cardW = cardWidth;     // card width (mm)
-    const cardH = cardHeight;    // card height (mm)
-    const pad = 2;               // inner padding
+    const cardW = cardWidth;
+    const cardH = cardHeight;
+    const cardPad = pxToMm(15);
+    const cardContentW = cardW - (cardPad * 2);
 
-    // ── Card Container ──────────────────────────────────────────
-    doc.setLineWidth(0.4);
-    doc.setDrawColor(235, 235, 235);                      // border gray-300
-    doc.setFillColor(255, 255, 255);            // background white
-    doc.roundedRect(x, y, cardW, cardH, 3, 3, "DF");
+    const leftX = x + cardPad;
+    let leftY = y + cardPad;
+    const leftW = cardContentW / 2 - cardPad;
 
-    // ── Product Image ───────────────────────────────
-    const imageH = 28;                          // image area height
-    const defaultImage = '/placeholder.svg';    // fallback image
+    const rightX = leftX + (cardContentW / 2);
+    let rightY = leftY;
+    const rightW = cardContentW / 2;
 
-    // Draw rounded border first
-    doc.setDrawColor(200, 200, 200); // light gray border
-    doc.setLineWidth(0.2);
-    doc.roundedRect(x + pad, y + pad, cardW - pad * 2, imageH, 3, 3, "D");
+    // Divider
+    doc.setDrawColor(lightGray);
+    doc.setLineWidth(pxToMm(1));
+    doc.setFillColor(white);
+    doc.roundedRect(x, y, cardW, cardH, pxToMm(10), pxToMm(10), "DF");
+
+    // === TOP SECTION ===
+    // Product Image
+    const imgH = pxToMm(72);
+    const imgW = pxToMm(72);
 
     try {
-      // Use product image if available, otherwise use default
-      const imageUrl = p.image || defaultImage;
-      doc.addImage(imageUrl, "JPEG", x + pad + 1, y + pad + 1, cardW - pad * 2 - 2, imageH - 2);
-    } catch (err) {
-      // If image loading fails, draw a colored rectangle
-      console.warn("Failed to load image for product:", p.name, err);
-      doc.setFillColor(255, 186, 122);  // bg-orange-200
-      doc.roundedRect(x + pad, y + pad, cardW - pad * 2, imageH, 3, 3, "F");
-    }
+      doc.setDrawColor(lightGray);
+      doc.setLineWidth(pxToMm(0.5));
+      doc.setFillColor(softGray);
+      doc.roundedRect(leftX, leftY, imgW, imgH, pxToMm(10), pxToMm(10), "DF");
 
-    // Y position for text after image
-    let textY = y + pad + imageH + 5;
-
-    // ── Brand (text-gray-500 text-xs) ────────────────
-    doc.setFontSize(7);
-    doc.setTextColor(107);                      // gray-500
-    doc.text(p?.brand ?? "-", x + pad, textY);
-
-    // ── Product Name (font-semibold text-sm) ─────────
-    textY += 4;
-    doc.setFontSize(8);
-    doc.setTextColor(33);                       // gray-800
-    const productTitle = `${p?.name ?? "-"} ${p?.size ?? ""}`;
-    const wrappedTitle = doc.splitTextToSize(productTitle, cardW - pad * 2);
-    doc.text(wrappedTitle, x + pad, textY);
-    textY += wrappedTitle.length * 5;
-
-    // ── 2-Column Detail Grid ─────────────────────────
-    const colGap = 5;
-    const colW = (cardW - pad * 2 - colGap) / 2;
-    const leftX = x + pad;
-    const rightX = x + pad + colW + colGap;
-    let leftY = textY;
-    let rightY = textY;
-
-    doc.setFontSize(6.5);
-    doc.setTextColor(107); // gray-500
-
-    /**
-     * Helper to render a 3-line block (label, value, subtext)
-     * @param startX X position
-     * @param startY Y position
-     * @param label Label text
-     * @param value Value text
-     * @param sub Optional subtext
-     * @returns Next Y position after block
-     */
-    const renderBlock = (
-      startX: number,
-      startY: number,
-      label: string,
-      value: string,
-      sub?: string
-    ) => {
-      doc.setTextColor(107);
-      doc.text(label, startX, startY);
-      doc.setTextColor(33);
-      doc.setFontSize(7);
-      const wrappedValue = doc.splitTextToSize(value, colW);
-      doc.text(wrappedValue, startX, startY + 3.8);
-      let nextY = startY + 1.8 + wrappedValue.length * 5;
-      if (sub) {
-        doc.setFontSize(6);
-        doc.setTextColor(107);
-        doc.text(sub, startX, nextY);
-        nextY += 6;
+      if (p?.image) {
+        doc.addImage(
+          safeString(p.image, '/placeholder.svg'),
+          "JPEG",
+          leftX + 1,
+          leftY + 1,
+          imgW - 2,
+          imgH - 2
+        );
       }
-      return nextY; // next block Y
-    };
-
-    // Get UOM values for this product
-    const moqUom = getMoqUom(p);
-    const pricingUom = getPricingUom(p);
-    const uom = pricingUom !== "pcs" ? pricingUom : "pcs";
-    const margin = calculateMargin(p, distributionArea);
-    const region = getRegionByArea(p, distributionArea)
-
-    // Left column
-    leftY = renderBlock(leftX, leftY, "Harga Distributor", formatRp(region.distributorPrice), `per ${uom}`);
-    leftY = renderBlock(leftX, leftY, "Margin Distributor", `${formatRp(margin.value)}`, `${margin.percentage.toFixed(1)}% margin`);
-    leftY = renderBlock(leftX, leftY, "MOQ", `${p?.moq ?? "-"}`, moqUom);
-
-    // Right column
-    rightY = renderBlock(rightX, rightY, "Harga Konsumen", formatRp(p?.consumerPrice), `per ${uom}`);
-    rightY = renderBlock(rightX, rightY, `Isi Per ${capitalizeFirst((uom || '').toLowerCase())}`, `${p?.units ?? "-"}`, "pieces");
-
-    // Format regions for display - show first area and count if more exist
-    let areaDisplay = p?.regions?.length
-      ? p.regions.length === 1
-        ? p.regions[0].area
-        : `${p.regions[0].area} +${p.regions.length - 1}`
-      : "-";
-
-    if (distributionArea !== 'Semua Area') {
-      areaDisplay = distributionArea;
+    } catch {
+      doc.setDrawColor(lightGray);
+      doc.setLineWidth(pxToMm(0.5));
+      doc.setFillColor(softGray);
+      doc.roundedRect(leftX, leftY, imgW, imgH, pxToMm(10), pxToMm(10), "DF");
     }
 
-    rightY = renderBlock(rightX, rightY, "Area Distribusi", areaDisplay);
+    // Product Info
+    const productInfoW = leftX + imgW + pxToMm(16);
+    let productInfoY = leftY + cardPad;
+
+    doc.setFontSize(pxToPt(14));
+    doc.setTextColor(baseDarker);
+    doc.text(safeString(p?.displayName, '-'), productInfoW, productInfoY);
+
+    productInfoY += pxToMm(18);
+    doc.setFontSize(pxToPt(10));
+    doc.setTextColor(baseLight);
+    const category = safeString(p?.category, '-');
+    const categoryWidth = doc.getTextWidth(category);
+
+    doc.text(category, productInfoW, productInfoY);
+    doc.setTextColor(baseDarker);
+    doc.text(`• ${safeString(p?.brand, '-')}`, productInfoW + categoryWidth + 2, productInfoY);
+
+    productInfoY += pxToMm(18);
+    doc.text(`Varian: ${safeString(p?.variantInfo?.variantName, '-')}`, productInfoW, productInfoY);
+
+    // Divider
+    leftY += imgH;
+    rightY += imgH;
+    leftY += pxToMm(10);
+    rightY += pxToMm(10);
+    doc.setFillColor(lightGray);
+    doc.rect(leftX, leftY, cardContentW, pxToMm(0.5), "F");
+
+    //=== LEFT SECTION ===
+    // Packaging & Distribution
+    leftY += pxToMm(20);
+    doc.setTextColor(baseLight);
+    doc.text('KEMASAN & DISTRIBUSI', leftX, leftY);
+
+    leftY += pxToMm(16);
+    doc.setTextColor(baseDarker);
+    doc.text(`Kemasan: -`, leftX, leftY);
+
+    leftY += pxToMm(16);
+    doc.text(`SLA: -`, leftX, leftY);
+
+    // Divider
+    leftY += pxToMm(8);
+    doc.setFillColor(lightGray);
+    doc.rect(leftX, leftY, leftW, pxToMm(0.5), "F");
+
+    // Area, Distributor Price & MOQ
+    // Label for Area, Distributor & MOQ
+    // Area
+    leftY += pxToMm(18);
+    doc.setTextColor(baseLight);
+    doc.text('AREA', leftX, leftY);
+    // Distributor Price
+    const leftWOneThird = leftW / 3;
+    doc.text('HARGA DISTRIBUTOR', leftX + leftWOneThird, leftY);
+    // MOQ
+    const moqX = leftX + leftW
+    doc.text('MOQ', moqX, leftY, { align: 'right' });
+
+    // List for Area, Distributor & MOQ
+    // Area
+    if (p?.regions && p.regions.length) {
+      p.regions.map((region) => {
+        leftY += pxToMm(16);
+        doc.setTextColor(baseDarker);
+        doc.text(region.area, leftX, leftY);
+        // Distributor Price
+        doc.text(`${safeString(safeString(region?.distributorPrice, '-'))} / ${safeString(region?.moq_uom, '-')}`, leftX + leftWOneThird, leftY);
+        // MOQ
+        doc.text(`${safeString(region?.moq, '-')} ${safeString(region?.price_uom, '-')}`, moqX, leftY, { align: 'right' });
+      })
+    }
+
+    // Divider
+    leftY += pxToMm(8);
+    doc.setFillColor(lightGray);
+    doc.rect(leftX, leftY, leftW, pxToMm(0.5), "F");
+
+    // Promo
+    leftY += pxToMm(14);
+    doc.setDrawColor(lightPrimary);
+    doc.setLineWidth(pxToMm(1));
+    doc.setFillColor(lightPeach);
+    doc.roundedRect(leftX, leftY, leftW, pxToMm(44), pxToMm(4), pxToMm(4), "DF");
+    const promoPad = pxToMm(8)
+    let promoContentY = leftY + (promoPad * 2);
+    const promoContentX = leftX + promoPad;
+    doc.setTextColor(primary);
+    doc.text('PROGRAM PROMO', promoContentX, promoContentY);
+    promoContentY += pxToMm(16);
+    doc.text('-', promoContentX, promoContentY);
+
+    //=== RIGHT SECTION ===
+    // Price
+    rightY += pxToMm(20);
+    doc.setTextColor(baseLight);
+    doc.text('HARGA', rightX, rightY);
+
+    // Distributor
+    rightY += pxToMm(16);
+    doc.setTextColor(baseDarker);
+    doc.setFontSize(pxToPt(12));
+    doc.text('Distributor', rightX, rightY);
+
+    rightY += pxToMm(16);
+    doc.setFontSize(pxToPt(10));
+    doc.text('Karton:', rightX, rightY);
+    const maxRightX = rightX + rightW;
+    doc.setTextColor(primary);
+    doc.text(formatRp(safeNumber(p?.distributorPrice)), maxRightX, rightY, { align: "right" });
+
+    rightY += pxToMm(16);
+    doc.setTextColor(baseDarker);
+    doc.text('Per Pcs:', rightX, rightY);
+    doc.setTextColor(primary);
+    doc.text("-", maxRightX, rightY, { align: "right" });
+
+    // Divider
+    rightY += pxToMm(8);
+    doc.setFillColor(lightGray);
+    doc.rect(rightX, rightY, rightW, pxToMm(0.5), "F");
+
+    // Retail
+    rightY += pxToMm(18);
+    doc.setTextColor(baseDarker);
+    doc.setFontSize(pxToPt(12));
+    doc.text('Retail', rightX, rightY);
+
+    rightY += pxToMm(16);
+    doc.setFontSize(pxToPt(10));
+    doc.text('Karton:', rightX, rightY);
+    doc.text(formatRp(safeNumber(p?.retailPrice)), maxRightX, rightY, { align: "right" });
+
+    rightY += pxToMm(16);
+    doc.text('Per Pcs:', rightX, rightY);
+    doc.text("-", maxRightX, rightY, { align: "right" });
+
+    // Potential Margin
+    rightY += pxToMm(10);
+    doc.setDrawColor(lightGray);
+    doc.setLineWidth(pxToMm(1));
+    doc.setFillColor(softGray);
+    const potentialMarginH = pxToMm(28)
+    doc.roundedRect(rightX, rightY, rightW, potentialMarginH, pxToMm(4), pxToMm(4), "DF");
+    const potentialMarginPad = pxToMm(8)
+    const potentialMarginContentY = rightY + (potentialMarginPad * 2);
+    const potentialMarginContentX = rightX + potentialMarginPad;
+    doc.text('Potensi Margin:', potentialMarginContentX, potentialMarginContentY);
+    promoContentY += pxToMm(16);
+    doc.text('-', maxRightX - potentialMarginPad, potentialMarginContentY, { align: 'right' });
+
+    // Divider
+    rightY += potentialMarginH + pxToMm(8);
+    doc.setFillColor(lightGray);
+    doc.rect(rightX, rightY, rightW, pxToMm(0.5), "F");
+
+    // Costomer
+    rightY += pxToMm(18);
+    doc.setTextColor(baseDarker);
+    doc.setFontSize(pxToPt(12));
+    doc.text('Konsumen', rightX, rightY);
+
+    rightY += pxToMm(16);
+    doc.setFontSize(pxToPt(10));
+    doc.text('Karton:', rightX, rightY);
+    doc.text(formatRp(safeNumber(p?.consumerPrice)), maxRightX, rightY, { align: "right" });
+
+    rightY += pxToMm(16);
+    doc.text('Per Pcs:', rightX, rightY);
+    doc.text("-", maxRightX, rightY, { align: "right" });
+
+    // Divider
+    rightY += pxToMm(8);
+    doc.setFillColor(lightGray);
+    doc.rect(rightX, rightY, rightW, pxToMm(0.5), "F");
+
   }
+
+  // Add Cover Page
+  renderCoverPage()
+  doc.addPage();
 
   // Loop through products and render cards, paginating as needed
   for (let i = 0; i < products.length; i++) {
@@ -294,14 +452,33 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
 
   // Footer: page numbers
   const pageCount = doc.getNumberOfPages();
-  for (let p = 1; p <= pageCount; p++) {
+  for (let p = 2; p <= pageCount; p++) {
+
     doc.setPage(p);
-    doc.setFontSize(9);
-    doc.setTextColor(120);
-    doc.text(`Page ${p} / ${pageCount}`, pageWidth / 2, pageHeight - 8, { align: "center" });
+    const footerY = pageHeight - (footerBottom + pxToMm(20));
+    const footerX = margin;
+    const footerW = pageWidth - margin;
+
+    doc.setFontSize(pxToPt(12));
+    // Secret
+    doc.setDrawColor(primary);
+    doc.setLineWidth(pxToMm(1));
+    doc.setFillColor(white);
+    doc.roundedRect(footerX, footerY - pxToMm(20), pxToMm(70), pxToMm(25), pxToMm(4), pxToMm(4), "DF");
+    const secretPad = pxToMm(8)
+    const secretContentY = footerY + (secretPad * 2) - pxToMm(20);
+    const secretContentX = footerX + secretPad;
+    doc.setTextColor(primary);
+    doc.text('RAHASIA', secretContentX, secretContentY);
+
+    // Page Number
+    doc.setTextColor(baseDarker);
+    doc.text(`Halaman ke ${p - 1} dari ${pageCount - 1}`, footerW, footerY, { align: "right" });
+
   }
 
   // Save file (triggers download in browser)
   doc.save(fileName);
-  //doc.output('dataurlnewwindow');
+  // doc.output('dataurlnewwindow');
+  //window.open(doc.output('bloburl'), '_blank');
 }
