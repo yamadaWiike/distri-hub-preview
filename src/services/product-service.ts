@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Product, RegionPricing, ProductVariant } from '@/data/products';
 import { withAuth, requireAuth, requireAuthForViewing, validateAuth } from '@/utils/auth-guards';
+import { getImageUrl } from '@/lib/s3-upload';
 
 // Define database types to match our schema
 export type ProductFromDB = {
@@ -685,6 +686,8 @@ export interface ProductWithVariant extends Omit<Product, 'variants' | 'hasVaria
   // Make sure these fields are also included and properly typed
   singleSkuMoq?: number;
   allowMixVariants?: boolean;
+  // S3 URL for images stored on S3
+  image_url?: string;
 }
 
 // Fetch products expanded by variants - each variant becomes a separate product entry
@@ -730,6 +733,11 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
               isActive: variantData.is_active
             };
             
+            // Generate proper S3 URL for image if needed
+            const imageUrl = product.image && !product.image.startsWith('http') && !product.image.startsWith('https')
+              ? getImageUrl(product.image) || product.image
+              : product.image;
+
             const variantProduct: ProductWithVariant = {
               ...product,
               id: `${product.id}_variant_${variant.id}`,
@@ -746,6 +754,7 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
               consumerPrice: product.consumerPrice + variant.additionalPrice,
               singleSkuMoq: product.singleSkuMoq || 0,
               allowMixVariants: product.allowMixVariants || false,
+              image_url: imageUrl,
               regions: product.regions.map(region => ({
                 ...region,
                 distributorPrice: region.distributorPrice + variant.additionalPrice,
@@ -758,20 +767,32 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
             expandedProducts.push(variantProduct);
           }
         } else {
+          // Generate proper S3 URL for image if needed
+          const imageUrl = product.image && !product.image.startsWith('http') && !product.image.startsWith('https')
+            ? getImageUrl(product.image) || product.image
+            : product.image;
+
           const regularProduct: ProductWithVariant = {
             ...product,
             baseProductId: product.id,
             isVariant: false,
-            displayName: product.name
+            displayName: product.name,
+            image_url: imageUrl
           };
           expandedProducts.push(regularProduct);
         }
       } else {
+        // Generate proper S3 URL for image if needed
+        const imageUrl = product.image && !product.image.startsWith('http') && !product.image.startsWith('https')
+          ? getImageUrl(product.image) || product.image
+          : product.image;
+
         const regularProduct: ProductWithVariant = {
           ...product,
           baseProductId: product.id,
           isVariant: false,
-          displayName: product.name
+          displayName: product.name,
+          image_url: imageUrl
         };
         expandedProducts.push(regularProduct);
       }

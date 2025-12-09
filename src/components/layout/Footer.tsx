@@ -106,7 +106,7 @@ export default function Footer() {
         {/* Copyright */}
         <div className="border-t border-gray-700 mt-8 pt-6 text-center">
           <p className="text-sm text-gray-400">{translation.copyright}</p>
-          <p className="text-xs text-gray-500 mt-2">v2.1.1</p>
+          <p className="text-xs text-gray-500 mt-2">v2.3.1</p>
         </div>
       </div>
     </footer>
