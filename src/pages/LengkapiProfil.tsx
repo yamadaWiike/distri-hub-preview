@@ -274,7 +274,7 @@ export default function LengkapiProfil() {
 
   // Debug logging
   useEffect(() => {
-    console.log("Current step changed to:", currentStep);
+
   }, [currentStep]);
 
   // Load existing profile data
@@ -464,9 +464,7 @@ export default function LengkapiProfil() {
   const handleNext = (e?: React.MouseEvent<HTMLButtonElement>) => {
     e?.preventDefault();
 
-    console.log("=== handleNext called ===");
-    console.log("currentStep:", currentStep);
-    console.log("Stack trace:", new Error().stack);
+
 
     // Validate step 1
     if (currentStep === 1) {
@@ -1490,7 +1488,7 @@ export default function LengkapiProfil() {
                           });
                         }}
                         onAddressFound={(address) => {
-                          console.log("Address found:", address);
+
                         }}
                         initialPosition={
                           selectedCoordinates

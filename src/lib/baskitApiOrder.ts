@@ -57,12 +57,6 @@ export async function createOrder(
   const bypassEnabled = import.meta.env.VITE_BASKIT_API_BYPASS === 'true';
   
   if (bypassEnabled) {
-    console.log('[BASKIT API BYPASS] Order creation bypassed');
-    console.log('[BASKIT API BYPASS] Order details:', {
-      customerId: payload.customerId,
-      total: payload.total,
-      productsCount: payload.products.length
-    });
     return {
       statusCode: 200,
       orderCode: `BYPASS-ORDER-${Date.now()}`,

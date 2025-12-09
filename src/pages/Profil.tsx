@@ -517,7 +517,7 @@ export default function Profil() {
         area_distribusi: tempForm.area_distribusi,
       };
 
-      console.log('Saving banking info:', updateData);
+
       
       const { error } = await supabase
         .from('distributor_profiles')

@@ -183,7 +183,7 @@ export default function ProdukDetail() {
         return '/placeholder.svg';
       })()];
   // Debug: log productImages array to check image URLs
-  console.log('ProdukDetail productImages:', productImages);
+
   
   const hasMultipleImages = productImages.length > 1;
   

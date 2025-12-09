@@ -48,7 +48,6 @@ export async function createCustomer(payload: CustomerPayload) {
   const bypassEnabled = import.meta.env.VITE_BASKIT_API_BYPASS === 'true';
   
   if (bypassEnabled) {
-    console.log('[BASKIT API BYPASS] Customer creation bypassed for:', payload.companyName);
     return {
       statusCode: 200,
       message: 'Customer created successfully (bypassed)',

@@ -42,8 +42,6 @@ export async function getInventory(payload: InventoryPayload): Promise<Inventory
   const bypassEnabled = import.meta.env.VITE_BASKIT_API_BYPASS === 'true';
   
   if (bypassEnabled) {
-    console.log('[BASKIT API BYPASS] Inventory fetch bypassed');
-    console.log('[BASKIT API BYPASS] Request params:', payload);
     return {
       statusCode: 200,
       totalData: 0,
