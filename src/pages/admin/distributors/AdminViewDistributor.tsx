@@ -1,30 +1,41 @@
 // React & Router
-import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
 // External Libraries & Icons
-import { ArrowLeft, Edit, User, Building2, Warehouse, CreditCard, Briefcase, FileText, Eye, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  Edit,
+  User,
+  Building2,
+  Warehouse,
+  CreditCard,
+  Briefcase,
+  FileText,
+  Eye,
+  X,
+} from "lucide-react";
 
 // UI Components
-import SEO from '@/components/seo/SEO';
-import Navbar from '@/components/layout/Navbar';
-import AdminSidebar from '@/components/layout/AdminSidebar';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { useToast } from '@/components/ui/use-toast';
+import SEO from "@/components/seo/SEO";
+import Navbar from "@/components/layout/Navbar";
+import AdminSidebar from "@/components/layout/AdminSidebar";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/use-toast";
 
 // Hooks
-import { useLanguage } from '@/hooks/use-language';
+import { useLanguage } from "@/hooks/use-language";
 
 // Utils & API
-import { getImageUrl } from '@/lib/s3-upload';
+import { getImageUrl } from "@/lib/s3-upload";
 
 // Integrations
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from "@/integrations/supabase/client";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -92,10 +103,13 @@ export default function AdminViewDistributor() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [distributor, setDistributor] = useState<Distributor | null>(null);
-  const [currentTab, setCurrentTab] = useState('overview');
-  const [documentPreview, setDocumentPreview] = useState<{ url: string; title: string } | null>(null);
+  const [currentTab, setCurrentTab] = useState("overview");
+  const [documentPreview, setDocumentPreview] = useState<{
+    url: string;
+    title: string;
+  } | null>(null);
 
-  const t = lang === 'id' ? translations.id : translations.en;
+  const t = lang === "id" ? translations.id : translations.en;
 
   useEffect(() => {
     if (id) {
@@ -109,9 +123,9 @@ export default function AdminViewDistributor() {
       setIsLoading(true);
 
       const { data, error } = await supabase
-        .from('distributor_profiles')
-        .select('*')
-        .eq('user_id', id)
+        .from("distributor_profiles")
+        .select("*")
+        .eq("user_id", id)
         .single();
 
       if (error) throw error;
@@ -120,7 +134,7 @@ export default function AdminViewDistributor() {
         const profile = data as any as DistributorProfile;
         setDistributor({
           id: profile.user_id,
-          email: profile.email || '',
+          email: profile.email || "",
           profile: profile,
         });
       }
@@ -128,7 +142,7 @@ export default function AdminViewDistributor() {
       toast({
         title: t.error,
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -137,17 +151,17 @@ export default function AdminViewDistributor() {
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      active: 'bg-green-500',
-      pending: 'bg-yellow-500',
-      approved: 'bg-blue-500',
-      rejected: 'bg-red-500',
-      suspended: 'bg-orange-500',
-      inactive: 'bg-gray-500',
-      draft: 'bg-gray-400',
+      active: "bg-green-500",
+      pending: "bg-yellow-500",
+      approved: "bg-blue-500",
+      rejected: "bg-red-500",
+      suspended: "bg-orange-500",
+      inactive: "bg-gray-500",
+      draft: "bg-gray-400",
     };
 
     return (
-      <Badge className={colors[status] || 'bg-gray-500'}>
+      <Badge className={colors[status] || "bg-gray-500"}>
         {t[status as keyof typeof t] || status}
       </Badge>
     );
@@ -163,16 +177,18 @@ export default function AdminViewDistributor() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <SEO
-          title="View Distributor"
-          description="View distributor details"
-        />
+      <div className="min-h-screen bg-gray-50">
+        <SEO title="View Distributor" description="View distributor details" />
         <Navbar />
         <div className="flex">
           <AdminSidebar lang={lang} />
-          <main className="flex-1 p-8">
-            <p>{t.loading}</p>
+          <main className="flex-1 py-8 px-4 lg:px-8">
+            <div className="max-w-6xl mx-auto">
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-4 text-muted-foreground">{t.loading}</p>
+              </div>
+            </div>
           </main>
         </div>
       </div>
@@ -182,7 +198,7 @@ export default function AdminViewDistributor() {
   return (
     <div className="min-h-screen bg-background">
       <SEO
-        title={`${distributor?.profile?.nama_bisnis || 'Distributor'} - View`}
+        title={`${distributor?.profile?.nama_bisnis || "Distributor"} - View`}
         description="View distributor details"
       />
       <Navbar />
@@ -192,20 +208,17 @@ export default function AdminViewDistributor() {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate('/admin/users')}
-              >
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                {t.back}
+              <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+                <ArrowLeft className="h-5 w-5" />
               </Button>
               <div className="flex items-center gap-3">
                 <div className="h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center">
                   <User className="h-6 w-6 text-orange-600" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold">{distributor?.profile?.nama_bisnis}</h1>
+                  <h1 className="text-2xl font-bold">
+                    {distributor?.profile?.nama_bisnis}
+                  </h1>
                   <p className="text-sm text-muted-foreground">
                     {distributor?.email} • {distributor?.profile?.kota}
                   </p>
@@ -259,35 +272,61 @@ export default function AdminViewDistributor() {
                 </h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.businessName}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.nama_bisnis || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.businessName}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.nama_bisnis || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.ownerName}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.nama_pemilik || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.ownerName}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.nama_pemilik || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.email}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.email_pemilik || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.email}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.email_pemilik || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.contact}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.kontak_pemilik || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.contact}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.kontak_pemilik || "-"}
+                    </p>
                   </div>
                   <div className="col-span-2">
-                    <Label className="text-sm font-medium text-muted-foreground">{t.address}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.alamat_lengkap || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.address}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.alamat_lengkap || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.location}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.kota || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.location}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.kota || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.status}</Label>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.status}
+                    </Label>
                     <div className="mt-1">
                       {distributor?.profile?.status
                         ? getStatusBadge(distributor.profile.status)
-                        : '-'}
+                        : "-"}
                     </div>
                   </div>
                 </div>
@@ -303,52 +342,106 @@ export default function AdminViewDistributor() {
                 </h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.companyEmail}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.email_perusahaan || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.companyEmail}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.email_perusahaan || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.companyPhone}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.nomor_telp_perusahaan || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.companyPhone}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.nomor_telp_perusahaan || "-"}
+                    </p>
                   </div>
                   <div className="col-span-2">
-                    <Label className="text-sm font-medium text-muted-foreground">{t.companyAddress}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.alamat_lengkap || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.companyAddress}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.alamat_lengkap || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.location}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.kota || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.location}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.kota || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.directorName}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.nama_direktur || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.directorName}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.nama_direktur || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.businessType}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.bentuk_usaha || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.businessType}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.bentuk_usaha || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.pkpStatus}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.status_pkp || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.pkpStatus}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.status_pkp || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.npwpNumber}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.npwp_number || distributor?.profile?.nomor_npwp || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.npwpNumber}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.npwp_number ||
+                        distributor?.profile?.nomor_npwp ||
+                        "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.nibNumber}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.nib_number || distributor?.profile?.nomor_nib || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.nibNumber}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.nib_number ||
+                        distributor?.profile?.nomor_nib ||
+                        "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.website}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.website || distributor?.profile?.website_perusahaan || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.website}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.website ||
+                        distributor?.profile?.website_perusahaan ||
+                        "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.revenue}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.omzet || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.revenue}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.omzet || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.employees}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.jumlah_karyawan || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.employees}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.jumlah_karyawan || "-"}
+                    </p>
                   </div>
                 </div>
               </Card>
@@ -363,50 +456,76 @@ export default function AdminViewDistributor() {
                 </h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div className="col-span-2">
-                    <Label className="text-sm font-medium text-muted-foreground">{t.officeAddress}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.alamat_kantor || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.officeAddress}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.alamat_kantor || "-"}
+                    </p>
                   </div>
                   <div className="col-span-2">
-                    <Label className="text-sm font-medium text-muted-foreground">{t.warehouseAddress}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.alamat_gudang || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.warehouseAddress}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.alamat_gudang || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.coordinates}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.koordinat || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.coordinates}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.koordinat || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.deliveryFleet}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.jumlah_armada_pengiriman || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.deliveryFleet}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.jumlah_armada_pengiriman || "-"}
+                    </p>
                   </div>
                   <div className="col-span-2">
-                    <Label className="text-sm font-medium text-muted-foreground">{t.recordingApp}</Label>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.recordingApp}
+                    </Label>
                     {distributor?.profile?.aplikasi_pencatatan ? (
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {distributor.profile.aplikasi_pencatatan.split(', ').filter(a => a).map((app) => (
-                          <span
-                            key={app}
-                            className="inline-flex items-center px-3 py-1 bg-orange-100 text-orange-700 text-sm rounded-md border border-orange-200"
-                          >
-                            {app}
-                          </span>
-                        ))}
+                        {distributor.profile.aplikasi_pencatatan
+                          .split(", ")
+                          .filter((a) => a)
+                          .map((app) => (
+                            <span
+                              key={app}
+                              className="inline-flex items-center px-3 py-1 bg-orange-100 text-orange-700 text-sm rounded-md border border-orange-200"
+                            >
+                              {app}
+                            </span>
+                          ))}
                       </div>
                     ) : (
                       <p className="mt-1 text-base">-</p>
                     )}
                   </div>
                   <div className="col-span-2">
-                    <Label className="text-sm font-medium text-muted-foreground">{t.distributionArea}</Label>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.distributionArea}
+                    </Label>
                     {distributor?.profile?.area_distribusi ? (
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {distributor.profile.area_distribusi.split(', ').filter(a => a).map((area) => (
-                          <span
-                            key={area}
-                            className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded-md border border-blue-200"
-                          >
-                            {area}
-                          </span>
-                        ))}
+                        {distributor.profile.area_distribusi
+                          .split(", ")
+                          .filter((a) => a)
+                          .map((area) => (
+                            <span
+                              key={area}
+                              className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded-md border border-blue-200"
+                            >
+                              {area}
+                            </span>
+                          ))}
                       </div>
                     ) : (
                       <p className="mt-1 text-base">-</p>
@@ -425,20 +544,36 @@ export default function AdminViewDistributor() {
                 </h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.bankName}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.nama_bank || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.bankName}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.nama_bank || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.accountOwner}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.nama_pemilik_akun || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.accountOwner}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.nama_pemilik_akun || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.accountNumber}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.nomor_rekening || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.accountNumber}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.nomor_rekening || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.paymentMethods}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.metode_pembayaran || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.paymentMethods}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.metode_pembayaran || "-"}
+                    </p>
                   </div>
                 </div>
               </Card>
@@ -453,20 +588,36 @@ export default function AdminViewDistributor() {
                 </h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.picName}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.nama_pic || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.picName}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.nama_pic || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.picPosition}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.posisi_pic || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.picPosition}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.posisi_pic || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.picContact}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.nomor_kontak_pic || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.picContact}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.nomor_kontak_pic || "-"}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">{t.picEmail}</Label>
-                    <p className="mt-1 text-base">{distributor?.profile?.email_pic || '-'}</p>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      {t.picEmail}
+                    </Label>
+                    <p className="mt-1 text-base">
+                      {distributor?.profile?.email_pic || "-"}
+                    </p>
                   </div>
                 </div>
               </Card>
@@ -482,20 +633,30 @@ export default function AdminViewDistributor() {
                 <div className="grid grid-cols-3 gap-6">
                   {/* NPWP Document */}
                   <div className="border rounded-lg p-4">
-                    <Label className="text-base font-semibold mb-3 block">{t.npwpDocument}</Label>
+                    <Label className="text-base font-semibold mb-3 block">
+                      {t.npwpDocument}
+                    </Label>
                     {distributor?.profile?.npwp_file_url ? (
-                      <div 
+                      <div
                         className="relative aspect-[3/4] rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity border-2 border-gray-200"
-                        onClick={() => handleDocumentPreview(distributor.profile?.npwp_file_url, t.npwpDocument)}
+                        onClick={() =>
+                          handleDocumentPreview(
+                            distributor.profile?.npwp_file_url,
+                            t.npwpDocument
+                          )
+                        }
                       >
-                        <img 
-                          src={getImageUrl(distributor.profile.npwp_file_url) || ''} 
+                        <img
+                          src={
+                            getImageUrl(distributor.profile.npwp_file_url) || ""
+                          }
                           alt={t.npwpDocument}
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            target.parentElement!.innerHTML = '<div class="flex items-center justify-center h-full bg-gray-100"><FileText class="h-12 w-12 text-gray-400" /></div>';
+                            target.style.display = "none";
+                            target.parentElement!.innerHTML =
+                              '<div class="flex items-center justify-center h-full bg-gray-100"><FileText class="h-12 w-12 text-gray-400" /></div>';
                           }}
                         />
                         <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-all flex items-center justify-center">
@@ -511,20 +672,30 @@ export default function AdminViewDistributor() {
 
                   {/* NIB Document */}
                   <div className="border rounded-lg p-4">
-                    <Label className="text-base font-semibold mb-3 block">{t.nibDocument}</Label>
+                    <Label className="text-base font-semibold mb-3 block">
+                      {t.nibDocument}
+                    </Label>
                     {distributor?.profile?.nib_file_url ? (
-                      <div 
+                      <div
                         className="relative aspect-[3/4] rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity border-2 border-gray-200"
-                        onClick={() => handleDocumentPreview(distributor.profile?.nib_file_url, t.nibDocument)}
+                        onClick={() =>
+                          handleDocumentPreview(
+                            distributor.profile?.nib_file_url,
+                            t.nibDocument
+                          )
+                        }
                       >
-                        <img 
-                          src={getImageUrl(distributor.profile.nib_file_url) || ''} 
+                        <img
+                          src={
+                            getImageUrl(distributor.profile.nib_file_url) || ""
+                          }
                           alt={t.nibDocument}
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            target.parentElement!.innerHTML = '<div class="flex items-center justify-center h-full bg-gray-100"><FileText class="h-12 w-12 text-gray-400" /></div>';
+                            target.style.display = "none";
+                            target.parentElement!.innerHTML =
+                              '<div class="flex items-center justify-center h-full bg-gray-100"><FileText class="h-12 w-12 text-gray-400" /></div>';
                           }}
                         />
                         <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-all flex items-center justify-center">
@@ -540,20 +711,30 @@ export default function AdminViewDistributor() {
 
                   {/* KTP Document */}
                   <div className="border rounded-lg p-4">
-                    <Label className="text-base font-semibold mb-3 block">{t.ktpDocument}</Label>
+                    <Label className="text-base font-semibold mb-3 block">
+                      {t.ktpDocument}
+                    </Label>
                     {distributor?.profile?.ktp_file_url ? (
-                      <div 
+                      <div
                         className="relative aspect-[3/4] rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity border-2 border-gray-200"
-                        onClick={() => handleDocumentPreview(distributor.profile?.ktp_file_url, t.ktpDocument)}
+                        onClick={() =>
+                          handleDocumentPreview(
+                            distributor.profile?.ktp_file_url,
+                            t.ktpDocument
+                          )
+                        }
                       >
-                        <img 
-                          src={getImageUrl(distributor.profile.ktp_file_url) || ''} 
+                        <img
+                          src={
+                            getImageUrl(distributor.profile.ktp_file_url) || ""
+                          }
                           alt={t.ktpDocument}
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            target.parentElement!.innerHTML = '<div class="flex items-center justify-center h-full bg-gray-100"><FileText class="h-12 w-12 text-gray-400" /></div>';
+                            target.style.display = "none";
+                            target.parentElement!.innerHTML =
+                              '<div class="flex items-center justify-center h-full bg-gray-100"><FileText class="h-12 w-12 text-gray-400" /></div>';
                           }}
                         />
                         <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-all flex items-center justify-center">
@@ -574,11 +755,16 @@ export default function AdminViewDistributor() {
       </div>
 
       {/* Document Preview Dialog */}
-      <Dialog open={!!documentPreview} onOpenChange={() => setDocumentPreview(null)}>
+      <Dialog
+        open={!!documentPreview}
+        onOpenChange={() => setDocumentPreview(null)}
+      >
         <DialogContent className="max-w-5xl max-h-[95vh] p-0 bg-gray-900">
           <div className="relative w-full h-full flex flex-col">
             <div className="bg-gray-900 p-4 flex-shrink-0 flex items-center justify-between">
-              <h3 className="text-white font-semibold">{documentPreview?.title}</h3>
+              <h3 className="text-white font-semibold">
+                {documentPreview?.title}
+              </h3>
               <button
                 onClick={() => setDocumentPreview(null)}
                 className="text-white hover:text-gray-300 transition-colors p-2 rounded-full hover:bg-gray-800"
@@ -587,9 +773,9 @@ export default function AdminViewDistributor() {
               </button>
             </div>
             <div className="flex items-center justify-center p-6 flex-1 min-h-0 bg-gray-900">
-              <img 
-                src={documentPreview?.url || ''} 
-                alt={documentPreview?.title || ''}
+              <img
+                src={documentPreview?.url || ""}
+                alt={documentPreview?.title || ""}
                 className="max-w-full max-h-[calc(95vh-100px)] object-contain"
               />
             </div>
@@ -603,127 +789,127 @@ export default function AdminViewDistributor() {
 // Translations
 const translations = {
   id: {
-    error: 'Error',
-    loading: 'Memuat...',
-    back: 'Kembali',
-    edit: 'Edit',
-    overview: 'Ringkasan',
-    company: 'Perusahaan',
-    warehouse: 'Gudang',
-    banking: 'Perbankan',
-    documents: 'Dokumen',
-    basicInformation: 'Informasi Dasar',
-    companyInformation: 'Informasi Perusahaan',
-    warehouseInformation: 'Informasi Gudang',
-    bankingInformation: 'Informasi Perbankan',
-    picInformation: 'Informasi PIC',
-    documentsInformation: 'Dokumen',
-    businessName: 'Nama Bisnis',
-    ownerName: 'Nama Pemilik',
-    email: 'Email',
-    contact: 'Kontak',
-    address: 'Alamat',
-    location: 'Lokasi',
-    status: 'Status',
-    companyEmail: 'Email Perusahaan',
-    companyPhone: 'Telepon Perusahaan',
-    companyAddress: 'Alamat Perusahaan',
-    directorName: 'Nama Direktur',
-    businessType: 'Bentuk Usaha',
-    pkpStatus: 'Status PKP',
-    npwpNumber: 'Nomor NPWP',
-    nibNumber: 'Nomor NIB',
-    website: 'Website',
-    revenue: 'Omzet',
-    employees: 'Jumlah Karyawan',
-    officeAddress: 'Alamat Kantor',
-    warehouseAddress: 'Alamat Gudang',
-    coordinates: 'Koordinat',
-    deliveryFleet: 'Jumlah Armada',
-    recordingApp: 'Aplikasi Pencatatan',
-    distributionArea: 'Area Distribusi',
-    bankName: 'Nama Bank',
-    accountOwner: 'Nama Pemilik Rekening',
-    accountNumber: 'Nomor Rekening',
-    paymentMethods: 'Metode Pembayaran',
-    picName: 'Nama PIC',
-    picPosition: 'Posisi PIC',
-    picContact: 'Kontak PIC',
-    picEmail: 'Email PIC',
-    npwpDocument: 'Dokumen NPWP',
-    nibDocument: 'Dokumen NIB',
-    ktpDocument: 'Dokumen KTP',
-    download: 'Unduh',
-    uploaded: 'Sudah diunggah',
-    notUploaded: 'Belum diunggah',
-    active: 'Aktif',
-    pending: 'Menunggu',
-    approved: 'Disetujui',
-    rejected: 'Ditolak',
-    suspended: 'Ditangguhkan',
-    inactive: 'Tidak Aktif',
-    draft: 'Draft',
+    error: "Error",
+    loading: "Memuat...",
+    back: "Kembali",
+    edit: "Edit",
+    overview: "Ringkasan",
+    company: "Perusahaan",
+    warehouse: "Gudang",
+    banking: "Perbankan",
+    documents: "Dokumen",
+    basicInformation: "Informasi Dasar",
+    companyInformation: "Informasi Perusahaan",
+    warehouseInformation: "Informasi Gudang",
+    bankingInformation: "Informasi Perbankan",
+    picInformation: "Informasi PIC",
+    documentsInformation: "Dokumen",
+    businessName: "Nama Bisnis",
+    ownerName: "Nama Pemilik",
+    email: "Email",
+    contact: "Kontak",
+    address: "Alamat",
+    location: "Lokasi",
+    status: "Status",
+    companyEmail: "Email Perusahaan",
+    companyPhone: "Telepon Perusahaan",
+    companyAddress: "Alamat Perusahaan",
+    directorName: "Nama Direktur",
+    businessType: "Bentuk Usaha",
+    pkpStatus: "Status PKP",
+    npwpNumber: "Nomor NPWP",
+    nibNumber: "Nomor NIB",
+    website: "Website",
+    revenue: "Omzet",
+    employees: "Jumlah Karyawan",
+    officeAddress: "Alamat Kantor",
+    warehouseAddress: "Alamat Gudang",
+    coordinates: "Koordinat",
+    deliveryFleet: "Jumlah Armada",
+    recordingApp: "Aplikasi Pencatatan",
+    distributionArea: "Area Distribusi",
+    bankName: "Nama Bank",
+    accountOwner: "Nama Pemilik Rekening",
+    accountNumber: "Nomor Rekening",
+    paymentMethods: "Metode Pembayaran",
+    picName: "Nama PIC",
+    picPosition: "Posisi PIC",
+    picContact: "Kontak PIC",
+    picEmail: "Email PIC",
+    npwpDocument: "Dokumen NPWP",
+    nibDocument: "Dokumen NIB",
+    ktpDocument: "Dokumen KTP",
+    download: "Unduh",
+    uploaded: "Sudah diunggah",
+    notUploaded: "Belum diunggah",
+    active: "Aktif",
+    pending: "Menunggu",
+    approved: "Disetujui",
+    rejected: "Ditolak",
+    suspended: "Ditangguhkan",
+    inactive: "Tidak Aktif",
+    draft: "Draft",
   },
   en: {
-    error: 'Error',
-    loading: 'Loading...',
-    back: 'Back',
-    edit: 'Edit',
-    overview: 'Overview',
-    company: 'Company',
-    warehouse: 'Warehouse',
-    banking: 'Banking',
-    documents: 'Documents',
-    basicInformation: 'Basic Information',
-    companyInformation: 'Company Information',
-    warehouseInformation: 'Warehouse Information',
-    bankingInformation: 'Banking Information',
-    picInformation: 'PIC Information',
-    documentsInformation: 'Documents',
-    businessName: 'Business Name',
-    ownerName: 'Owner Name',
-    email: 'Email',
-    contact: 'Contact',
-    address: 'Address',
-    location: 'Location',
-    status: 'Status',
-    companyEmail: 'Company Email',
-    companyPhone: 'Company Phone',
-    companyAddress: 'Company Address',
-    directorName: 'Director Name',
-    businessType: 'Business Type',
-    pkpStatus: 'PKP Status',
-    npwpNumber: 'NPWP Number',
-    nibNumber: 'NIB Number',
-    website: 'Website',
-    revenue: 'Revenue',
-    employees: 'Employees',
-    officeAddress: 'Office Address',
-    warehouseAddress: 'Warehouse Address',
-    coordinates: 'Coordinates',
-    deliveryFleet: 'Delivery Fleet',
-    recordingApp: 'Recording Application',
-    distributionArea: 'Distribution Area',
-    bankName: 'Bank Name',
-    accountOwner: 'Account Owner',
-    accountNumber: 'Account Number',
-    paymentMethods: 'Payment Methods',
-    picName: 'PIC Name',
-    picPosition: 'PIC Position',
-    picContact: 'PIC Contact',
-    picEmail: 'PIC Email',
-    npwpDocument: 'NPWP Document',
-    nibDocument: 'NIB Document',
-    ktpDocument: 'KTP Document',
-    download: 'Download',
-    uploaded: 'Uploaded',
-    notUploaded: 'Not uploaded',
-    active: 'Active',
-    pending: 'Pending',
-    approved: 'Approved',
-    rejected: 'Rejected',
-    suspended: 'Suspended',
-    inactive: 'Inactive',
-    draft: 'Draft',
+    error: "Error",
+    loading: "Loading...",
+    back: "Back",
+    edit: "Edit",
+    overview: "Overview",
+    company: "Company",
+    warehouse: "Warehouse",
+    banking: "Banking",
+    documents: "Documents",
+    basicInformation: "Basic Information",
+    companyInformation: "Company Information",
+    warehouseInformation: "Warehouse Information",
+    bankingInformation: "Banking Information",
+    picInformation: "PIC Information",
+    documentsInformation: "Documents",
+    businessName: "Business Name",
+    ownerName: "Owner Name",
+    email: "Email",
+    contact: "Contact",
+    address: "Address",
+    location: "Location",
+    status: "Status",
+    companyEmail: "Company Email",
+    companyPhone: "Company Phone",
+    companyAddress: "Company Address",
+    directorName: "Director Name",
+    businessType: "Business Type",
+    pkpStatus: "PKP Status",
+    npwpNumber: "NPWP Number",
+    nibNumber: "NIB Number",
+    website: "Website",
+    revenue: "Revenue",
+    employees: "Employees",
+    officeAddress: "Office Address",
+    warehouseAddress: "Warehouse Address",
+    coordinates: "Coordinates",
+    deliveryFleet: "Delivery Fleet",
+    recordingApp: "Recording Application",
+    distributionArea: "Distribution Area",
+    bankName: "Bank Name",
+    accountOwner: "Account Owner",
+    accountNumber: "Account Number",
+    paymentMethods: "Payment Methods",
+    picName: "PIC Name",
+    picPosition: "PIC Position",
+    picContact: "PIC Contact",
+    picEmail: "PIC Email",
+    npwpDocument: "NPWP Document",
+    nibDocument: "NIB Document",
+    ktpDocument: "KTP Document",
+    download: "Download",
+    uploaded: "Uploaded",
+    notUploaded: "Not uploaded",
+    active: "Active",
+    pending: "Pending",
+    approved: "Approved",
+    rejected: "Rejected",
+    suspended: "Suspended",
+    inactive: "Inactive",
+    draft: "Draft",
   },
 };

@@ -341,10 +341,11 @@ export default function UserManagementRevamped() {
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      approved: "bg-blue-500", // NO KYB - Approved without KYB verification
-      "not-approved": "bg-red-500", // NON KYB - Not approved
-      actived: "bg-green-500", // KYB Approved - Fully verified and active
-      deactivated: "bg-gray-500", // Deactivated
+      pending: "bg-yellow-500 text-white",
+      waiting_activation: "bg-blue-500 text-white",
+      active: "bg-green-500 text-white",
+      inactive: "bg-gray-500 text-white",
+      rejected: "bg-red-500 text-white",
     };
 
     return (
