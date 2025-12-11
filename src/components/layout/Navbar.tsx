@@ -1,6 +1,6 @@
 // React & Router
 import { useState, useEffect } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 
 // External Libraries & Icons
 import {
@@ -12,7 +12,7 @@ import {
   Phone,
   LogOut,
   Languages,
-  LogIn,
+  LayoutDashboard,
 } from "lucide-react";
 
 // UI Components
@@ -50,12 +50,12 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
       : "text-gray-700 hover:text-orange-600 hover:after:absolute hover:after:bottom-0 hover:after:left-0 hover:after:right-0 hover:after:h-0.5 hover:after:bg-orange-300"
   }`;
 
-const mobileNavLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center gap-2 px-4 py-3 transition-colors ${
-    isActive
-      ? "bg-accent text-foreground font-medium"
-      : "text-foreground/80 hover:bg-accent/50"
-  }`;
+// const mobileNavLinkClass = ({ isActive }: { isActive: boolean }) =>
+//   `flex items-center gap-2 px-4 py-3 transition-colors relative w-full ${
+//     isActive
+//       ? "bg-orange-50 text-orange-600 font-medium border-r-4 border-orange-500"
+//       : "text-foreground/80 hover:bg-accent/50"
+//   }`;
 
 // Cart indicator component
 function CartIndicator() {
@@ -75,10 +75,11 @@ function CartIndicator() {
 
 export default function Navbar() {
   const { lang, setLang } = useLanguage();
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading } = useAuth();
   const t = translations[lang];
   const isMobile = useIsMobile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const location = useLocation();
 
   // Close the mobile menu when resizing to desktop
   useEffect(() => {
@@ -113,31 +114,55 @@ export default function Navbar() {
                 {/* Mobile Navigation Links */}
                 <div className="py-3 flex flex-col">
                   <SheetClose asChild>
-                    <NavLink to="/" className={mobileNavLinkClass}>
-                      <div className="flex justify-start items-center">
-                        <Home className="h-4 w-4 me-3" /> {t.home}
-                      </div>
+                    <NavLink
+                      to="/"
+                      className={`flex items-center px-4 py-3 transition-colors relative w-full ${
+                        location.pathname === "/"
+                          ? "bg-orange-50 text-orange-600 font-medium border-r-4 border-orange-500"
+                          : "text-foreground/80 hover:bg-accent/50"
+                      }`}
+                    >
+                      <Home className="h-4 w-4 me-3" />
+                      <span>{t.home}</span>
                     </NavLink>
                   </SheetClose>
                   <SheetClose asChild>
-                    <NavLink to="/daftar-produk" className={mobileNavLinkClass}>
-                      <div className="flex justify-start items-center">
-                        <Package className="h-4 w-4 me-3" /> {t.productList}
-                      </div>
+                    <NavLink
+                      to="/daftar-produk"
+                      className={`flex items-center px-4 py-3 transition-colors relative w-full ${
+                        location.pathname === "/daftar-produk"
+                          ? "bg-orange-50 text-orange-600 font-medium border-r-4 border-orange-500"
+                          : "text-foreground/80 hover:bg-accent/50"
+                      }`}
+                    >
+                      <Package className="h-4 w-4 me-3" />
+                      <span>{t.productList}</span>
                     </NavLink>
                   </SheetClose>
                   <SheetClose asChild>
-                    <NavLink to="/tentang" className={mobileNavLinkClass}>
-                      <div className="flex justify-start items-center">
-                        <Info className="h-4 w-4 me-3" /> {t.about}
-                      </div>
+                    <NavLink
+                      to="/tentang"
+                      className={`flex items-center px-4 py-3 transition-colors relative w-full ${
+                        location.pathname === "/tentang"
+                          ? "bg-orange-50 text-orange-600 font-medium border-r-4 border-orange-500"
+                          : "text-foreground/80 hover:bg-accent/50"
+                      }`}
+                    >
+                      <Info className="h-4 w-4 me-3" />
+                      <span>{t.about}</span>
                     </NavLink>
                   </SheetClose>
                   <SheetClose asChild>
-                    <NavLink to="/hubungi" className={mobileNavLinkClass}>
-                      <div className="flex justify-start items-center">
-                        <Phone className="h-4 w-4 me-3" /> {t.contact}
-                      </div>
+                    <NavLink
+                      to="/hubungi"
+                      className={`flex items-center px-4 py-3 transition-colors relative w-full ${
+                        location.pathname === "/hubungi"
+                          ? "bg-orange-50 text-orange-600 font-medium border-r-4 border-orange-500"
+                          : "text-foreground/80 hover:bg-accent/50"
+                      }`}
+                    >
+                      <Phone className="h-4 w-4 me-3" />
+                      <span>{t.contact}</span>
                     </NavLink>
                   </SheetClose>
                 </div>
@@ -217,7 +242,7 @@ export default function Navbar() {
           )}
 
           {/* Masuk Link */}
-          {!user && !isMobile && (
+          {!isLoading && !user && !isMobile && (
             <Link to="/masuk">
               <Button
                 variant="ghost"
@@ -229,7 +254,7 @@ export default function Navbar() {
           )}
 
           {/* Daftar Distributor Button */}
-          {!user && !isMobile && (
+          {!isLoading && !user && !isMobile && (
             <Link to="/daftar">
               <Button className="hidden sm:inline-flex bg-orange-500 hover:bg-orange-600 text-white rounded-lg px-5">
                 {lang === "id" ? "Daftar Distributor" : "Register Distributor"}
@@ -241,40 +266,57 @@ export default function Navbar() {
           {user && <ModernCartDrawer />}
 
           {/* Auth Actions (Desktop) - Only show if logged in */}
-          {!isMobile && user ? (
-            <>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="default">
-                    <span className="text-sm">{user.email}</span>
-                  </Button>
-                </DropdownMenuTrigger>
+          {!isMobile &&
+            (isLoading && !user ? (
+              // Loading state for when we might have a user
+              <div className="h-8 w-20 bg-gray-200 rounded animate-pulse"></div>
+            ) : user ? (
+              <>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="default">
+                      <span className="text-sm">{user.email}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
 
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild className="cursor-pointer">
-                    <div className="w-full flex justify-start items-center font-normal">
-                      <User className="h-4 w-4 me-2" />
-                      <Link to="/profil">{t.profile}</Link>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => logout()}
-                    className="text-destructive cursor-pointer"
-                  >
-                    <div className="w-full flex justify-start items-center font-normal">
-                      <LogOut className="h-4 w-4 me-2" />
-                      {t.logout}
-                    </div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </>
-          ) : null}
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <div className="w-full flex justify-start items-center font-normal">
+                        <User className="h-4 w-4 me-2" />
+                        <Link to="/profil">{t.profile}</Link>
+                      </div>
+                    </DropdownMenuItem>
+                    {user.role === "admin" && (
+                      <>
+                        <DropdownMenuItem asChild className="cursor-pointer">
+                          <div className="w-full flex justify-start items-center font-normal">
+                            <LayoutDashboard className="h-4 w-4 me-2" />
+                            <Link to="/admin">Admin Dashboard</Link>
+                          </div>
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => logout()}
+                      className="text-destructive cursor-pointer"
+                    >
+                      <div className="w-full flex justify-start items-center font-normal">
+                        <LogOut className="h-4 w-4 me-2" />
+                        {t.logout}
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : null)}
 
           {/* Mobile User Menu */}
           {isMobile &&
-            (user ? (
+            (isLoading && !user ? (
+              // Loading skeleton for mobile auth actions - only when we might have a user
+              <div className="h-8 w-16 bg-gray-200 rounded animate-pulse"></div>
+            ) : user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="default">
@@ -290,6 +332,17 @@ export default function Navbar() {
                       <Link to="/profil">{t.profile}</Link>
                     </div>
                   </DropdownMenuItem>
+                  {user.role === "admin" && (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <div className="w-full flex justify-start items-center font-normal">
+                          <LayoutDashboard className="h-4 w-4 me-2" />
+                          <Link to="/admin">Admin Dashboard</Link>
+                        </div>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => logout()}
                     className="text-destructive"

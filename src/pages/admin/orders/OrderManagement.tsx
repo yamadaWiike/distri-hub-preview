@@ -3,17 +3,17 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 // External Libraries
-import { 
-  Search, 
-  MoreVertical, 
-  Eye, 
-  Package, 
-  MapPin, 
-  Clock, 
+import {
+  Search,
+  MoreVertical,
+  Eye,
+  Package,
+  MapPin,
+  Clock,
   User,
   Phone,
   Mail,
-  FileText
+  FileText,
 } from "lucide-react";
 
 // UI Components
@@ -95,8 +95,14 @@ interface Order {
   order_items?: OrderItem[];
 }
 
-const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
-const PAYMENT_STATUSES = ['unpaid', 'partial', 'paid'];
+const ORDER_STATUSES = [
+  "pending",
+  "processing",
+  "shipped",
+  "delivered",
+  "cancelled",
+];
+const PAYMENT_STATUSES = ["unpaid", "partial", "paid"];
 
 export default function OrderManagement() {
   const { lang } = useLanguage();
@@ -110,103 +116,106 @@ export default function OrderManagement() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const t = lang === 'id' ? {
-    title: "Kelola Pesanan",
-    description: "Kelola semua pesanan distributor",
-    search: "Cari pesanan...",
-    searchBy: "Cari berdasarkan nomor order, distributor",
-    orderNumber: "Nomor Pesanan",
-    distributor: "Distributor",
-    totalAmount: "Total",
-    status: "Status",
-    paymentStatus: "Status Pembayaran",
-    date: "Tanggal",
-    actions: "Aksi",
-    viewDetails: "Lihat Detail",
-    updateStatus: "Update Status",
-    orderDetails: "Detail Pesanan",
-    shippingInfo: "Informasi Pengiriman",
-    orderItems: "Item Pesanan",
-    product: "Produk",
-    quantity: "Jumlah",
-    unitPrice: "Harga Satuan",
-    subtotal: "Subtotal",
-    total: "Total",
-    tax: "PPN (11%)",
-    grandTotal: "Total Keseluruhan",
-    notes: "Catatan",
-    noOrders: "Tidak ada pesanan",
-    loading: "Memuat...",
-    sortBy: "Urutkan",
-    latest: "Terbaru",
-    oldest: "Terlama",
-    perPage: "Per halaman",
-    showing: "Menampilkan",
-    of: "dari",
-    orders: "pesanan",
-    statusPending: "Menunggu",
-    statusProcessing: "Diproses",
-    statusShipped: "Dikirim",
-    statusDelivered: "Terkirim",
-    statusCancelled: "Dibatalkan",
-    paymentUnpaid: "Belum Dibayar",
-    paymentPartial: "Dibayar Sebagian",
-    paymentPaid: "Lunas",
-    updateOrderStatus: "Update Status Pesanan",
-    orderStatus: "Status Pesanan",
-    save: "Simpan",
-    cancel: "Batal",
-    successUpdate: "Status pesanan berhasil diupdate",
-    errorUpdate: "Gagal mengupdate status pesanan",
-  } : {
-    title: "Manage Orders",
-    description: "Manage all distributor orders",
-    search: "Search orders...",
-    searchBy: "Search by order number, distributor",
-    orderNumber: "Order Number",
-    distributor: "Distributor",
-    totalAmount: "Total",
-    status: "Status",
-    paymentStatus: "Payment Status",
-    date: "Date",
-    actions: "Actions",
-    viewDetails: "View Details",
-    updateStatus: "Update Status",
-    orderDetails: "Order Details",
-    shippingInfo: "Shipping Information",
-    orderItems: "Order Items",
-    product: "Product",
-    quantity: "Quantity",
-    unitPrice: "Unit Price",
-    subtotal: "Subtotal",
-    total: "Total",
-    tax: "VAT (11%)",
-    grandTotal: "Grand Total",
-    notes: "Notes",
-    noOrders: "No orders found",
-    loading: "Loading...",
-    sortBy: "Sort by",
-    latest: "Latest",
-    oldest: "Oldest",
-    perPage: "Per page",
-    showing: "Showing",
-    of: "of",
-    orders: "orders",
-    statusPending: "Pending",
-    statusProcessing: "Processing",
-    statusShipped: "Shipped",
-    statusDelivered: "Delivered",
-    statusCancelled: "Cancelled",
-    paymentUnpaid: "Unpaid",
-    paymentPartial: "Partial",
-    paymentPaid: "Paid",
-    updateOrderStatus: "Update Order Status",
-    orderStatus: "Order Status",
-    save: "Save",
-    cancel: "Cancel",
-    successUpdate: "Order status updated successfully",
-    errorUpdate: "Failed to update order status",
-  };
+  const t =
+    lang === "id"
+      ? {
+          title: "Kelola Pesanan",
+          description: "Kelola semua pesanan distributor",
+          search: "Cari pesanan...",
+          searchBy: "Cari berdasarkan nomor order, distributor",
+          orderNumber: "Nomor Pesanan",
+          distributor: "Distributor",
+          totalAmount: "Total",
+          status: "Status",
+          paymentStatus: "Status Pembayaran",
+          date: "Tanggal",
+          actions: "Aksi",
+          viewDetails: "Lihat Detail",
+          updateStatus: "Update Status",
+          orderDetails: "Detail Pesanan",
+          shippingInfo: "Informasi Pengiriman",
+          orderItems: "Item Pesanan",
+          product: "Produk",
+          quantity: "Jumlah",
+          unitPrice: "Harga Satuan",
+          subtotal: "Subtotal",
+          total: "Total",
+          tax: "PPN (11%)",
+          grandTotal: "Total Keseluruhan",
+          notes: "Catatan",
+          noOrders: "Tidak ada pesanan",
+          loading: "Memuat...",
+          sortBy: "Urutkan",
+          latest: "Terbaru",
+          oldest: "Terlama",
+          perPage: "Per halaman",
+          showing: "Menampilkan",
+          of: "dari",
+          orders: "pesanan",
+          statusPending: "Menunggu",
+          statusProcessing: "Diproses",
+          statusShipped: "Dikirim",
+          statusDelivered: "Terkirim",
+          statusCancelled: "Dibatalkan",
+          paymentUnpaid: "Belum Dibayar",
+          paymentPartial: "Dibayar Sebagian",
+          paymentPaid: "Lunas",
+          updateOrderStatus: "Update Status Pesanan",
+          orderStatus: "Status Pesanan",
+          save: "Simpan",
+          cancel: "Batal",
+          successUpdate: "Status pesanan berhasil diupdate",
+          errorUpdate: "Gagal mengupdate status pesanan",
+        }
+      : {
+          title: "Manage Orders",
+          description: "Manage all distributor orders",
+          search: "Search orders...",
+          searchBy: "Search by order number, distributor",
+          orderNumber: "Order Number",
+          distributor: "Distributor",
+          totalAmount: "Total",
+          status: "Status",
+          paymentStatus: "Payment Status",
+          date: "Date",
+          actions: "Actions",
+          viewDetails: "View Details",
+          updateStatus: "Update Status",
+          orderDetails: "Order Details",
+          shippingInfo: "Shipping Information",
+          orderItems: "Order Items",
+          product: "Product",
+          quantity: "Quantity",
+          unitPrice: "Unit Price",
+          subtotal: "Subtotal",
+          total: "Total",
+          tax: "VAT (11%)",
+          grandTotal: "Grand Total",
+          notes: "Notes",
+          noOrders: "No orders found",
+          loading: "Loading...",
+          sortBy: "Sort by",
+          latest: "Latest",
+          oldest: "Oldest",
+          perPage: "Per page",
+          showing: "Showing",
+          of: "of",
+          orders: "orders",
+          statusPending: "Pending",
+          statusProcessing: "Processing",
+          statusShipped: "Shipped",
+          statusDelivered: "Delivered",
+          statusCancelled: "Cancelled",
+          paymentUnpaid: "Unpaid",
+          paymentPartial: "Partial",
+          paymentPaid: "Paid",
+          updateOrderStatus: "Update Order Status",
+          orderStatus: "Order Status",
+          save: "Save",
+          cancel: "Cancel",
+          successUpdate: "Order status updated successfully",
+          errorUpdate: "Failed to update order status",
+        };
 
   useEffect(() => {
     fetchOrders();
@@ -221,8 +230,9 @@ export default function OrderManagement() {
       setIsLoading(true);
 
       const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select(`
+        .from("orders")
+        .select(
+          `
           id,
           distributor_id,
           total_amount,
@@ -239,24 +249,25 @@ export default function OrderManagement() {
             email_pemilik,
             kontak_pemilik
           )
-        `)
-        .order('created_at', { ascending: false });
+        `
+        )
+        .order("created_at", { ascending: false });
 
       if (ordersError) throw ordersError;
 
       const formattedOrders: Order[] = (ordersData || []).map((order: any) => ({
         ...order,
         distributor: {
-          id: order.distributor_profiles?.id || '',
-          name: order.distributor_profiles?.nama_bisnis || 'Unknown',
-          email: order.distributor_profiles?.email_pemilik || '',
-          phone: order.distributor_profiles?.kontak_pemilik || '',
+          id: order.distributor_profiles?.id || "",
+          name: order.distributor_profiles?.nama_bisnis || "Unknown",
+          email: order.distributor_profiles?.email_pemilik || "",
+          phone: order.distributor_profiles?.kontak_pemilik || "",
         },
       }));
 
       setOrders(formattedOrders);
     } catch (error: any) {
-      console.error('Error loading orders:', error);
+      console.error("Error loading orders:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to load orders",
@@ -272,9 +283,14 @@ export default function OrderManagement() {
 
     // Search filter
     if (searchQuery) {
-      filtered = filtered.filter(order =>
-        order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.distributor?.name.toLowerCase().includes(searchQuery.toLowerCase())
+      filtered = filtered.filter(
+        (order) =>
+          order.order_number
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          order.distributor?.name
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())
       );
     }
 
@@ -298,43 +314,49 @@ export default function OrderManagement() {
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { variant: any; label: string }> = {
-      pending: { variant: 'default', label: t.statusPending },
-      processing: { variant: 'secondary', label: t.statusProcessing },
-      shipped: { variant: 'outline', label: t.statusShipped },
-      delivered: { variant: 'default', label: t.statusDelivered },
-      cancelled: { variant: 'destructive', label: t.statusCancelled },
+      pending: { variant: "default", label: t.statusPending },
+      processing: { variant: "secondary", label: t.statusProcessing },
+      shipped: { variant: "outline", label: t.statusShipped },
+      delivered: { variant: "default", label: t.statusDelivered },
+      cancelled: { variant: "destructive", label: t.statusCancelled },
     };
 
-    const statusInfo = statusMap[status] || { variant: 'default', label: status };
+    const statusInfo = statusMap[status] || {
+      variant: "default",
+      label: status,
+    };
     return <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>;
   };
 
   const getPaymentBadge = (status: string) => {
     const statusMap: Record<string, { variant: any; label: string }> = {
-      unpaid: { variant: 'destructive', label: t.paymentUnpaid },
-      partial: { variant: 'secondary', label: t.paymentPartial },
-      paid: { variant: 'default', label: t.paymentPaid },
+      unpaid: { variant: "destructive", label: t.paymentUnpaid },
+      partial: { variant: "secondary", label: t.paymentPartial },
+      paid: { variant: "default", label: t.paymentPaid },
     };
 
-    const statusInfo = statusMap[status] || { variant: 'default', label: status };
+    const statusInfo = statusMap[status] || {
+      variant: "default",
+      label: status,
+    };
     return <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>;
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
       minimumFractionDigits: 0,
     }).format(amount);
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('id-ID', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return new Date(dateString).toLocaleDateString("id-ID", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -381,7 +403,10 @@ export default function OrderManagement() {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
+                  <Select
+                    value={sortOrder}
+                    onValueChange={(value: any) => setSortOrder(value)}
+                  >
                     <SelectTrigger className="w-[140px]">
                       <SelectValue />
                     </SelectTrigger>
@@ -390,8 +415,8 @@ export default function OrderManagement() {
                       <SelectItem value="oldest">{t.oldest}</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select 
-                    value={itemsPerPage.toString()} 
+                  <Select
+                    value={itemsPerPage.toString()}
                     onValueChange={(value) => {
                       setItemsPerPage(Number(value));
                       setCurrentPage(1);
@@ -429,13 +454,24 @@ export default function OrderManagement() {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8">
-                          {t.loading}
+                        <TableCell
+                          colSpan={7}
+                          className="text-center py-12 h-64"
+                        >
+                          <div className="flex justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                          </div>
+                          <p className="mt-2 text-muted-foreground">
+                            {t.loading}
+                          </p>
                         </TableCell>
                       </TableRow>
                     ) : currentOrders.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                        <TableCell
+                          colSpan={7}
+                          className="text-center py-8 text-gray-500"
+                        >
                           {t.noOrders}
                         </TableCell>
                       </TableRow>
@@ -452,16 +488,24 @@ export default function OrderManagement() {
                             <div className="flex items-center gap-2">
                               <User className="h-4 w-4 text-gray-400" />
                               <div>
-                                <div className="font-medium">{order.distributor?.name}</div>
+                                <div className="font-medium">
+                                  {order.distributor?.name}
+                                </div>
                                 {order.distributor?.email && (
-                                  <div className="text-xs text-gray-500">{order.distributor.email}</div>
+                                  <div className="text-xs text-gray-500">
+                                    {order.distributor.email}
+                                  </div>
                                 )}
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell>{formatCurrency(order.total_amount)}</TableCell>
+                          <TableCell>
+                            {formatCurrency(order.total_amount)}
+                          </TableCell>
                           <TableCell>{getStatusBadge(order.status)}</TableCell>
-                          <TableCell>{getPaymentBadge(order.payment_status)}</TableCell>
+                          <TableCell>
+                            {getPaymentBadge(order.payment_status)}
+                          </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                               <Clock className="h-4 w-4" />
@@ -476,11 +520,15 @@ export default function OrderManagement() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleViewOrder(order)}>
+                                <DropdownMenuItem
+                                  onClick={() => handleViewOrder(order)}
+                                >
                                   <Eye className="h-4 w-4 mr-2" />
                                   {t.viewDetails}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleUpdateStatus(order)}>
+                                <DropdownMenuItem
+                                  onClick={() => handleUpdateStatus(order)}
+                                >
                                   <FileText className="h-4 w-4 mr-2" />
                                   {t.updateStatus}
                                 </DropdownMenuItem>
@@ -498,13 +546,15 @@ export default function OrderManagement() {
               {filteredOrders.length > 0 && (
                 <div className="flex items-center justify-between px-4 py-4 border-t">
                   <div className="text-sm text-gray-500">
-                    {t.showing} {startIndex + 1}-{Math.min(endIndex, filteredOrders.length)} {t.of} {filteredOrders.length} {t.orders}
+                    {t.showing} {startIndex + 1}-
+                    {Math.min(endIndex, filteredOrders.length)} {t.of}{" "}
+                    {filteredOrders.length} {t.orders}
                   </div>
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
                     >
                       Previous
@@ -512,7 +562,9 @@ export default function OrderManagement() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
                       disabled={currentPage === totalPages}
                     >
                       Next
