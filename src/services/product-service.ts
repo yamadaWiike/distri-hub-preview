@@ -230,32 +230,41 @@ export async function fetchProductVariantOptions(productId: string) {
       return [];
     }
 
-    // Get unique groups and their options from variants_view
+    // Try variants_view first, fallback to product_variants
+    let optionMap: Record<string, string[]> = {};
     const { data: optionsData, error: optionsError } = await supabase
       .from('variants_view')
       .select('group_name, option_name')
       .eq('product_id', productId)
       .eq('is_active', true);
-    
-    if (optionsError || !optionsData) {
-      console.error('Error fetching product variant options:', optionsError);
-      return [];
+
+    if (!optionsError && optionsData && Array.isArray(optionsData) && optionsData.length > 0) {
+      (optionsData as VariantViewOption[]).forEach(opt => {
+        const groupName = opt.group_name;
+        const optionName = opt.option_name;
+        if (!optionMap[groupName]) optionMap[groupName] = [];
+        if (!optionMap[groupName].includes(optionName)) optionMap[groupName].push(optionName);
+      });
+    } else {
+      const { data: pvData, error: pvError } = await supabase
+        .from('product_variants')
+        .select('variant_name, is_active')
+        .eq('product_id', productId)
+        .eq('is_active', true);
+      if (pvError) {
+        console.error('Error fetching product variants for options:', pvError);
+        return [];
+      }
+      const names = (pvData || [])
+        .map((v: any) => v.variant_name)
+        .filter((v: any) => typeof v === 'string' && v.trim().length > 0);
+      const uniqueNames = Array.from(new Set(names));
+      if (uniqueNames.length > 0) {
+        optionMap['Variant'] = uniqueNames;
+      } else {
+        return [];
+      }
     }
-    
-    // Group options by name with their values
-    const optionMap: Record<string, string[]> = {};
-    (optionsData as VariantViewOption[]).forEach(opt => {
-      const groupName = opt.group_name;
-      const optionName = opt.option_name;
-      
-      if (!optionMap[groupName]) {
-        optionMap[groupName] = [];
-      }
-      
-      if (!optionMap[groupName].includes(optionName)) {
-        optionMap[groupName].push(optionName);
-      }
-    });
     
     // Convert to array format
     const options: VariantOptionFromDB[] = Object.entries(optionMap).map(([name, values]) => ({

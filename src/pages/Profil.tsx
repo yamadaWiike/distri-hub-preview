@@ -286,6 +286,7 @@ export default function Profil() {
     [number, number] | null
   >(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [userStatus, setUserStatus] = useState<
     "pending" | "active" | "incomplete"
   >("pending");
@@ -324,8 +325,10 @@ export default function Profil() {
 
   // Update profile completion when form changes
   useEffect(() => {
-    calculateProfileCompletion();
-  }, [calculateProfileCompletion]);
+    if (!isLoading && profileLoaded) {
+      calculateProfileCompletion();
+    }
+  }, [calculateProfileCompletion, isLoading, profileLoaded]);
 
   // Load profile data from Supabase if user is logged in
   useEffect(() => {
@@ -348,6 +351,7 @@ export default function Profil() {
 
         if (error && error.code !== "PGRST116") {
           console.error("Error fetching profile:", error);
+          setProfileLoaded(false);
           return;
         }
 
@@ -443,17 +447,42 @@ export default function Profil() {
             area_distribusi: (data as ExtendedDistributorProfile)
               .area_distribusi,
           });
+          setProfileLoaded(true);
         } else {
-          // If no profile data yet but we have user data, prefill what we can
+          // If no profile data yet but we have user data, create a minimal profile row with the registration email
+          try {
+            const payload: Record<string, string> = {
+              user_id: user.id,
+              email_pemilik: user.email || "",
+              status: "incomplete",
+              nama_bisnis: "",
+              alamat_lengkap: "",
+              kota: "",
+              nama_pemilik: "",
+              kontak_pemilik: "",
+            };
+            const { error: insertError } = await supabase
+              .from("distributor_profiles")
+              .insert(payload);
+            if (insertError) {
+              console.warn("Unable to create initial distributor profile:", insertError);
+            }
+          } catch (ie) {
+            console.warn("Exception creating initial distributor profile:", ie);
+          }
+
+          // Prefill local form so user sees their registration email immediately
           setForm((prev) => ({
             ...prev,
             nama_bisnis: user.namaBisnis || "",
             kota: user.kota || "",
             email_pemilik: user.email || "",
           }));
+          setProfileLoaded(true);
         }
       } catch (e) {
         console.error("Error loading profile data:", e);
+        setProfileLoaded(false);
       } finally {
         setIsLoading(false);
       }
@@ -485,6 +514,8 @@ export default function Profil() {
             });
             return updatedForm;
           });
+          // Consider localStorage as a valid data source for completion
+          setProfileLoaded(true);
         } catch (e) {
           console.error("Error loading saved profile:", e);
         }
@@ -543,13 +574,18 @@ export default function Profil() {
       setIsSubmitting(true);
       const { supabase } = await import("@/integrations/supabase/client");
 
+      // Prevent overwriting non-empty email with empty value
+      const nextEmailPemilik = (tempForm.email_pemilik && tempForm.email_pemilik.trim().length > 0)
+        ? tempForm.email_pemilik
+        : (form.email_pemilik || "");
+
       const { error } = await supabase
         .from("distributor_profiles")
         // @ts-expect-error - Bypassing type check
         .update({
           nama_pemilik: tempForm.nama_pemilik,
           kontak_pemilik: tempForm.kontak_pemilik,
-          email_pemilik: tempForm.email_pemilik,
+          email_pemilik: nextEmailPemilik,
         })
         .eq("user_id", user.id);
 
@@ -581,10 +617,15 @@ export default function Profil() {
       setUploadingFiles(true);
       const { supabase } = await import("@/integrations/supabase/client");
 
+      // Prevent overwriting non-empty company email with empty value
+      const nextCompanyEmail = (tempForm.email_perusahaan && tempForm.email_perusahaan.trim().length > 0)
+        ? tempForm.email_perusahaan
+        : (form.email_perusahaan || "");
+
       // Upload files if they exist
       const updateData: Record<string, string | null | undefined> = {
         nama_bisnis: tempForm.nama_bisnis,
-        email_perusahaan: tempForm.email_perusahaan,
+        email_perusahaan: nextCompanyEmail,
         nomor_telp_perusahaan: tempForm.nomor_telp_perusahaan,
         nama_direktur: tempForm.nama_direktur,
         alamat_lengkap: tempForm.alamat_lengkap,
@@ -673,11 +714,16 @@ export default function Profil() {
       setUploadingFiles(true);
       const { supabase } = await import("@/integrations/supabase/client");
 
+      // Default email_pic to owner email if empty
+      const nextEmailPic = (tempForm.email_pic && tempForm.email_pic.trim().length > 0)
+        ? tempForm.email_pic
+        : (form.email_pemilik || "");
+
       const updateData: Record<string, string | null | undefined> = {
         nama_pic: tempForm.nama_pic,
         posisi_pic: tempForm.posisi_pic,
         nomor_kontak_pic: tempForm.nomor_kontak_pic,
-        email_pic: tempForm.email_pic,
+        email_pic: nextEmailPic,
         alamat_gudang: tempForm.alamat_gudang,
         koordinat: tempForm.koordinat,
       };

@@ -255,7 +255,7 @@ export async function fetchProductBySku(skuOrId: string): Promise<Product | null
         const { data: variantsData, error: variantsViewError } = await supabase
           .from('variants_view')
           .select('*')
-          .eq('parent_product_id', productId);
+          .eq('product_id', productId);
         
         if (!variantsViewError && variantsData) {
           variants = (variantsData as VariantRecord[]).map(v => ({
@@ -280,7 +280,7 @@ export async function fetchProductBySku(skuOrId: string): Promise<Product | null
               stock_quantity, 
               image_url
             `)
-            .eq('parent_product_id', productId);
+            .eq('product_id', productId);
           
           if (!fallbackError && fallbackVariants) {
             variants = (fallbackVariants as VariantRecord[]).map(v => ({

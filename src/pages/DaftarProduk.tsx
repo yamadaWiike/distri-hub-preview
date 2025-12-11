@@ -114,9 +114,22 @@ const ProductCard = React.memo(
       regional?.skuLevelMoq || product.singleSkuMoq || 0
     );
 
-    // If we have SKU-level MOQ and allow mixing variants, use it; otherwise use standard MOQ
-    const displayMoq =
-      allowMixVariants && skuLevelMoq > 0 ? skuLevelMoq : usedMoq;
+    // Display regular MOQ only (no conversions or SKU-level mixing)
+    const displayMoq = usedMoq;
+
+    // Debug logging for MOQ inconsistency issue
+    if (product.name.includes('Suno') || product.name.includes('Tobelo')) {
+      console.log(`[MOQ DEBUG] ${product.name}:`, {
+        productMoq: product.moq,
+        regionalMoq: regional?.moq,
+        usedMoq,
+        allowMixVariants,
+        skuLevelMoq,
+        displayMoq,
+        selectedArea,
+        regionCount: product.regions.length
+      });
+    }
 
     // UOM conversion properties (not displayed on frontend)
     const moqUom =
@@ -652,7 +665,7 @@ const ProductCard = React.memo(
                 Margin (Distributor — Retail)
               </span>
               <span className="text-sm font-bold text-teal-600">
-                {unitMargin.toFixed(0)}%
+                {unitMargin.toFixed(1)}%
               </span>
             </div>
           </div>
@@ -1088,6 +1101,7 @@ export default function DaftarProduk() {
           max: safeNumber(priceBounds[1]),
         },
         fileName: fileName,
+        lang: lang === 'en' ? 'en' : 'id',
       });
 
       // Show success toast

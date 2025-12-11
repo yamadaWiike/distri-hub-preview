@@ -228,8 +228,23 @@ export default function ProdukDetail() {
   // Mix variant logic
   const allowMixVariants = Boolean(regional?.allowMixVariants === true || product.allowMixVariants === true);
   const skuLevelMoq = Number(regional?.skuLevelMoq || product.singleSkuMoq || 0);
-  const displayMoq = (allowMixVariants && skuLevelMoq > 0) ? skuLevelMoq : usedMoq;
+  // Display regular MOQ only (no conversions or SKU-level mixing)
+  const displayMoq = usedMoq;
   const canMixVariants = Boolean(allowMixVariants === true && product.hasVariants === true);
+
+  // Debug logging for MOQ inconsistency issue
+  if (product.name.includes('Suno') || product.name.includes('Tobelo')) {
+    console.log(`[MOQ DEBUG DETAIL] ${product.name}:`, {
+      productMoq: product.moq,
+      regionalMoq: regional?.moq,
+      usedMoq,
+      allowMixVariants,
+      skuLevelMoq,
+      displayMoq,
+      selectedArea,
+      regionCount: product.regions.length
+    });
+  }
   
   // Calculate content per carton from UOM conversion factors
   const pricingConversionFactor = product.pricing_conversion_factor || regional?.pricing_conversion_factor || 0;
