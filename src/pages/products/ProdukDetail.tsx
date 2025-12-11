@@ -223,6 +223,7 @@ export default function ProdukDetail() {
   );
   const regional = product.regions.find((r) => r.area === selectedArea) || product.regions[0];
   const usedPrice = regional?.distributorPrice ?? product.distributorPrice;
+  const usedRetailPrice = regional?.retailPrice ?? product.retailPrice ?? product.consumerPrice * 0.9;
   const usedMoq = regional?.moq ?? product.moq;
   
   // Mix variant logic
@@ -490,11 +491,11 @@ export default function ProdukDetail() {
                 </div>
                 <div className="text-right">
                   <p className="text-base font-semibold text-gray-900">
-                    {formatIDR(product.retailPrice || product.consumerPrice * 0.9)}
+                    {formatIDR(usedRetailPrice)}
                   </p>
                   {contentPerCarton && (
                     <p className="text-xs text-gray-600">
-                      {lang === 'id' ? `Per ${baseUom}` : `Per ${baseUom}`}: <span className="font-semibold">{formatIDR(Math.round((product.retailPrice || product.consumerPrice * 0.9) / contentPerCarton))}</span>
+                      {lang === 'id' ? `Per ${baseUom}` : `Per ${baseUom}`}: <span className="font-semibold">{formatIDR(Math.round(usedRetailPrice / contentPerCarton))}</span>
                     </p>
                   )}
                 </div>
@@ -534,7 +535,7 @@ export default function ProdukDetail() {
                     {lang === 'id' ? `Estimasi Margin (${qty} karton)` : `Estimated Margin (${qty} cartons)`}
                   </p>
                   <p className={`text-base font-bold text-teal-600 ${!user ? 'blur-sm select-none' : ''}`}>
-                    {formatIDR(Math.round(((product.retailPrice || product.consumerPrice * 0.9) - usedPrice) * qty))} ({((((product.retailPrice || product.consumerPrice * 0.9) - usedPrice) / (product.retailPrice || product.consumerPrice * 0.9)) * 100).toFixed(1)}%)
+                    {formatIDR(Math.round((usedRetailPrice - usedPrice) * qty))} ({(((usedRetailPrice - usedPrice) / usedRetailPrice) * 100).toFixed(1)}%)
                   </p>
                 </div>
               </div>
