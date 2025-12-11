@@ -12,6 +12,7 @@ import {
   Phone,
   LogOut,
   Languages,
+  LayoutDashboard,
 } from "lucide-react";
 
 // UI Components
@@ -285,6 +286,16 @@ export default function Navbar() {
                         <Link to="/profil">{t.profile}</Link>
                       </div>
                     </DropdownMenuItem>
+                    {user.role === "admin" && (
+                      <>
+                        <DropdownMenuItem asChild className="cursor-pointer">
+                          <div className="w-full flex justify-start items-center font-normal">
+                            <LayoutDashboard className="h-4 w-4 me-2" />
+                            <Link to="/admin">Admin Dashboard</Link>
+                          </div>
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={() => logout()}
@@ -321,6 +332,17 @@ export default function Navbar() {
                       <Link to="/profil">{t.profile}</Link>
                     </div>
                   </DropdownMenuItem>
+                  {user.role === "admin" && (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <div className="w-full flex justify-start items-center font-normal">
+                          <LayoutDashboard className="h-4 w-4 me-2" />
+                          <Link to="/admin">Admin Dashboard</Link>
+                        </div>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => logout()}
                     className="text-destructive"
