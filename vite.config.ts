@@ -54,10 +54,24 @@ export default defineConfig(({ mode }) => {
 
               const s3 = new S3Client({ region, credentials: accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined });
 
-              // Derive Key from full S3 URL or accept raw key
+              // Derive Key from full S3 URL (virtual-hosted or path-style) or accept raw key
               let Key = rawUrl;
-              const m = rawUrl.match(/https?:\/\/[^/]+\/(.+)$/);
-              if (m) Key = m[1];
+              if (/^https?:\/\//i.test(rawUrl)) {
+                try {
+                  const u = new URL(rawUrl);
+                  const path = u.pathname.replace(/^\/+/, '');
+                  if (path && bucket && path.startsWith(`${bucket}/`)) {
+                    // Path-style URL: s3.<region>.amazonaws.com/<bucket>/<key>
+                    Key = path.substring(bucket.length + 1);
+                  } else {
+                    // Virtual-hosted style already yields the key-only path
+                    Key = path || rawUrl;
+                  }
+                } catch {
+                  const m = rawUrl.match(/https?:\/\/[^/]+\/(.+)$/);
+                  if (m) Key = m[1];
+                }
+              }
 
               const cmd = new GetObjectCommand({ Bucket: bucket, Key });
               const signedUrl = await getSignedUrl(s3, cmd, { expiresIn: expires });

@@ -2,7 +2,7 @@ import { jsPDF } from "jspdf";
 import { format } from 'date-fns';
 import { formatRp, pxToMm, pxToPt, safeNumber, safeString } from "./Funtions";
 import { ProductWithVariant } from "@/services/product-service";
-import { getImageUrl } from "@/lib/s3-upload";
+import { getImageUrl, getImageUrlAsync } from "@/lib/s3-upload";
 
 /**
  * Convert image URL to base64 data URL for PDF compatibility
@@ -331,23 +331,28 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
       doc.roundedRect(leftX, leftY, imgW, imgH, pxToMm(10), pxToMm(10), "DF");
 
       if (p?.image_url || p?.image) {
-        // Use image_url if available (already processed with S3 URL), otherwise process image field
+        // Prefer explicit image_url; fallback to image field
         let imageUrl = p.image_url || p.image;
-        
-        // If using original image field and not already a full URL, try to get S3 URL
-        if (!p.image_url && p.image && !p.image.startsWith('http') && !p.image.startsWith('https')) {
-          const s3Url = getImageUrl(p.image);
-          if (s3Url) {
-            imageUrl = s3Url;
+
+        // If the source looks like an S3 key or S3 URL, resolve a presigned URL for reliable access
+        const looksLikeS3 = !!imageUrl && (
+          !imageUrl.startsWith('http') ||
+          imageUrl.includes('amazonaws.com')
+        );
+        if (looksLikeS3 && imageUrl) {
+          try {
+            const presigned = await getImageUrlAsync(imageUrl);
+            if (presigned) {
+              imageUrl = presigned;
+            }
+          } catch (_) {
+            // Fall back to original imageUrl on failure
           }
+        } else if (!p.image_url && p.image && !p.image.startsWith('http')) {
+          // Non-http keys in non-S3 scenario (dev local keys)
+          const s3Url = getImageUrl(p.image);
+          if (s3Url) imageUrl = s3Url;
         }
-        
-        console.log(`Processing image for product: ${p.name}`, {
-          image_url: p.image_url,
-          image: p.image,
-          finalImageUrl: imageUrl,
-          isValidUrl: !(!imageUrl || imageUrl === '/placeholder.svg' || imageUrl === 'null' || imageUrl.trim() === '')
-        });
 
         // Skip invalid URLs
         if (!imageUrl || imageUrl === '/placeholder.svg' || imageUrl === 'null' || imageUrl.trim() === '') {

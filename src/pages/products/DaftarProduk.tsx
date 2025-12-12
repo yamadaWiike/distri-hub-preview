@@ -28,6 +28,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/components/ui/use-toast";
+import PresignedImage from "@/components/ui/PresignedImage";
 
 // Hooks
 import { useAuth } from "@/hooks/use-auth";
@@ -297,11 +298,11 @@ const ProductCard = React.memo(
         <article className="border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow h-full w-full flex flex-col">
           {/* Product Image with Area Badge */}
           <div className="relative w-full h-48 p-3">
-            <img
-              src={product.image || "/placeholder.svg"}
+            <PresignedImage
+              src={product.image_url || product.image || "/placeholder.svg"}
               alt={`${product.displayName} — ${product.size}`}
-              loading="lazy"
               className="size-full object-cover"
+              allowRawS3
             />
             {/* Area Badge - top right corner */}
             <div className="absolute top-3 right-3 bg-gray-600 text-white rounded px-2 py-1 text-xs font-medium">
@@ -420,11 +421,11 @@ const ProductCard = React.memo(
         <article className="border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow h-full flex flex-col">
           {/* Product Image with Area Badge */}
           <div className="relative w-full h-48 p-3">
-            <img
-              src={product.image || "/placeholder.svg"}
+            <PresignedImage
+              src={product.image_url || product.image || "/placeholder.svg"}
               alt={`${product.displayName} — ${product.size}`}
-              loading="lazy"
               className="size-full object-cover"
+              allowRawS3
             />
             {/* Area Badge - top right corner */}
             <div className="absolute top-3 right-3 bg-gray-600 text-white rounded px-2 py-1 text-xs font-medium">
@@ -558,11 +559,11 @@ const ProductCard = React.memo(
       <article className="border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow h-full flex flex-col">
         {/* Product Image with Area Badge */}
         <div className="relative w-full h-48 p-3">
-          <img
-            src={product.image || "/placeholder.svg"}
+          <PresignedImage
+            src={product.image_url || product.image || "/placeholder.svg"}
             alt={`${product.displayName} — ${product.size}`}
-            loading="lazy"
             className="size-full object-cover"
+            allowRawS3
           />
           {/* Area Badge - top right corner */}
           <div className="absolute top-3 right-3 bg-gray-600 text-white rounded px-2 py-1 text-xs font-medium">
@@ -997,8 +998,42 @@ export default function DaftarProduk() {
         p.consumerPrice >= priceRange[0] && p.consumerPrice <= priceRange[1]
     );
 
-    return filtered;
-  }, [searchQuery, area, selectedBrand, priceRange, products]);
+    // Apply sorting
+    const sorted = [...filtered];
+    switch (sortOrder) {
+      case "price-asc":
+        sorted.sort((a, b) => (a.consumerPrice || 0) - (b.consumerPrice || 0));
+        break;
+      case "price-desc":
+        sorted.sort((a, b) => (b.consumerPrice || 0) - (a.consumerPrice || 0));
+        break;
+      case "newest": {
+        const getDate = (p: any) => {
+          const d = p?.created_at || p?.createdAt || null;
+          return d ? new Date(d).getTime() : 0;
+        };
+        sorted.sort((a, b) => getDate(b) - getDate(a));
+        break;
+      }
+      case "oldest": {
+        const getDate = (p: any) => {
+          const d = p?.created_at || p?.createdAt || null;
+          return d ? new Date(d).getTime() : 0;
+        };
+        sorted.sort((a, b) => getDate(a) - getDate(b));
+        break;
+      }
+      case "popular": {
+        const score = (p: any) => p?.order_count || p?.orders_count || p?.popularity || 0;
+        sorted.sort((a, b) => score(b) - score(a));
+        break;
+      }
+      default:
+        break;
+    }
+
+    return sorted;
+  }, [searchQuery, area, selectedBrand, priceRange, products, sortOrder]);
 
   // Pagination logic
   const paginationTotalPages = useMemo(
@@ -2151,8 +2186,30 @@ export default function DaftarProduk() {
               <label className="text-sm font-medium mb-1.5 text-foreground">
                 {lang === "id" ? "Urutkan" : "Sort"}
               </label>
-              <select className="w-full rounded-md border bg-background px-3 py-2 text-sm">
-                <option value="">{lang === "id" ? "Urutkan" : "Sort"}</option>
+              <select
+                value={sortOrder}
+                disabled={loading}
+                onChange={(e) => {
+                  setSortOrder(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50"
+              >
+                <option value="price-desc">
+                  {lang === "id" ? "Harga: Tertinggi → Terendah" : "Price: High → Low"}
+                </option>
+                <option value="price-asc">
+                  {lang === "id" ? "Harga: Terendah → Tertinggi" : "Price: Low → High"}
+                </option>
+                <option value="newest">
+                  {lang === "id" ? "Terbaru (Ditambahkan)" : "Newest (Added)"}
+                </option>
+                <option value="oldest">
+                  {lang === "id" ? "Terlama (Ditambahkan)" : "Oldest (Added)"}
+                </option>
+                <option value="popular">
+                  {lang === "id" ? "Paling Populer (Paling dipesan)" : "Most Popular (Most ordered)"}
+                </option>
               </select>
             </div>
 

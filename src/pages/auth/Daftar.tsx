@@ -24,7 +24,7 @@ import { useLanguage } from "@/hooks/use-language";
 
 // Utils, Data & API
 import { translations } from "@/lib/translations";
-import { uploadStorePhoto, getImageUrl } from "@/lib/s3-upload";
+import { uploadStorePhoto, getImageUrl, getImageUrlAsync } from "@/lib/s3-upload";
 import {
   fetchProvinces,
   fetchRegenciesByProvince,
@@ -340,18 +340,13 @@ export default function Daftar() {
         console.log('Upload result:', result);
         
         if (result.success && result.url) {
-          // Get the actual URL for preview
-          const previewUrl = getImageUrl(result.url);
+          // Resolve presigned URL for preview; works in dev (data URL) and prod (signed URL)
+          const previewUrl = await getImageUrlAsync(result.url);
           console.log('Preview URL generated:', previewUrl);
-          
-          // Always create a fallback object URL as backup
-          let finalPreviewUrl = previewUrl;
-          if (!previewUrl || previewUrl === 'null' || previewUrl === 'undefined') {
-            console.warn('Preview URL is invalid, using object URL fallback');
-            finalPreviewUrl = URL.createObjectURL(file);
-          }
+
+          const finalPreviewUrl = previewUrl || URL.createObjectURL(file);
           console.log('Final preview URL:', finalPreviewUrl);
-          
+
           setForm({ ...form, fotoToko: file, fotoTokoUrl: result.url });
           setPhotoPreview(finalPreviewUrl);
           
@@ -411,9 +406,9 @@ export default function Daftar() {
       try {
         const result = await uploadStorePhoto(file);
         if (result.success && result.url) {
-          const previewUrl = getImageUrl(result.url);
+          const previewUrl = await getImageUrlAsync(result.url);
           setForm({ ...form, ktpFile: file, ktpUrl: result.url });
-          setKtpPreview(previewUrl);
+          setKtpPreview(previewUrl || URL.createObjectURL(file));
           toast({
             title: lang === 'id' ? "KTP Berhasil Diunggah" : "ID Card Uploaded Successfully",
             description: lang === 'id' ? "Foto KTP Anda telah disimpan" : "Your ID card has been saved",
@@ -460,9 +455,9 @@ export default function Daftar() {
       try {
         const result = await uploadStorePhoto(file);
         if (result.success && result.url) {
-          const previewUrl = file.type === 'application/pdf' ? '/pdf-icon.svg' : getImageUrl(result.url);
+          const previewUrl = file.type === 'application/pdf' ? '/pdf-icon.svg' : await getImageUrlAsync(result.url);
           setForm({ ...form, aktaFile: file, aktaUrl: result.url });
-          setAktaPreview(previewUrl);
+          setAktaPreview(previewUrl || URL.createObjectURL(file));
           toast({
             title: lang === 'id' ? "Akta Berhasil Diunggah" : "Company Registration Uploaded Successfully",
             description: lang === 'id' ? "Dokumen Akta/NIB Anda telah disimpan" : "Your company registration document has been saved",
@@ -509,9 +504,9 @@ export default function Daftar() {
       try {
         const result = await uploadStorePhoto(file);
         if (result.success && result.url) {
-          const previewUrl = file.type === 'application/pdf' ? '/pdf-icon.svg' : getImageUrl(result.url);
+          const previewUrl = file.type === 'application/pdf' ? '/pdf-icon.svg' : await getImageUrlAsync(result.url);
           setForm({ ...form, npwpFile: file, npwpUrl: result.url });
-          setNpwpPreview(previewUrl);
+          setNpwpPreview(previewUrl || URL.createObjectURL(file));
           toast({
             title: lang === 'id' ? "NPWP Berhasil Diunggah" : "Tax ID Uploaded Successfully",
             description: lang === 'id' ? "Dokumen NPWP Anda telah disimpan" : "Your tax ID document has been saved",

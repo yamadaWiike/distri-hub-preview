@@ -16,6 +16,11 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 const isDevelopment = import.meta.env.MODE === 'development';
 
+// Simple in-memory cache for presigned URLs to reduce duplicate requests
+type PresignEntry = { url: string; expireAt: number };
+const presignCache = new Map<string, PresignEntry>();
+const presignInFlight = new Map<string, Promise<string | null>>();
+
 // Validate S3 configuration in production
 if (!isDevelopment) {
   const requiredEnvVars = {
@@ -51,6 +56,40 @@ export interface UploadResult {
   success: boolean;
   url?: string;
   error?: string;
+}
+
+/**
+ * Normalize any S3 URL to the bucket/region defined in ENV.
+ * - If input is a plain key (no http), return as-is.
+ * - If input is an S3 URL from any bucket/region, rebuild to ENV bucket/region with same key.
+ * - Non-AWS URLs are returned unchanged.
+ */
+export function normalizeS3ToEnvBucket(input: string): string {
+  if (!input) return input;
+  const isHttp = /^https?:\/\//i.test(input);
+  if (!isHttp) return input; // treat as key
+
+  if (!/amazonaws\.com/i.test(input)) return input; // not S3
+
+  const bucket = import.meta.env.VITE_AWS_BUCKET;
+  const region = import.meta.env.VITE_AWS_DEFAULT_REGION;
+  if (!bucket || !region) return input;
+
+  try {
+    const u = new URL(input);
+    // Derive key from both styles
+    let key = u.pathname.replace(/^\/+/, '');
+    const pathParts = key.split('/');
+    // Path-style: s3.<region>.amazonaws.com/<bucket>/<key>
+    const isPathStyle = /(^|\.)s3(\.|-)[a-z0-9-]+\.amazonaws\.com$/i.test(u.host);
+    if (isPathStyle && pathParts[0] && pathParts[0].toLowerCase() === bucket.toLowerCase()) {
+      key = pathParts.slice(1).join('/');
+    }
+    // Always rebuild using ENV bucket
+    return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+  } catch {
+    return input;
+  }
 }
 
 /**
@@ -480,41 +519,91 @@ export async function getImageUrlAsync(rawUrl: string | null | undefined): Promi
     return null;
   }
 
-  // Dev: if not http, treat as localStorage key
+  // If already has signature, return as is
+  if (/X-Amz-Signature/i.test(rawUrl)) {
+    return rawUrl;
+  }
+
+  // Dev: if not http, try localStorage first; if not found, fall through to presign
   if (isDevelopment && !rawUrl.startsWith('http')) {
     const dataURL = localStorage.getItem(rawUrl);
-    if (!dataURL) {
-      return null;
+    if (dataURL) {
+      return dataURL;
     }
-    return dataURL;
+    // no local dev asset — continue to presign flow below
   }
 
-  try {
-    const presignEndpoint = '/api/presign';
-    const body = { url: rawUrl };
-    const res = await fetch(presignEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    const contentType = res.headers.get('content-type') || '';
-    if (!res.ok) {
-      return null;
-    }
-    if (!contentType.includes('application/json')) {
-      const preview = await res.text();
-      return null;
-    }
-    const data = await res.json();
-    const url: string | undefined = data?.url;
-    const hasSignature: boolean = /X-Amz-Signature/i.test(url || '') || data?.hasSignature === true;
-    if (!url || !hasSignature) {
-      return null;
-    }
-    return url;
-  } catch (e) {
-    return null;
+  // Return cached if not expired
+  const now = Date.now();
+  const cached = presignCache.get(rawUrl);
+  if (cached && cached.expireAt > now) {
+    return cached.url;
   }
+
+  // Deduplicate concurrent presign calls
+  const inflight = presignInFlight.get(rawUrl);
+  if (inflight) {
+    return inflight;
+  }
+
+  const presignPromise = (async (): Promise<string | null> => {
+    try {
+      const presignEndpoint = '/api/presign';
+      const body = { url: rawUrl };
+      const res = await fetch(presignEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok) {
+        return null;
+      }
+      let data: { url?: string; hasSignature?: boolean } | null = null;
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        // Be tolerant: some platforms may not set proper JSON content-type
+        const bodyText = await res.text();
+        try {
+          data = JSON.parse(bodyText) as { url?: string; hasSignature?: boolean };
+        } catch (_) {
+          return null;
+        }
+      }
+      const url: string | undefined = data?.url;
+      const hasSignature: boolean = /X-Amz-Signature/i.test(url || '') || data?.hasSignature === true;
+      if (!url || !hasSignature) {
+        return null;
+      }
+
+      // Compute expiry for cache from URL params if available
+      let expireAt = now + 5 * 60 * 1000; // default 5 minutes
+      try {
+        const u = new URL(url);
+        const amzDate = u.searchParams.get('X-Amz-Date'); // e.g., 20251212T091337Z
+        const amzExpires = u.searchParams.get('X-Amz-Expires'); // seconds
+        if (amzDate && amzExpires) {
+          const base = Date.parse(
+            `${amzDate.slice(0, 4)}-${amzDate.slice(4, 6)}-${amzDate.slice(6, 8)}T${amzDate.slice(9, 11)}:${amzDate.slice(11, 13)}:${amzDate.slice(13, 15)}Z`
+          );
+          const expMs = parseInt(amzExpires, 10) * 1000;
+          // Subtract a small buffer to avoid near-expiry usage
+          expireAt = base + expMs - 10_000;
+        }
+      } catch { void 0; }
+
+      presignCache.set(rawUrl, { url, expireAt });
+      return url;
+    } catch (e) {
+      return null;
+    } finally {
+      presignInFlight.delete(rawUrl);
+    }
+  })();
+
+  presignInFlight.set(rawUrl, presignPromise);
+  return presignPromise;
 }
 

@@ -24,7 +24,8 @@ import { PRODUCTS, Product } from "@/data/products";
 import { formatIDR, getProductIdFromSlug, generateProductSlug } from "@/lib/utils";
 import { translations } from "@/lib/translations";
 import { fetchProductBySku } from "@/lib/db";
-import { getImageUrl } from "@/lib/s3-upload";
+// getImageUrl no longer needed for display; PresignedImage handles S3
+import PresignedImage from "@/components/ui/PresignedImage";
 import { checkMixedVariantsMOQ } from "@/utils/mixVariants";
 import { getAllProducts } from "@/services/product-service";
 import { CartItem } from "@/contexts/CartContextDefinition";
@@ -158,29 +159,10 @@ export default function ProdukDetail() {
   // Create product images array - use product.images if available, fallback to single image
   // Use image_url if available (already processed), otherwise use getImageUrl for proper S3 URL handling
   const productImages = product && product.images && product.images.length > 0
-    ? product.images.map(img => {
-        // If already a full URL, use as is, otherwise process through getImageUrl for S3
-        if (img.startsWith('http') || img.startsWith('https')) {
-          return img;
-        }
-        const s3Url = getImageUrl(img);
-        return s3Url || img; // Fallback to original if getImageUrl returns null
-      })
+    ? product.images
     : [(() => {
-        // Check for image_url field first (from database, already processed)
         const productWithImageUrl = product as Product & { image_url?: string };
-        if (productWithImageUrl?.image_url) {
-          return productWithImageUrl.image_url;
-        }
-        // Fallback to processing image field
-        if (product?.image) {
-          if (product.image.startsWith('http') || product.image.startsWith('https')) {
-            return product.image;
-          }
-          const s3Url = getImageUrl(product.image);
-          return s3Url || product.image;
-        }
-        return '/placeholder.svg';
+        return productWithImageUrl?.image_url || product?.image || '/placeholder.svg';
       })()];
   // Debug: log productImages array to check image URLs
 
@@ -279,12 +261,14 @@ export default function ProdukDetail() {
           <div className="lg:col-span-2 space-y-4">
             {/* Main Product Image */}
             <div className="bg-white rounded-lg border overflow-hidden relative group">
-              <img 
-                src={productImages[currentImageIndex]} 
-                alt={`${product.name} ${product.size}`} 
-                className="w-full aspect-square object-contain cursor-pointer hover:scale-105 transition-transform duration-300" 
-                onClick={() => setImageDialogOpen(true)}
-              />
+              <div onClick={() => setImageDialogOpen(true)}>
+                <PresignedImage
+                  src={productImages[currentImageIndex]}
+                  alt={`${product.name} ${product.size}`}
+                  className="w-full aspect-square object-contain cursor-pointer hover:scale-105 transition-transform duration-300"
+                  allowRawS3
+                />
+              </div>
               
               {/* Navigation Arrows - Only show if multiple images */}
               {hasMultipleImages && (
@@ -327,11 +311,11 @@ export default function ProdukDetail() {
                     }`}
                     onClick={() => setCurrentImageIndex(idx)}
                   >
-                    <img 
-                      src={getImageUrl(img) || img}
+                    <PresignedImage
+                      src={img}
                       alt={`Thumbnail ${idx + 1}`}
                       className="w-full h-full object-cover hover:opacity-75 transition"
-                      onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = '/placeholder.svg'; }}
+                      allowRawS3
                     />
                   </div>
                 ))}
