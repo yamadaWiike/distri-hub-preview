@@ -156,10 +156,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    // Auto-logout when session is expired
+    const sessionMonitor = setInterval(async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        // If no session or expired, force logout
+        if (!session || (session.expires_at && session.expires_at * 1000 <= Date.now())) {
+          await supabase.auth.signOut();
+          setUser(null);
+          localStorage.removeItem("baskit_user");
+          toast({
+            title: "Sesi Berakhir",
+            description: "Sesi Anda telah berakhir. Silakan masuk kembali.",
+            variant: "destructive",
+          });
+        }
+      } catch (e) {
+        // If getSession fails unexpectedly, ensure user is logged out to avoid stale state
+        await supabase.auth.signOut();
+        setUser(null);
+        localStorage.removeItem("baskit_user");
+      }
+    }, 60_000); // check every 60 seconds
+
     initializeAuth();
 
     return () => {
       subscription.unsubscribe();
+      clearInterval(sessionMonitor);
     };
   }, []);
 

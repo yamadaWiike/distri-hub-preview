@@ -117,19 +117,7 @@ const ProductCard = React.memo(
     // Display regular MOQ only (no conversions or SKU-level mixing)
     const displayMoq = usedMoq;
 
-    // Debug logging for MOQ inconsistency issue
-    if (product.name.includes('Suno') || product.name.includes('Tobelo')) {
-      console.log(`[MOQ DEBUG] ${product.name}:`, {
-        productMoq: product.moq,
-        regionalMoq: regional?.moq,
-        usedMoq,
-        allowMixVariants,
-        skuLevelMoq,
-        displayMoq,
-        selectedArea,
-        regionCount: product.regions.length
-      });
-    }
+    // Debug logging removed per request
 
     // UOM conversion properties (not displayed on frontend)
     const moqUom =
