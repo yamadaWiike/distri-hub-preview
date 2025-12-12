@@ -237,6 +237,7 @@ const ProductCard = React.memo(
 
       addItem({
         id: product.baseProductId,
+        sku: product.sku,
         name: product.name,
         size: product.size,
         image: product.image,
@@ -1124,7 +1125,7 @@ export default function DaftarProduk() {
           max: safeNumber(priceBounds[1]),
         },
         fileName: fileName,
-        lang: lang === 'en' ? 'en' : 'id',
+        lang: lang === "en" ? "en" : "id",
       });
 
       // Show success toast
@@ -2216,7 +2217,9 @@ export default function DaftarProduk() {
             {/* Price Range Filter */}
             <div className="flex flex-col">
               <label className="text-sm font-medium mb-1.5 text-foreground">
-                {lang === "id" ? "Rentang Harga per Karton" : "Price Range per Carton"}
+                {lang === "id"
+                  ? "Rentang Harga per Karton"
+                  : "Price Range per Carton"}
               </label>
               <div className="flex gap-2 items-center">
                 <div className="relative w-full">
