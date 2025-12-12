@@ -1,15 +1,22 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method Not Allowed' });
     return;
   }
   try {
-    const { url } = req.body || {};
-    if (!url || typeof url !== 'string') {
+    // Be tolerant of raw string or improperly parsed bodies
+    let body = req.body;
+    if (!body && typeof req.rawBody === 'string') {
+      try { body = JSON.parse(req.rawBody); } catch { body = { url: req.rawBody }; }
+    }
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch { body = { url: body }; }
+    }
+    const url: string | null = body && typeof body.url === 'string' ? body.url : null;
+    if (!url) {
       res.status(400).json({ error: 'Missing url in body' });
       return;
     }
@@ -28,9 +35,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const creds = accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined;
     const s3 = new S3Client({ region, credentials: creds });
 
+    // Robust key extraction (virtual-hosted or path-style). Always presign against ENV bucket.
     let Key = url;
-    const m = url.match(/https?:\/\/[^/]+\/(.+)$/);
-    if (m) Key = m[1];
+    if (/^https?:\/\//i.test(url)) {
+      try {
+        const u = new URL(url);
+        const path = u.pathname.replace(/^\/+/, '');
+        if (path && bucket && path.startsWith(`${bucket}/`)) {
+          Key = path.substring(bucket.length + 1);
+        } else {
+          Key = path || url;
+        }
+      } catch {
+        const m = url.match(/^https?:\/\/[^/]+\/(.+)$/);
+        if (m && m[1]) Key = m[1];
+      }
+    }
 
     const cmd = new GetObjectCommand({ Bucket: bucket, Key });
     const signedUrl = await getSignedUrl(s3, cmd, { expiresIn: expires });
