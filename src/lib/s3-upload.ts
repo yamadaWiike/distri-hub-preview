@@ -471,3 +471,50 @@ export function getImageUrl(storageKey: string | null | undefined): string | nul
   return storageKey;
 }
 
+/**
+ * Resolve a presigned URL for an S3 object key or absolute S3 URL.
+ * In dev, returns data URL from localStorage. In prod, calls `/api/presign`.
+ */
+export async function getImageUrlAsync(rawUrl: string | null | undefined): Promise<string | null> {
+  if (!rawUrl) {
+    return null;
+  }
+
+  // Dev: if not http, treat as localStorage key
+  if (isDevelopment && !rawUrl.startsWith('http')) {
+    const dataURL = localStorage.getItem(rawUrl);
+    if (!dataURL) {
+      return null;
+    }
+    return dataURL;
+  }
+
+  try {
+    const presignEndpoint = '/api/presign';
+    const body = { url: rawUrl };
+    const res = await fetch(presignEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    const contentType = res.headers.get('content-type') || '';
+    if (!res.ok) {
+      return null;
+    }
+    if (!contentType.includes('application/json')) {
+      const preview = await res.text();
+      return null;
+    }
+    const data = await res.json();
+    const url: string | undefined = data?.url;
+    const hasSignature: boolean = /X-Amz-Signature/i.test(url || '') || data?.hasSignature === true;
+    if (!url || !hasSignature) {
+      return null;
+    }
+    return url;
+  } catch (e) {
+    return null;
+  }
+}
+

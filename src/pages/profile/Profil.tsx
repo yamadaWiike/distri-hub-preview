@@ -30,6 +30,8 @@ import { useLanguage } from "@/hooks/use-language";
 // Utils & API
 import { translations } from "@/lib/translations";
 import { uploadFileToS3, getImageUrl } from "@/lib/s3-upload";
+import PresignedImage from "@/components/ui/PresignedImage";
+import { getImageUrlAsync } from "@/lib/s3-upload";
 
 // Integrations & Types
 import { Database } from "@/integrations/supabase/types";
@@ -1443,22 +1445,15 @@ export default function Profil() {
                                 className="relative w-full h-32 bg-gray-100 rounded-md overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
                                 onClick={() =>
                                   setDocumentPreview({
-                                    url: getImageUrl(form.npwp_file_url) || "",
+                                    url: form.npwp_file_url || "",
                                     title: "Dokumen NPWP",
                                   })
                                 }
                               >
-                                <img
-                                  src={getImageUrl(form.npwp_file_url) || ""}
+                                <PresignedImage
+                                  src={form.npwp_file_url || ""}
                                   alt="NPWP Preview"
                                   className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = "none";
-                                    target.nextElementSibling?.classList.remove(
-                                      "hidden"
-                                    );
-                                  }}
                                 />
                                 <div className="absolute inset-0 hidden items-center justify-center text-gray-400 bg-gray-100">
                                   <div className="w-full h-full flex justify-center items-center">
@@ -1478,9 +1473,14 @@ export default function Profil() {
                                   </div>
                                 </div>
                               </div>
-                              <a
-                                href={getImageUrl(form.npwp_file_url) || "#"}
-                                download="dokumen-npwp"
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const url = await getImageUrlAsync(form.npwp_file_url || "");
+                                  if (url) {
+                                    window.open(url, "_blank");
+                                  }
+                                }}
                                 className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-md text-xs hover:bg-blue-100 transition-colors w-full justify-center"
                               >
                                 <svg
@@ -1497,7 +1497,7 @@ export default function Profil() {
                                   />
                                 </svg>
                                 Download
-                              </a>
+                              </button>
                             </div>
                           ) : (
                             <p className="text-xs text-gray-400">
@@ -1515,22 +1515,15 @@ export default function Profil() {
                                 className="relative w-full h-32 bg-gray-100 rounded-md overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
                                 onClick={() =>
                                   setDocumentPreview({
-                                    url: getImageUrl(form.nib_file_url) || "",
+                                    url: form.nib_file_url || "",
                                     title: "Dokumen NIB",
                                   })
                                 }
                               >
-                                <img
-                                  src={getImageUrl(form.nib_file_url) || ""}
+                                <PresignedImage
+                                  src={form.nib_file_url || ""}
                                   alt="NIB Preview"
                                   className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = "none";
-                                    target.nextElementSibling?.classList.remove(
-                                      "hidden"
-                                    );
-                                  }}
                                 />
                                 <div className="absolute inset-0 hidden items-center justify-center text-gray-400 bg-gray-100">
                                   <div className="w-full h-full flex justify-center items-center">
@@ -1550,9 +1543,14 @@ export default function Profil() {
                                   </div>
                                 </div>
                               </div>
-                              <a
-                                href={getImageUrl(form.nib_file_url) || "#"}
-                                download="dokumen-nib"
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const url = await getImageUrlAsync(form.nib_file_url || "");
+                                  if (url) {
+                                    window.open(url, "_blank");
+                                  }
+                                }}
                                 className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-md text-xs hover:bg-blue-100 transition-colors w-full justify-center"
                               >
                                 <svg
@@ -1569,7 +1567,7 @@ export default function Profil() {
                                   />
                                 </svg>
                                 Download
-                              </a>
+                              </button>
                             </div>
                           ) : (
                             <p className="text-xs text-gray-400">
@@ -1587,22 +1585,15 @@ export default function Profil() {
                                 className="relative w-full h-32 bg-gray-100 rounded-md overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
                                 onClick={() =>
                                   setDocumentPreview({
-                                    url: getImageUrl(form.ktp_file_url) || "",
+                                    url: form.ktp_file_url || "",
                                     title: "Dokumen KTP Pemilik",
                                   })
                                 }
                               >
-                                <img
-                                  src={getImageUrl(form.ktp_file_url) || ""}
+                                <PresignedImage
+                                  src={form.ktp_file_url || ""}
                                   alt="KTP Preview"
                                   className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = "none";
-                                    target.nextElementSibling?.classList.remove(
-                                      "hidden"
-                                    );
-                                  }}
                                 />
                                 <div className="absolute inset-0 hidden items-center justify-center text-gray-400 bg-gray-100">
                                   <div className="w-full h-full flex justify-center items-center">
@@ -1622,9 +1613,14 @@ export default function Profil() {
                                   </div>
                                 </div>
                               </div>
-                              <a
-                                href={getImageUrl(form.ktp_file_url) || "#"}
-                                download="dokumen-ktp"
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const url = await getImageUrlAsync(form.ktp_file_url || "");
+                                  if (url) {
+                                    window.open(url, "_blank");
+                                  }
+                                }}
                                 className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-md text-xs hover:bg-blue-100 transition-colors w-full justify-center"
                               >
                                 <svg
@@ -1641,7 +1637,7 @@ export default function Profil() {
                                   />
                                 </svg>
                                 Download
-                              </a>
+                              </button>
                             </div>
                           ) : (
                             <p className="text-xs text-gray-400">
@@ -1794,7 +1790,7 @@ export default function Profil() {
                         <p className="text-gray-700 font-medium mb-3">
                           📸 Foto Gudang
                         </p>
-                        <img
+                        <PresignedImage
                           src={form.foto_gudang}
                           alt="Foto Gudang"
                           className="w-full max-w-md h-48 object-cover rounded-lg border border-gray-200"
@@ -2202,23 +2198,15 @@ export default function Profil() {
                               className="relative w-16 h-16 bg-gray-100 rounded-md overflow-hidden cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0"
                               onClick={() =>
                                 setDocumentPreview({
-                                  url:
-                                    getImageUrl(tempForm.npwp_file_url) || "",
+                                  url: tempForm.npwp_file_url || "",
                                   title: "Dokumen NPWP",
                                 })
                               }
                             >
-                              <img
-                                src={getImageUrl(tempForm.npwp_file_url) || ""}
+                              <PresignedImage
+                                src={tempForm.npwp_file_url || ""}
                                 alt="NPWP Preview"
                                 className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.style.display = "none";
-                                  target.nextElementSibling?.classList.remove(
-                                    "hidden"
-                                  );
-                                }}
                               />
                               <div className="absolute inset-0 hidden items-center justify-center text-gray-400 bg-gray-100">
                                 <svg
@@ -2268,22 +2256,15 @@ export default function Profil() {
                               className="relative w-16 h-16 bg-gray-100 rounded-md overflow-hidden cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0"
                               onClick={() =>
                                 setDocumentPreview({
-                                  url: getImageUrl(tempForm.nib_file_url) || "",
+                                  url: tempForm.nib_file_url || "",
                                   title: "Dokumen NIB",
                                 })
                               }
                             >
-                              <img
-                                src={getImageUrl(tempForm.nib_file_url) || ""}
+                              <PresignedImage
+                                src={tempForm.nib_file_url || ""}
                                 alt="NIB Preview"
                                 className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.style.display = "none";
-                                  target.nextElementSibling?.classList.remove(
-                                    "hidden"
-                                  );
-                                }}
                               />
                               <div className="absolute inset-0 hidden items-center justify-center text-gray-400 bg-gray-100">
                                 <svg
@@ -2333,22 +2314,15 @@ export default function Profil() {
                               className="relative w-16 h-16 bg-gray-100 rounded-md overflow-hidden cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0"
                               onClick={() =>
                                 setDocumentPreview({
-                                  url: getImageUrl(tempForm.ktp_file_url) || "",
+                                  url: tempForm.ktp_file_url || "",
                                   title: "Dokumen KTP Pemilik",
                                 })
                               }
                             >
-                              <img
-                                src={getImageUrl(tempForm.ktp_file_url) || ""}
+                              <PresignedImage
+                                src={tempForm.ktp_file_url || ""}
                                 alt="KTP Preview"
                                 className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.style.display = "none";
-                                  target.nextElementSibling?.classList.remove(
-                                    "hidden"
-                                  );
-                                }}
                               />
                               <div className="absolute inset-0 hidden items-center justify-center text-gray-400 bg-gray-100">
                                 <svg
@@ -2642,7 +2616,7 @@ export default function Profil() {
                         />
                         {tempForm.foto_gudang && (
                           <div className="mt-2">
-                            <img
+                            <PresignedImage
                               src={tempForm.foto_gudang}
                               alt="Preview"
                               className="w-32 h-32 object-cover rounded border"
@@ -3142,9 +3116,9 @@ export default function Profil() {
                 </DialogHeader>
                 <div className="relative w-full h-[70vh] bg-gray-100 rounded-lg overflow-hidden">
                   {documentPreview?.url && (
-                    <img
+                    <PresignedImage
                       src={documentPreview.url}
-                      alt={documentPreview.title}
+                      alt={documentPreview.title || "Preview"}
                       className="w-full h-full object-contain"
                     />
                   )}
@@ -3158,9 +3132,14 @@ export default function Profil() {
                     {lang === "id" ? "Tutup" : "Close"}
                   </Button>
                   {documentPreview?.url && (
-                    <a
-                      href={documentPreview.url}
-                      download={documentPreview.title}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const url = await getImageUrlAsync(documentPreview.url);
+                        if (url) {
+                          window.open(url, "_blank");
+                        }
+                      }}
                       className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 transition-colors"
                     >
                       <svg
@@ -3177,7 +3156,7 @@ export default function Profil() {
                         />
                       </svg>
                       Download
-                    </a>
+                    </button>
                   )}
                 </div>
               </DialogContent>

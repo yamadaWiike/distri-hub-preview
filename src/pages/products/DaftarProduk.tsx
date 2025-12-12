@@ -2113,7 +2113,7 @@ export default function DaftarProduk() {
             {/* Area Distribution Filter */}
             <div className="flex flex-col">
               <label className="text-sm font-medium mb-1.5 text-foreground">
-                {lang === "id" ? "Area Distribusi" : "Area Distribusi"}
+                {t.area}
               </label>
               <select
                 value={area}
@@ -2124,9 +2124,7 @@ export default function DaftarProduk() {
                 }}
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50"
               >
-                <option value="">
-                  {lang === "id" ? "Semua Area" : "Semua Area"}
-                </option>
+                <option value="">{t.allAreas}</option>
                 {["Jabodetabek", "Jawa Barat", "Jawa Tengah", "Jawa Timur"].map(
                   (p) => (
                     <option key={p} value={p}>
@@ -2140,7 +2138,7 @@ export default function DaftarProduk() {
             {/* Brand Filter */}
             <div className="flex flex-col">
               <label className="text-sm font-medium mb-1.5 text-foreground">
-                Brand
+                {t.brand}
               </label>
               <select
                 value={selectedBrand}
@@ -2151,9 +2149,7 @@ export default function DaftarProduk() {
                 }}
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50"
               >
-                <option value="">
-                  {lang === "id" ? "Semua Brand" : "Semua Brand"}
-                </option>
+                <option value="">{t.allBrands}</option>
                 {allBrands.map((brand) => (
                   <option key={brand} value={brand}>
                     {brand}
@@ -2165,21 +2161,17 @@ export default function DaftarProduk() {
             {/* Sort Order Filter */}
             <div className="flex flex-col">
               <label className="text-sm font-medium mb-1.5 text-foreground">
-                {lang === "id" ? "Urutkan" : "Urutkan"}
+                {lang === "id" ? "Urutkan" : "Sort"}
               </label>
               <select className="w-full rounded-md border bg-background px-3 py-2 text-sm">
-                <option value="">
-                  {lang === "id" ? "Urutkan" : "Urutkan"}
-                </option>
+                <option value="">{lang === "id" ? "Urutkan" : "Sort"}</option>
               </select>
             </div>
 
             {/* Price Range Filter */}
             <div className="flex flex-col">
               <label className="text-sm font-medium mb-1.5 text-foreground">
-                {lang === "id"
-                  ? "Rentang Harga per Karton"
-                  : "Rentang Harga per Karton"}
+                {lang === "id" ? "Rentang Harga per Karton" : "Price Range per Carton"}
               </label>
               <div className="flex gap-2 items-center">
                 <div className="relative w-full">
