@@ -273,9 +273,7 @@ export default function LengkapiProfil() {
   }, [form.regencyId]);
 
   // Debug logging
-  useEffect(() => {
-
-  }, [currentStep]);
+  useEffect(() => {}, [currentStep]);
 
   // Load existing profile data
   useEffect(() => {
@@ -464,8 +462,6 @@ export default function LengkapiProfil() {
   const handleNext = (e?: React.MouseEvent<HTMLButtonElement>) => {
     e?.preventDefault();
 
-
-
     // Validate step 1
     if (currentStep === 1) {
       if (
@@ -640,9 +636,9 @@ export default function LengkapiProfil() {
         phone: form.nomor_kontak_perusahaan,
         email: form.email_perusahaan,
         companyTypeId: companyTypeId,
-        assignedUsersId: null, // TODO: Add assigned user
-        parentCompanyId: null, // TODO: Add parent company selection if needed
-        childType: null, // TODO: Default to distributor
+        assignedUsersId: [],
+        parentCompanyId: null,
+        childType: null,
         districtId: parseInt(form.districtId),
         detailAddress: form.alamat_perusahaan,
         companyWebsite: form.companyWebsite,
@@ -1487,9 +1483,7 @@ export default function LengkapiProfil() {
                             koordinat: JSON.stringify({ lat, lng }),
                           });
                         }}
-                        onAddressFound={(address) => {
-
-                        }}
+                        onAddressFound={(address) => {}}
                         initialPosition={
                           selectedCoordinates
                             ? `${selectedCoordinates[0]},${selectedCoordinates[1]}`
