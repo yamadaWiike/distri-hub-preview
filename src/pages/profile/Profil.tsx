@@ -441,14 +441,6 @@ export default function Profil() {
               (data as ExtendedDistributorProfile).area_distribusi || "",
           });
 
-          console.log("Loaded operational fields from DB:", {
-            metode_pembayaran: (data as ExtendedDistributorProfile)
-              .metode_pembayaran,
-            aplikasi_pencatatan: (data as ExtendedDistributorProfile)
-              .aplikasi_pencatatan,
-            area_distribusi: (data as ExtendedDistributorProfile)
-              .area_distribusi,
-          });
           setProfileLoaded(true);
         } else {
           // If no profile data yet but we have user data, create a minimal profile row with the registration email
@@ -465,9 +457,13 @@ export default function Profil() {
             };
             const { error: insertError } = await supabase
               .from("distributor_profiles")
+              // @ts-expect-error - Bypassing type check for Supabase client compatibility
               .insert(payload);
             if (insertError) {
-              console.warn("Unable to create initial distributor profile:", insertError);
+              console.warn(
+                "Unable to create initial distributor profile:",
+                insertError
+              );
             }
           } catch (ie) {
             console.warn("Exception creating initial distributor profile:", ie);
@@ -577,9 +573,10 @@ export default function Profil() {
       const { supabase } = await import("@/integrations/supabase/client");
 
       // Prevent overwriting non-empty email with empty value
-      const nextEmailPemilik = (tempForm.email_pemilik && tempForm.email_pemilik.trim().length > 0)
-        ? tempForm.email_pemilik
-        : (form.email_pemilik || "");
+      const nextEmailPemilik =
+        tempForm.email_pemilik && tempForm.email_pemilik.trim().length > 0
+          ? tempForm.email_pemilik
+          : form.email_pemilik || "";
 
       const { error } = await supabase
         .from("distributor_profiles")
@@ -620,9 +617,10 @@ export default function Profil() {
       const { supabase } = await import("@/integrations/supabase/client");
 
       // Prevent overwriting non-empty company email with empty value
-      const nextCompanyEmail = (tempForm.email_perusahaan && tempForm.email_perusahaan.trim().length > 0)
-        ? tempForm.email_perusahaan
-        : (form.email_perusahaan || "");
+      const nextCompanyEmail =
+        tempForm.email_perusahaan && tempForm.email_perusahaan.trim().length > 0
+          ? tempForm.email_perusahaan
+          : form.email_perusahaan || "";
 
       // Upload files if they exist
       const updateData: Record<string, string | null | undefined> = {
@@ -717,9 +715,10 @@ export default function Profil() {
       const { supabase } = await import("@/integrations/supabase/client");
 
       // Default email_pic to owner email if empty
-      const nextEmailPic = (tempForm.email_pic && tempForm.email_pic.trim().length > 0)
-        ? tempForm.email_pic
-        : (form.email_pemilik || "");
+      const nextEmailPic =
+        tempForm.email_pic && tempForm.email_pic.trim().length > 0
+          ? tempForm.email_pic
+          : form.email_pemilik || "";
 
       const updateData: Record<string, string | null | undefined> = {
         nama_pic: tempForm.nama_pic,
@@ -800,8 +799,6 @@ export default function Profil() {
         console.error("Database error:", error);
         throw error;
       }
-
-      console.log("Banking info saved successfully");
 
       setForm(tempForm);
       setEditBankingOpen(false);
@@ -1476,7 +1473,9 @@ export default function Profil() {
                               <button
                                 type="button"
                                 onClick={async () => {
-                                  const url = await getImageUrlAsync(form.npwp_file_url || "");
+                                  const url = await getImageUrlAsync(
+                                    form.npwp_file_url || ""
+                                  );
                                   if (url) {
                                     window.open(url, "_blank");
                                   }
@@ -1546,7 +1545,9 @@ export default function Profil() {
                               <button
                                 type="button"
                                 onClick={async () => {
-                                  const url = await getImageUrlAsync(form.nib_file_url || "");
+                                  const url = await getImageUrlAsync(
+                                    form.nib_file_url || ""
+                                  );
                                   if (url) {
                                     window.open(url, "_blank");
                                   }
@@ -1616,7 +1617,9 @@ export default function Profil() {
                               <button
                                 type="button"
                                 onClick={async () => {
-                                  const url = await getImageUrlAsync(form.ktp_file_url || "");
+                                  const url = await getImageUrlAsync(
+                                    form.ktp_file_url || ""
+                                  );
                                   if (url) {
                                     window.open(url, "_blank");
                                   }
@@ -3161,8 +3164,6 @@ export default function Profil() {
                 </div>
               </DialogContent>
             </Dialog>
-
-            
           </>
         )}
       </main>
