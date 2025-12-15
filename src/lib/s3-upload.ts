@@ -524,13 +524,18 @@ export async function getImageUrlAsync(rawUrl: string | null | undefined): Promi
     return rawUrl;
   }
 
-  // Dev: if not http, try localStorage first; if not found, fall through to presign
+  // Dev: if not http, try localStorage first
   if (isDevelopment && !rawUrl.startsWith('http')) {
     const dataURL = localStorage.getItem(rawUrl);
     if (dataURL) {
+      // If found in localStorage, return it directly without presign attempt
       return dataURL;
     }
-    // no local dev asset — continue to presign flow below
+    // If not found in localStorage but looks like a dev key, don't try presign
+    if (rawUrl.includes('/') || rawUrl.includes('-')) {
+      // Looks like a dev storage key but not in localStorage - return null
+      return null;
+    }
   }
 
   // Return cached if not expired

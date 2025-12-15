@@ -518,6 +518,37 @@ export default function LengkapiProfil() {
     try {
       setIsLoading(true);
 
+      // Validate session before making requests
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        console.error("Session error:", sessionError);
+        toast({
+          title: lang === "id" ? "Sesi Berakhir" : "Session Expired",
+          description: lang === "id" 
+            ? "Sesi Anda telah berakhir. Silakan masuk kembali."
+            : "Your session has expired. Please log in again.",
+          variant: "destructive",
+        });
+        navigate("/masuk");
+        return;
+      }
+
+      // Check if session has valid refresh token
+      if (!session.refresh_token) {
+        console.error("No refresh token in session");
+        await supabase.auth.signOut();
+        toast({
+          title: lang === "id" ? "Sesi Tidak Valid" : "Invalid Session",
+          description: lang === "id"
+            ? "Sesi Anda tidak valid. Silakan masuk kembali."
+            : "Your session is invalid. Please log in again.",
+          variant: "destructive",
+        });
+        navigate("/masuk");
+        return;
+      }
+
       // Upload files if they exist (only upload new files)
       let npwpFileUrl = existingFiles.npwp_file_url; // Keep existing URL
       let nibFileUrl = existingFiles.nib_file_url; // Keep existing URL
@@ -684,15 +715,46 @@ export default function LengkapiProfil() {
 
       navigate("/profil");
     } catch (error) {
-      console.error("Error updating profile:", error);
+      console.error("Error updating company info:", error);
+      
+      // Handle auth-specific errors
+      if (error instanceof Error) {
+        if (error.message.includes("Invalid Refresh Token") || error.message.includes("Refresh Token Not Found")) {
+          toast({
+            title: lang === "id" ? "Sesi Berakhir" : "Session Expired",
+            description: lang === "id"
+              ? "Sesi Anda telah berakhir. Silakan masuk kembali."
+              : "Your session has expired. Please log in again.",
+            variant: "destructive",
+          });
+          await supabase.auth.signOut();
+          navigate("/masuk");
+          return;
+        }
+        
+        if (error.message.includes("401")) {
+          toast({
+            title: lang === "id" ? "Tidak Terautentikasi" : "Not Authenticated",
+            description: lang === "id"
+              ? "Anda harus masuk untuk melanjutkan."
+              : "You must be logged in to continue.",
+            variant: "destructive",
+          });
+          navigate("/masuk");
+          return;
+        }
+      }
+
       toast({
         title: lang === "id" ? "Gagal" : "Failed",
         description:
           lang === "id"
-            ? "Terjadi kesalahan saat memperbarui profil"
-            : "An error occurred while updating profile",
+            ? "Terjadi kesalahan saat memperbarui profil. Silakan coba lagi."
+            : "An error occurred while updating profile. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 

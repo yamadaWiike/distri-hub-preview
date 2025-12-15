@@ -550,7 +550,7 @@ export default function UserManagementRevamped() {
                     {user.profile?.nama_bisnis || "-"}
                   </TableCell>
                   <TableCell>{user.profile?.nama_pemilik || "-"}</TableCell>
-                  <TableCell className="text-sm">{user.profile?.email_pemilik || user.profile?.email || user.email}</TableCell>
+                  <TableCell className="text-sm">{user.profile?.email_pemilik || user.email}</TableCell>
                   <TableCell>{user.profile?.kota || "-"}</TableCell>
                   <TableCell>
                     {user.profile?.status

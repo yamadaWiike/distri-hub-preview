@@ -42,6 +42,14 @@ export default defineConfig(({ mode }) => {
               const payload = JSON.parse(bodyStr || '{}');
               const rawUrl: string = payload?.url || '';
 
+              // Validate input
+              if (!rawUrl) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Missing URL in request body' }));
+                return;
+              }
+
               // Lazy import AWS SDK only in dev server
               const { S3Client, GetObjectCommand } = await import('@aws-sdk/client-s3');
               const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
@@ -52,7 +60,34 @@ export default defineConfig(({ mode }) => {
               const accessKeyId = process.env.VITE_AWS_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
               const secretAccessKey = process.env.VITE_AWS_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY;
 
-              const s3 = new S3Client({ region, credentials: accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined });
+              // Validate required configuration
+              if (!region) {
+                console.error('[presign] Missing AWS_DEFAULT_REGION');
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Server misconfiguration: missing region' }));
+                return;
+              }
+
+              if (!bucket) {
+                console.error('[presign] Missing AWS_BUCKET');
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Server misconfiguration: missing bucket' }));
+                return;
+              }
+
+              // AWS credentials are optional for some scenarios, but warn if missing in production
+              if (!accessKeyId || !secretAccessKey) {
+                console.warn('[presign] AWS credentials not found. Presigning may fail for private buckets.');
+              }
+
+              // Create S3 client with proper credential handling
+              const s3ClientConfig: any = { region };
+              if (accessKeyId && secretAccessKey) {
+                s3ClientConfig.credentials = { accessKeyId, secretAccessKey };
+              }
+              const s3 = new S3Client(s3ClientConfig);
 
               // Derive Key from full S3 URL (virtual-hosted or path-style) or accept raw key
               let Key = rawUrl;
@@ -67,10 +102,18 @@ export default defineConfig(({ mode }) => {
                     // Virtual-hosted style already yields the key-only path
                     Key = path || rawUrl;
                   }
-                } catch {
+                } catch (urlError) {
+                  console.error('[presign] URL parsing error:', urlError, 'rawUrl:', rawUrl);
                   const m = rawUrl.match(/https?:\/\/[^/]+\/(.+)$/);
                   if (m) Key = m[1];
                 }
+              }
+
+              if (!Key) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Could not extract key from URL' }));
+                return;
               }
 
               const cmd = new GetObjectCommand({ Bucket: bucket, Key });
@@ -82,9 +125,10 @@ export default defineConfig(({ mode }) => {
               res.end(JSON.stringify({ url: signedUrl, hasSignature, bucket, region }));
             } catch (e) {
               console.error('[presign] error', e);
+              const errorMsg = (e && typeof e === 'object' && 'message' in e) ? (e as any).message : 'Presign failed';
               res.statusCode = 500;
               res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ error: (e && (e as any).message) || 'Presign failed' }));
+              res.end(JSON.stringify({ error: errorMsg }));
             }
           });
         },
