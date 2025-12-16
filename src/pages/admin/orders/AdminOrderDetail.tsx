@@ -510,8 +510,7 @@ export default function AdminOrderDetail() {
                   variant="outline"
                   onClick={() => navigate("/admin/orders")}
                 >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  {t.backToOrders}
+                  <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900">
