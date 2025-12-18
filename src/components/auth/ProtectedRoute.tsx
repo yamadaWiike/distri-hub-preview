@@ -3,13 +3,22 @@
  * Provides route-level security based on authentication and user roles
  */
 
+// React & Router
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/use-auth';
-import { validateAuth, AuthValidationResult } from '@/utils/auth-guards';
+
+// External Libraries
 import { Loader2, AlertTriangle, Lock } from 'lucide-react';
+
+// UI Components
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+
+// Hooks
+import { useAuth } from '@/hooks/use-auth';
+
+// Utils
+import { validateAuth, AuthValidationResult } from '@/utils/auth-guards';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;

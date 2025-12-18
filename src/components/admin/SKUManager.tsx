@@ -77,7 +77,15 @@ interface UOMPricing {
  * - Update the Database interface in types.ts to match actual DB schema
  * - Consider using the Supabase CLI to generate types automatically
  */
+
+// React
 import React, { useState, useEffect } from 'react';
+
+// External Libraries
+import { Trash2, Edit, Plus, X, Search, Loader2, RefreshCw, Info } from 'lucide-react';
+import { PostgrestError } from '@supabase/supabase-js';
+
+// UI Components
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -88,19 +96,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/use-auth';
-import { Trash2, Edit, Plus, X, Search, Loader2, RefreshCw, Info } from 'lucide-react';
-import { useLanguage } from '@/hooks/use-language';
-import { PostgrestError } from '@supabase/supabase-js';
-import { fetchAllBrands, getBrandNameFromCache, Brand, createNewBrand } from '@/data/brands';
-import { Database } from '@/integrations/supabase/types';
 import { 
   Tooltip, 
   TooltipContent, 
   TooltipProvider, 
   TooltipTrigger 
 } from '@/components/ui/tooltip';
+
+// Hooks
+import { useAuth } from '@/hooks/use-auth';
+import { useLanguage } from '@/hooks/use-language';
+
+// Integrations
+import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
+
+// Data
+import { fetchAllBrands, getBrandNameFromCache, Brand, createNewBrand } from '@/data/brands';
 
 // Translation objects
 const id = {

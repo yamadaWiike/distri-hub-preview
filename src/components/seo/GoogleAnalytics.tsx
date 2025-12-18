@@ -3,7 +3,7 @@
  * Adds Google Analytics tracking to the application
  */
 
-// Third-party imports
+// React & Router
 import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 

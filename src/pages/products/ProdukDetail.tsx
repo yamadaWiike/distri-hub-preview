@@ -24,7 +24,8 @@ import { PRODUCTS, Product } from "@/data/products";
 import { formatIDR, getProductIdFromSlug, generateProductSlug } from "@/lib/utils";
 import { translations } from "@/lib/translations";
 import { fetchProductBySku } from "@/lib/db";
-import { getImageUrl } from "@/lib/s3-upload";
+// getImageUrl no longer needed for display; PresignedImage handles S3
+import PresignedImage from "@/components/ui/PresignedImage";
 import { checkMixedVariantsMOQ } from "@/utils/mixVariants";
 import { getAllProducts } from "@/services/product-service";
 import { CartItem } from "@/contexts/CartContextDefinition";
@@ -158,29 +159,10 @@ export default function ProdukDetail() {
   // Create product images array - use product.images if available, fallback to single image
   // Use image_url if available (already processed), otherwise use getImageUrl for proper S3 URL handling
   const productImages = product && product.images && product.images.length > 0
-    ? product.images.map(img => {
-        // If already a full URL, use as is, otherwise process through getImageUrl for S3
-        if (img.startsWith('http') || img.startsWith('https')) {
-          return img;
-        }
-        const s3Url = getImageUrl(img);
-        return s3Url || img; // Fallback to original if getImageUrl returns null
-      })
+    ? product.images
     : [(() => {
-        // Check for image_url field first (from database, already processed)
         const productWithImageUrl = product as Product & { image_url?: string };
-        if (productWithImageUrl?.image_url) {
-          return productWithImageUrl.image_url;
-        }
-        // Fallback to processing image field
-        if (product?.image) {
-          if (product.image.startsWith('http') || product.image.startsWith('https')) {
-            return product.image;
-          }
-          const s3Url = getImageUrl(product.image);
-          return s3Url || product.image;
-        }
-        return '/placeholder.svg';
+        return productWithImageUrl?.image_url || product?.image || '/placeholder.svg';
       })()];
   // Debug: log productImages array to check image URLs
 
@@ -223,13 +205,29 @@ export default function ProdukDetail() {
   );
   const regional = product.regions.find((r) => r.area === selectedArea) || product.regions[0];
   const usedPrice = regional?.distributorPrice ?? product.distributorPrice;
+  const usedRetailPrice = regional?.retailPrice ?? product.retailPrice ?? product.consumerPrice * 0.9;
   const usedMoq = regional?.moq ?? product.moq;
   
   // Mix variant logic
   const allowMixVariants = Boolean(regional?.allowMixVariants === true || product.allowMixVariants === true);
   const skuLevelMoq = Number(regional?.skuLevelMoq || product.singleSkuMoq || 0);
-  const displayMoq = (allowMixVariants && skuLevelMoq > 0) ? skuLevelMoq : usedMoq;
+  // Display regular MOQ only (no conversions or SKU-level mixing)
+  const displayMoq = usedMoq;
   const canMixVariants = Boolean(allowMixVariants === true && product.hasVariants === true);
+
+  // Debug logging for MOQ inconsistency issue
+  if (product.name.includes('Suno') || product.name.includes('Tobelo')) {
+    console.log(`[MOQ DEBUG DETAIL] ${product.name}:`, {
+      productMoq: product.moq,
+      regionalMoq: regional?.moq,
+      usedMoq,
+      allowMixVariants,
+      skuLevelMoq,
+      displayMoq,
+      selectedArea,
+      regionCount: product.regions.length
+    });
+  }
   
   // Calculate content per carton from UOM conversion factors
   const pricingConversionFactor = product.pricing_conversion_factor || regional?.pricing_conversion_factor || 0;
@@ -263,12 +261,14 @@ export default function ProdukDetail() {
           <div className="lg:col-span-2 space-y-4">
             {/* Main Product Image */}
             <div className="bg-white rounded-lg border overflow-hidden relative group">
-              <img 
-                src={productImages[currentImageIndex]} 
-                alt={`${product.name} ${product.size}`} 
-                className="w-full aspect-square object-contain cursor-pointer hover:scale-105 transition-transform duration-300" 
-                onClick={() => setImageDialogOpen(true)}
-              />
+              <div onClick={() => setImageDialogOpen(true)}>
+                <PresignedImage
+                  src={productImages[currentImageIndex]}
+                  alt={`${product.name} ${product.size}`}
+                  className="w-full aspect-square object-contain cursor-pointer hover:scale-105 transition-transform duration-300"
+                  allowRawS3
+                />
+              </div>
               
               {/* Navigation Arrows - Only show if multiple images */}
               {hasMultipleImages && (
@@ -311,11 +311,11 @@ export default function ProdukDetail() {
                     }`}
                     onClick={() => setCurrentImageIndex(idx)}
                   >
-                    <img 
-                      src={getImageUrl(img) || img}
+                    <PresignedImage
+                      src={img}
                       alt={`Thumbnail ${idx + 1}`}
                       className="w-full h-full object-cover hover:opacity-75 transition"
-                      onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = '/placeholder.svg'; }}
+                      allowRawS3
                     />
                   </div>
                 ))}
@@ -475,11 +475,11 @@ export default function ProdukDetail() {
                 </div>
                 <div className="text-right">
                   <p className="text-base font-semibold text-gray-900">
-                    {formatIDR(product.retailPrice || product.consumerPrice * 0.9)}
+                    {formatIDR(usedRetailPrice)}
                   </p>
                   {contentPerCarton && (
                     <p className="text-xs text-gray-600">
-                      {lang === 'id' ? `Per ${baseUom}` : `Per ${baseUom}`}: <span className="font-semibold">{formatIDR(Math.round((product.retailPrice || product.consumerPrice * 0.9) / contentPerCarton))}</span>
+                      {lang === 'id' ? `Per ${baseUom}` : `Per ${baseUom}`}: <span className="font-semibold">{formatIDR(Math.round(usedRetailPrice / contentPerCarton))}</span>
                     </p>
                   )}
                 </div>
@@ -519,7 +519,7 @@ export default function ProdukDetail() {
                     {lang === 'id' ? `Estimasi Margin (${qty} karton)` : `Estimated Margin (${qty} cartons)`}
                   </p>
                   <p className={`text-base font-bold text-teal-600 ${!user ? 'blur-sm select-none' : ''}`}>
-                    {formatIDR(Math.round(((product.retailPrice || product.consumerPrice * 0.9) - usedPrice) * qty))} ({((((product.retailPrice || product.consumerPrice * 0.9) - usedPrice) / (product.retailPrice || product.consumerPrice * 0.9)) * 100).toFixed(1)}%)
+                    {formatIDR(Math.round((usedRetailPrice - usedPrice) * qty))} ({(((usedRetailPrice - usedPrice) / usedRetailPrice) * 100).toFixed(1)}%)
                   </p>
                 </div>
               </div>

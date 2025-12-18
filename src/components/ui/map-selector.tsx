@@ -1,8 +1,13 @@
+// React
 import { useCallback, useEffect, useState, useRef } from 'react';
+
+// External Libraries
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
-import { L } from '../../lib/leaflet-icon-fix';
 import axios from 'axios';
 import 'leaflet/dist/leaflet.css';
+
+// Utils
+import { L } from '../../lib/leaflet-icon-fix';
 
 interface SearchResult {
   display_name: string;

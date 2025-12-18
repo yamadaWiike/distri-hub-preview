@@ -54,17 +54,17 @@ export async function createOrder(
   payload: orderPayload
 ): Promise<OrderResponse> {
   // Check if bypass mode is enabled
-  const bypassEnabled = import.meta.env.VITE_BASKIT_API_BYPASS === 'true';
-  
+  const bypassEnabled = import.meta.env.VITE_BASKIT_API_BYPASS === "true";
+
   if (bypassEnabled) {
     return {
       statusCode: 200,
       orderCode: `BYPASS-ORDER-${Date.now()}`,
-      message: 'Order created successfully (bypassed)'
+      message: "Order created successfully (bypassed)",
     };
   }
 
-  return baskitApiRequest("/distributor-hub/order", {
+  return baskitApiRequest("/distributor-hub/sales-order", {
     method: "POST",
     body: JSON.stringify(payload),
   });

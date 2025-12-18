@@ -2,7 +2,7 @@ import { jsPDF } from "jspdf";
 import { format } from 'date-fns';
 import { formatRp, pxToMm, pxToPt, safeNumber, safeString } from "./Funtions";
 import { ProductWithVariant } from "@/services/product-service";
-import { getImageUrl } from "@/lib/s3-upload";
+import { getImageUrl, getImageUrlAsync } from "@/lib/s3-upload";
 
 /**
  * Convert image URL to base64 data URL for PDF compatibility
@@ -108,6 +108,7 @@ type GenerateCatalogPDF = {
   brand?: string;
   priceRange?: PriceRange;
   fileName?: string;
+  lang?: 'id' | 'en';
 }
 
 /**
@@ -121,6 +122,34 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
   const brand = safeString(props.brand, '-');
   const priceRange = props.priceRange || { min: 0, max: 0 };
   const fileName = safeString(props.fileName, 'catalog.pdf');
+  const lang: 'id' | 'en' = (props.lang === 'en' || props.lang === 'id') ? props.lang : 'id';
+  const TT = {
+    secret: lang === 'id' ? 'RAHASIA' : 'CONFIDENTIAL',
+    coverTitle: lang === 'id' ? 'Katalog Distributor' : 'Distributor Catalog',
+    coverSubtitle: lang === 'id' ? 'Katalog Resmi: Harga & Stok Terkini' : 'Official Catalog: Latest Prices & Stock',
+    areaLabel: lang === 'id' ? 'Area Distribusi' : 'Distribution Area',
+    brandLabel: lang === 'id' ? 'Brand' : 'Brand',
+    priceRangeLabel: lang === 'id' ? 'Rentang Harga per Karton' : 'Price Range per Carton',
+    headerTitle: lang === 'id' ? 'Katalog Distributor' : 'Distributor Catalog',
+    headerArea: lang === 'id' ? 'Area Distribusi' : 'Distribution Area',
+    headerDate: lang === 'id' ? 'Tanggal' : 'Date',
+    packagingSection: lang === 'id' ? 'KEMASAN & DISTRIBUSI' : 'PACKAGING & DISTRIBUTION',
+    packagingUnknown: lang === 'id' ? 'Kemasan: -' : 'Packaging: -',
+    sla: lang === 'id' ? 'SLA: 7-14 hari' : 'SLA: 7-14 days',
+    area: lang === 'id' ? 'AREA' : 'AREA',
+    distributorPriceLabel: lang === 'id' ? 'HARGA DISTRIBUTOR' : 'DISTRIBUTOR PRICE',
+    moqLabel: lang === 'id' ? 'MOQ' : 'MOQ',
+    variant: lang === 'id' ? 'Varian' : 'Variant',
+    priceSection: lang === 'id' ? 'HARGA' : 'PRICE',
+    distributor: lang === 'id' ? 'Distributor' : 'Distributor',
+    cartonLabel: lang === 'id' ? 'Karton:' : 'Carton:',
+    perPiece: lang === 'id' ? 'Per Pcs:' : 'Per Piece:',
+    retail: lang === 'id' ? 'Retail' : 'Retail',
+    potentialMargin: lang === 'id' ? 'Potensi Margin:' : 'Potential Margin:',
+    consumer: lang === 'id' ? 'Konsumen' : 'Consumer',
+    footerPageLabel: lang === 'id' ? 'Halaman ke' : 'Page',
+    footerOfLabel: lang === 'id' ? 'dari' : 'of'
+  } as const;
 
   // Create jsPDF instance (A4 portrait, units = mm)
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
@@ -169,6 +198,7 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     doc.setFontSize(pxToPt(12));
     doc.setTextColor(primary);
     doc.text('RAHASIA', secretContentX, secretContentY);
+  doc.text(TT.secret, secretContentX, secretContentY);
 
     // Baskit Logo
     const logoH = pxToMm(60);
@@ -179,12 +209,14 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     doc.setFontSize(pxToPt(34));
     doc.setTextColor(primary);
     doc.text("Katalog Distributor", coverX, coverY);
+  doc.text(TT.coverTitle, coverX, coverY);
 
     // Catalog description
     coverY += pxToMm(30);
     doc.setFontSize(pxToPt(14));
     doc.setTextColor(baseLight);
     doc.text('Katalog Resmi: Harga & Stok Terkini', coverX, coverY);
+  doc.text(TT.coverSubtitle, coverX, coverY);
 
     // Divider
     coverY += pxToMm(50);
@@ -196,12 +228,14 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     doc.setFontSize(pxToPt(12));
     doc.setTextColor(baseLight);
     doc.text('Area Distribusi', coverX, coverY);
+  doc.text(TT.areaLabel, coverX, coverY);
 
     // Brand Label
     const brandX = coverX + pxToMm(160);
     doc.setFontSize(pxToPt(12));
     doc.setTextColor(baseLight);
     doc.text('Brand', brandX, coverY);
+  doc.text(TT.brandLabel, brandX, coverY);
 
     // Distributor Area Value
     coverY += pxToMm(30);
@@ -217,6 +251,7 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     doc.setFontSize(pxToPt(12));
     doc.setTextColor(baseLight);
     doc.text('Rentang Harga per Karton', coverX, coverY)
+  doc.text(TT.priceRangeLabel, coverX, coverY)
 
     coverY += pxToMm(30);
     doc.setFontSize(pxToPt(18));
@@ -241,12 +276,15 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     doc.setFontSize(pxToPt(12));
     doc.setTextColor(primary);
     doc.text("Distributor Catalog", headerX, headerY);
+  doc.text(TT.headerTitle, headerX, headerY);
 
     // Distributor Area
     doc.setFontSize(pxToPt(12));
     doc.setTextColor(baseDarker);
     doc.text(`Area Distribusi: ${distributionArea}`, headerX + headerW, margin, { align: "right" });
+      doc.text(`${TT.headerArea}: ${distributionArea}`, headerX + headerW, margin, { align: "right" });
     doc.text(`Tanggal: ${today}`, headerX + headerW, margin + pxToMm(16), { align: "right" });
+  doc.text(`${TT.headerDate}: ${today}`, headerX + headerW, margin + pxToMm(16), { align: "right" });
 
     // Divider
     headerY += pxToMm(8);
@@ -293,23 +331,28 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
       doc.roundedRect(leftX, leftY, imgW, imgH, pxToMm(10), pxToMm(10), "DF");
 
       if (p?.image_url || p?.image) {
-        // Use image_url if available (already processed with S3 URL), otherwise process image field
+        // Prefer explicit image_url; fallback to image field
         let imageUrl = p.image_url || p.image;
-        
-        // If using original image field and not already a full URL, try to get S3 URL
-        if (!p.image_url && p.image && !p.image.startsWith('http') && !p.image.startsWith('https')) {
-          const s3Url = getImageUrl(p.image);
-          if (s3Url) {
-            imageUrl = s3Url;
+
+        // If the source looks like an S3 key or S3 URL, resolve a presigned URL for reliable access
+        const looksLikeS3 = !!imageUrl && (
+          !imageUrl.startsWith('http') ||
+          imageUrl.includes('amazonaws.com')
+        );
+        if (looksLikeS3 && imageUrl) {
+          try {
+            const presigned = await getImageUrlAsync(imageUrl);
+            if (presigned) {
+              imageUrl = presigned;
+            }
+          } catch (_) {
+            // Fall back to original imageUrl on failure
           }
+        } else if (!p.image_url && p.image && !p.image.startsWith('http')) {
+          // Non-http keys in non-S3 scenario (dev local keys)
+          const s3Url = getImageUrl(p.image);
+          if (s3Url) imageUrl = s3Url;
         }
-        
-        console.log(`Processing image for product: ${p.name}`, {
-          image_url: p.image_url,
-          image: p.image,
-          finalImageUrl: imageUrl,
-          isValidUrl: !(!imageUrl || imageUrl === '/placeholder.svg' || imageUrl === 'null' || imageUrl.trim() === '')
-        });
 
         // Skip invalid URLs
         if (!imageUrl || imageUrl === '/placeholder.svg' || imageUrl === 'null' || imageUrl.trim() === '') {
@@ -385,13 +428,16 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     leftY += pxToMm(20);
     doc.setTextColor(baseLight);
     doc.text('KEMASAN & DISTRIBUSI', leftX, leftY);
+  doc.text(TT.packagingSection, leftX, leftY);
 
     leftY += pxToMm(16);
     doc.setTextColor(baseDarker);
     doc.text(`Kemasan: -`, leftX, leftY);
+  doc.text(TT.packagingUnknown, leftX, leftY);
 
     leftY += pxToMm(16);
-    doc.text(`SLA: -`, leftX, leftY);
+    doc.text(`SLA: 7-14 hari`, leftX, leftY);
+  doc.text(TT.sla, leftX, leftY);
 
     // Divider
     leftY += pxToMm(8);
@@ -404,12 +450,16 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     leftY += pxToMm(18);
     doc.setTextColor(baseLight);
     doc.text('AREA', leftX, leftY);
+      doc.text(TT.area, leftX, leftY);
     // Distributor Price
     const leftWOneThird = leftW / 3;
     doc.text('HARGA DISTRIBUTOR', leftX + leftWOneThird, leftY);
+      doc.text(TT.distributorPriceLabel, leftX + leftWOneThird, leftY);
     // MOQ
     const moqX = leftX + leftW
     doc.text('MOQ', moqX, leftY, { align: 'right' });
+  doc.text(TT.moqLabel, moqX, leftY, { align: 'right' });
+  doc.text(`${TT.variant}: ${safeString(p?.variantInfo?.variantName, '-')}`, productInfoW, productInfoY);
 
     // List for Area, Distributor & MOQ
     // Area
@@ -418,10 +468,10 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
         leftY += pxToMm(16);
         doc.setTextColor(baseDarker);
         doc.text(region.area, leftX, leftY);
-        // Distributor Price
+        // Distributor Price (paired with MOQ UOM for clarity)
         doc.text(`${safeString(safeString(region?.distributorPrice, '-'))} / ${safeString(region?.moq_uom, '-')}`, leftX + leftWOneThird, leftY);
-        // MOQ
-        doc.text(`${safeString(region?.moq, '-')} ${safeString(region?.price_uom, '-')}`, moqX, leftY, { align: 'right' });
+        // MOQ should display value with its own UOM, not price UOM
+        doc.text(`${safeString(region?.moq, '-')} ${safeString(region?.moq_uom, '-')}`, moqX, leftY, { align: 'right' });
       })
     }
 
@@ -430,42 +480,51 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     doc.setFillColor(lightGray);
     doc.rect(leftX, leftY, leftW, pxToMm(0.5), "F");
 
-    // Promo
-    leftY += pxToMm(14);
-    doc.setDrawColor(lightPrimary);
-    doc.setLineWidth(pxToMm(1));
-    doc.setFillColor(lightPeach);
-    doc.roundedRect(leftX, leftY, leftW, pxToMm(44), pxToMm(4), pxToMm(4), "DF");
-    const promoPad = pxToMm(8)
-    let promoContentY = leftY + (promoPad * 2);
-    const promoContentX = leftX + promoPad;
-    doc.setTextColor(primary);
-    doc.text('PROGRAM PROMO', promoContentX, promoContentY);
-    promoContentY += pxToMm(16);
-    doc.text('-', promoContentX, promoContentY);
+    // Promo (hidden)
+    // leftY += pxToMm(14);
+    // doc.setDrawColor(lightPrimary);
+    // doc.setLineWidth(pxToMm(1));
+    // doc.setFillColor(lightPeach);
+    // doc.roundedRect(leftX, leftY, leftW, pxToMm(44), pxToMm(4), pxToMm(4), "DF");
+    // const promoPad = pxToMm(8)
+    // let promoContentY = leftY + (promoPad * 2);
+    // const promoContentX = leftX + promoPad;
+    // doc.setTextColor(primary);
+    // doc.text('PROGRAM PROMO', promoContentX, promoContentY);
+    // promoContentY += pxToMm(16);
+    // doc.text('-', promoContentX, promoContentY);
 
     //=== RIGHT SECTION ===
     // Price
     rightY += pxToMm(20);
     doc.setTextColor(baseLight);
     doc.text('HARGA', rightX, rightY);
+  doc.text(TT.priceSection, rightX, rightY);
 
+    // Distributor (use selected area price for consistency)
+    const selectedRegion = Array.isArray(p?.regions)
+      ? (p.regions.find(r => safeString(r.area, '-') === distributionArea) || p.regions[0])
+      : undefined;
+    const distributorPricePerCarton = safeNumber(selectedRegion?.distributorPrice ?? p?.distributorPrice);
     // Distributor
     rightY += pxToMm(16);
     doc.setTextColor(baseDarker);
     doc.setFontSize(pxToPt(12));
-    doc.text('Distributor', rightX, rightY);
+    // Single localized label
+    doc.text(TT.distributor, rightX, rightY);
+  //doc.text(TT.cartonLabel, rightX, rightY);
 
     rightY += pxToMm(16);
     doc.setFontSize(pxToPt(10));
-    doc.text('Karton:', rightX, rightY);
+    doc.text(TT.cartonLabel, rightX, rightY);
     const maxRightX = rightX + rightW;
     doc.setTextColor(primary);
-    doc.text(formatRp(safeNumber(p?.distributorPrice)), maxRightX, rightY, { align: "right" });
+    doc.text(formatRp(distributorPricePerCarton), maxRightX, rightY, { align: "right" });
 
     rightY += pxToMm(16);
     doc.setTextColor(baseDarker);
-    doc.text('Per Pcs:', rightX, rightY);
+    // Single localized label
+    doc.text(TT.perPiece, rightX, rightY);
     doc.setTextColor(primary);
     doc.text("-", maxRightX, rightY, { align: "right" });
 
@@ -478,15 +537,17 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     rightY += pxToMm(18);
     doc.setTextColor(baseDarker);
     doc.setFontSize(pxToPt(12));
-    doc.text('Retail', rightX, rightY);
+    // Single localized label
+    doc.text(TT.retail, rightX, rightY);
+  //doc.text(TT.perPiece, rightX, rightY);
 
     rightY += pxToMm(16);
     doc.setFontSize(pxToPt(10));
-    doc.text('Karton:', rightX, rightY);
+    doc.text(TT.cartonLabel, rightX, rightY);
     doc.text(formatRp(safeNumber(p?.retailPrice)), maxRightX, rightY, { align: "right" });
 
     rightY += pxToMm(16);
-    doc.text('Per Pcs:', rightX, rightY);
+    doc.text(TT.perPiece, rightX, rightY);
     doc.text("-", maxRightX, rightY, { align: "right" });
 
     // Potential Margin
@@ -499,9 +560,9 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     const potentialMarginPad = pxToMm(8)
     const potentialMarginContentY = rightY + (potentialMarginPad * 2);
     const potentialMarginContentX = rightX + potentialMarginPad;
-    doc.text('Potensi Margin:', potentialMarginContentX, potentialMarginContentY);
-    promoContentY += pxToMm(16);
-    doc.text('-', maxRightX - potentialMarginPad, potentialMarginContentY, { align: 'right' });
+    // Single localized label to avoid duplicate rendering
+    doc.text(TT.potentialMargin, potentialMarginContentX, potentialMarginContentY);
+      doc.text(`${margin.toFixed(1)}%`, maxRightX - potentialMarginPad, potentialMarginContentY, { align: 'right' });
 
     // Divider
     rightY += potentialMarginH + pxToMm(8);
@@ -513,10 +574,11 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
     doc.setTextColor(baseDarker);
     doc.setFontSize(pxToPt(12));
     doc.text('Konsumen', rightX, rightY);
+  doc.text(TT.consumer, rightX, rightY);
 
     rightY += pxToMm(16);
     doc.setFontSize(pxToPt(10));
-    doc.text('Karton:', rightX, rightY);
+    doc.text(TT.cartonLabel, rightX, rightY);
     doc.text(formatRp(safeNumber(p?.consumerPrice)), maxRightX, rightY, { align: "right" });
 
     rightY += pxToMm(16);
@@ -589,12 +651,11 @@ export async function generateCatalogPDF(props: GenerateCatalogPDF) {
 
     // Page Number
     doc.setTextColor(baseDarker);
-    doc.text(`Halaman ke ${p - 1} dari ${pageCount - 1}`, footerW, footerY, { align: "right" });
+    doc.text(`${TT.footerPageLabel} ${p - 1} ${TT.footerOfLabel} ${pageCount - 1}`, footerW, footerY, { align: "right" });
 
   }
 
   // Save file (triggers download in browser)
   doc.save(fileName);
-  // doc.output('dataurlnewwindow');
-  //window.open(doc.output('bloburl'), '_blank');
+  console.log('PDF generation completed:', fileName);
 }

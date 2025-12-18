@@ -1,29 +1,57 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { Eye, Edit, Trash2, Search, Loader2, Calendar, MoreVertical } from 'lucide-react';
+// React & Router
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+
+// External Libraries
+import {
+  Eye,
+  Edit,
+  Trash2,
+  Search,
+  Loader2,
+  Calendar,
+  MoreVertical,
+} from "lucide-react";
+
+// UI Components
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-// import { createCustomer, type CustomerPayload } from '@/lib/baskitApiCustomer'; // BYPASSED
-import { useLanguage } from '@/hooks/use-language';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
+// Hooks
+import { useLanguage } from "@/hooks/use-language";
+
+// Integrations
+import { supabase } from "@/integrations/supabase/client";
 
 // Define distributor profile type based on actual database schema
 type DistributorProfile = {
@@ -44,11 +72,11 @@ const DistributorManager = () => {
   const { toast } = useToast();
   const { lang } = useLanguage();
   const navigate = useNavigate();
-  const t = lang === 'id' ? translations.id : translations.en;
-  
+  const t = lang === "id" ? translations.id : translations.en;
+
   const [distributors, setDistributors] = useState<DistributorProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Fetch distributors from database
   const fetchDistributors = async () => {
@@ -56,19 +84,19 @@ const DistributorManager = () => {
     try {
       // In the fetchDistributors function, revert to original:
       const { data, error } = await supabase
-        .from('distributor_profiles')
-        .select('*');
+        .from("distributor_profiles")
+        .select("*");
       if (error) {
-        console.error('Error fetching distributors:', error);
+        console.error("Error fetching distributors:", error);
         throw error;
       }
       setDistributors(data || []);
     } catch (error) {
-      console.error('Error fetching distributors:', error);
+      console.error("Error fetching distributors:", error);
       toast({
         title: t.errorFetching,
         description: error instanceof Error ? error.message : String(error),
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -85,9 +113,9 @@ const DistributorManager = () => {
 
     try {
       const { error } = await supabase
-        .from('distributor_profiles')
+        .from("distributor_profiles")
         .delete()
-        .eq('id', distributorId);
+        .eq("id", distributorId);
 
       if (error) throw error;
 
@@ -98,11 +126,11 @@ const DistributorManager = () => {
 
       fetchDistributors();
     } catch (error) {
-      console.error('Error deleting distributor:', error);
+      console.error("Error deleting distributor:", error);
       toast({
         title: t.errorDeleting,
         description: error instanceof Error ? error.message : String(error),
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -118,7 +146,7 @@ const DistributorManager = () => {
   };
 
   // Filter distributors based on search query
-  const filteredDistributors = distributors.filter(distributor => {
+  const filteredDistributors = distributors.filter((distributor) => {
     const searchLower = searchQuery.toLowerCase();
     return (
       distributor.nama_bisnis?.toLowerCase().includes(searchLower) ||
@@ -130,62 +158,82 @@ const DistributorManager = () => {
   });
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    return new Date(dateString).toLocaleDateString(
+      lang === "id" ? "id-ID" : "en-US",
+      {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }
+    );
   };
 
   // Handle status change using actual database status values
-  const handleStatusChange = async (distributor: DistributorProfile, newStatus: string) => {
+  const handleStatusChange = async (
+    distributor: DistributorProfile,
+    newStatus: string
+  ) => {
     try {
       // Update status in Supabase directly
       const { error } = await supabase
-        .from('distributor_profiles')
+        .from("distributor_profiles")
         // @ts-expect-error - Type mismatch with Supabase generated types
         .update({ status: newStatus })
-        .eq('user_id', distributor.user_id);
-      
+        .eq("user_id", distributor.user_id);
+
       if (error) throw error;
-      
-      toast({ title: t.statusUpdated, variant: 'default' });
-      
+
+      toast({ title: t.statusUpdated, variant: "default" });
+
       // TODO: External Customer API call bypassed for now to prevent blocking
-      if (newStatus === 'active') {
-        console.log('[BYPASSED] Customer API call for distributor:', distributor.nama_bisnis);
-        toast({ title: t.success, description: 'Distributor activated successfully (API calls bypassed)', variant: 'default' });
-        
+      if (newStatus === "active") {
+        console.log(
+          "[BYPASSED] Customer API call for distributor:",
+          distributor.nama_bisnis
+        );
+        toast({
+          title: t.success,
+          description:
+            "Distributor activated successfully (API calls bypassed)",
+          variant: "default",
+        });
+
         // Future implementation:
         // - Call external Customer API
         // - Register distributor in external systems
         // - Handle API responses and errors
       }
-      
+
       // Refresh distributors list
       fetchDistributors();
     } catch (err) {
-      console.error('Status update error:', err);
-      toast({ title: t.error, description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
+      console.error("Status update error:", err);
+      toast({
+        title: t.error,
+        description: err instanceof Error ? err.message : String(err),
+        variant: "destructive",
+      });
     }
   };
 
   // Get status badge color and label using actual database values
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      'pending': { color: 'bg-yellow-500 text-white', label: t.pending },
-      'waiting_activation': { color: 'bg-blue-500 text-white', label: t.waitingActivation },
-      'active': { color: 'bg-green-500 text-white', label: t.active },
-      'inactive': { color: 'bg-gray-500 text-white', label: t.inactive },
-      'rejected': { color: 'bg-red-500 text-white', label: t.rejected },
+      pending: { color: "bg-yellow-500 text-white", label: t.pending },
+      waiting_activation: {
+        color: "bg-blue-500 text-white",
+        label: t.waitingActivation,
+      },
+      active: { color: "bg-green-500 text-white", label: t.active },
+      inactive: { color: "bg-gray-500 text-white", label: t.inactive },
+      rejected: { color: "bg-red-500 text-white", label: t.rejected },
     };
-    
-    const config = statusConfig[status] || { color: 'bg-gray-400 text-white', label: status };
-    return (
-      <Badge className={config.color}>
-        {config.label}
-      </Badge>
-    );
+
+    const config = statusConfig[status] || {
+      color: "bg-gray-400 text-white",
+      label: status,
+    };
+    return <Badge className={config.color}>{config.label}</Badge>;
   };
 
   return (
@@ -194,36 +242,46 @@ const DistributorManager = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t.totalDistributors}</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {t.totalDistributors}
+            </CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{distributors.length}</div>
-            <p className="text-xs text-muted-foreground">{t.registeredDistributors}</p>
+            <p className="text-xs text-muted-foreground">
+              {t.registeredDistributors}
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t.activeDistributors}</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {t.activeDistributors}
+            </CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {distributors.filter(d => d.status === 'active').length}
+              {distributors.filter((d) => d.status === "active").length}
             </div>
-            <p className="text-xs text-muted-foreground">{t.approvedAndActive}</p>
+            <p className="text-xs text-muted-foreground">
+              {t.approvedAndActive}
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t.pendingApproval}</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {t.pendingApproval}
+            </CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {distributors.filter(d => d.status === 'pending').length}
+              {distributors.filter((d) => d.status === "pending").length}
             </div>
             <p className="text-xs text-muted-foreground">{t.awaitingReview}</p>
           </CardContent>
@@ -231,12 +289,17 @@ const DistributorManager = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t.waitingActivation}</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {t.waitingActivation}
+            </CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {distributors.filter(d => d.status === 'waiting_activation').length}
+              {
+                distributors.filter((d) => d.status === "waiting_activation")
+                  .length
+              }
             </div>
             <p className="text-xs text-muted-foreground">{t.kybCompleted}</p>
           </CardContent>
@@ -254,10 +317,7 @@ const DistributorManager = () => {
             className="pl-8"
           />
         </div>
-        <Button 
-          variant="outline" 
-          onClick={() => setSearchQuery('')}
-        >
+        <Button variant="outline" onClick={() => setSearchQuery("")}>
           {t.clearFilters}
         </Button>
       </div>
@@ -270,8 +330,11 @@ const DistributorManager = () => {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin" />
+            <div className="h-64 flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+                <p className="text-sm text-muted-foreground">{t.loading}</p>
+              </div>
             </div>
           ) : (
             <Table>
@@ -290,7 +353,9 @@ const DistributorManager = () => {
               <TableBody>
                 {filteredDistributors.map((distributor) => (
                   <TableRow key={distributor.id}>
-                    <TableCell className="font-medium">{distributor.nama_bisnis}</TableCell>
+                    <TableCell className="font-medium">
+                      {distributor.nama_bisnis}
+                    </TableCell>
                     <TableCell>{distributor.nama_pemilik}</TableCell>
                     <TableCell>{distributor.email}</TableCell>
                     <TableCell>{distributor.kontak_pemilik}</TableCell>
@@ -300,22 +365,32 @@ const DistributorManager = () => {
                         {getStatusBadge(distributor.status)}
                         <Select
                           value={distributor.status}
-                          onValueChange={(newStatus) => handleStatusChange(distributor, newStatus)}
+                          onValueChange={(newStatus) =>
+                            handleStatusChange(distributor, newStatus)
+                          }
                         >
                           <SelectTrigger className="w-auto h-6 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="pending">{t.pending}</SelectItem>
-                            <SelectItem value="waiting_activation">{t.waitingActivation}</SelectItem>
+                            <SelectItem value="waiting_activation">
+                              {t.waitingActivation}
+                            </SelectItem>
                             <SelectItem value="active">{t.active}</SelectItem>
-                            <SelectItem value="inactive">{t.inactive}</SelectItem>
-                            <SelectItem value="rejected">{t.rejected}</SelectItem>
+                            <SelectItem value="inactive">
+                              {t.inactive}
+                            </SelectItem>
+                            <SelectItem value="rejected">
+                              {t.rejected}
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     </TableCell>
-                    <TableCell>{formatDate(distributor.created_at || '')}</TableCell>
+                    <TableCell>
+                      {formatDate(distributor.created_at || "")}
+                    </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -324,15 +399,22 @@ const DistributorManager = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEditDistributor(distributor)}>
+                          <DropdownMenuItem
+                            onClick={() => handleEditDistributor(distributor)}
+                          >
                             <Edit className="h-4 w-4 mr-2" />
                             {t.edit}
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleViewDistributor(distributor)}>
+                          <DropdownMenuItem
+                            onClick={() => handleViewDistributor(distributor)}
+                          >
                             <Eye className="h-4 w-4 mr-2" />
                             {t.viewDetails}
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600" onClick={() => deleteDistributor(distributor.id)}>
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={() => deleteDistributor(distributor.id)}
+                          >
                             <Trash2 className="h-4 w-4 mr-2" />
                             {t.delete}
                           </DropdownMenuItem>
@@ -408,7 +490,8 @@ const translations = {
     activeDistributors: "Distributor Aktif",
     approvedAndActive: "disetujui & aktif",
     pendingApproval: "Menunggu Persetujuan",
-    awaitingReview: "menunggu tinjauan"
+    awaitingReview: "menunggu tinjauan",
+    loading: "Memuat...",
   },
   en: {
     totalDistributors: "Total Distributors",
@@ -464,6 +547,7 @@ const translations = {
     activeDistributors: "Active Distributors",
     approvedAndActive: "approved & active",
     pendingApproval: "Pending Approval",
-    awaitingReview: "awaiting review"
-  }
+    awaitingReview: "awaiting review",
+    loading: "Loading...",
+  },
 };

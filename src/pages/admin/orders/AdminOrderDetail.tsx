@@ -1,7 +1,32 @@
+// React & Router
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+
+// External Libraries
+import {
+  ArrowLeft,
+  Package,
+  MapPin,
+  Clock,
+  User,
+  Phone,
+  Mail,
+  FileText,
+  Save,
+  Trash2,
+  Plus,
+  Pencil,
+} from "lucide-react";
+
+// UI Components
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -21,26 +46,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  ArrowLeft,
-  Package, 
-  MapPin, 
-  Clock, 
-  User,
-  Phone,
-  Mail,
-  FileText,
-  Save,
-  Trash2,
-  Plus,
-  Pencil
-} from "lucide-react";
-import { useLanguage } from "@/hooks/use-language";
+import { Separator } from "@/components/ui/separator";
 import Navbar from "@/components/layout/Navbar";
 import AdminSidebar from "@/components/layout/AdminSidebar";
 import SEO from "@/components/seo/SEO";
-import { Separator } from "@/components/ui/separator";
+
+// Hooks
+import { useLanguage } from "@/hooks/use-language";
+
+// Integrations
+import { supabase } from "@/integrations/supabase/client";
 
 interface OrderItem {
   id: string;
@@ -73,15 +88,21 @@ interface Order {
   order_items?: OrderItem[];
 }
 
-const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
-const PAYMENT_STATUSES = ['unpaid', 'partial', 'paid'];
+const ORDER_STATUSES = [
+  "pending",
+  "processing",
+  "shipped",
+  "delivered",
+  "cancelled",
+];
+const PAYMENT_STATUSES = ["unpaid", "partial", "paid"];
 
 export default function AdminOrderDetail() {
   const { lang } = useLanguage();
   const { toast } = useToast();
   const navigate = useNavigate();
   const { id } = useParams();
-  
+
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -90,99 +111,102 @@ export default function AdminOrderDetail() {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [taxRate, setTaxRate] = useState(11); // Default 11%
 
-  const t = lang === 'id' ? {
-    title: "Detail Pesanan",
-    description: "Lihat dan kelola detail pesanan",
-    backToOrders: "Kembali ke Pesanan",
-    orderNumber: "Nomor Pesanan",
-    distributor: "Distributor",
-    status: "Status",
-    paymentStatus: "Status Pembayaran",
-    date: "Tanggal",
-    updatedDate: "Terakhir Diupdate",
-    shippingInfo: "Informasi Pengiriman",
-    address: "Alamat",
-    city: "Kota",
-    notes: "Catatan",
-    orderItems: "Item Pesanan",
-    product: "Produk",
-    sku: "SKU",
-    quantity: "Jumlah",
-    unitPrice: "Harga Satuan",
-    subtotal: "Subtotal",
-    orderSummary: "Ringkasan Pesanan",
-    total: "Total",
-    tax: "PPN (11%)",
-    grandTotal: "Total Keseluruhan",
-    statusPending: "Menunggu",
-    statusProcessing: "Diproses",
-    statusShipped: "Dikirim",
-    statusDelivered: "Terkirim",
-    statusCancelled: "Dibatalkan",
-    paymentUnpaid: "Belum Dibayar",
-    paymentPartial: "Dibayar Sebagian",
-    paymentPaid: "Lunas",
-    saveChanges: "Simpan Perubahan",
-    saving: "Menyimpan...",
-    loading: "Memuat...",
-    orderNotFound: "Pesanan tidak ditemukan",
-    successUpdate: "Pesanan berhasil diupdate",
-    errorUpdate: "Gagal mengupdate pesanan",
-    orderStatus: "Status Pesanan",
-    distributorInfo: "Informasi Distributor",
-    taxRate: "Tarif Pajak (%)",
-    editItems: "Edit Item",
-    removeItem: "Hapus Item",
-    addItem: "Tambah Item",
-    actions: "Aksi",
-    recalculating: "Menghitung ulang...",
-  } : {
-    title: "Order Details",
-    description: "View and manage order details",
-    backToOrders: "Back to Orders",
-    orderNumber: "Order Number",
-    distributor: "Distributor",
-    status: "Status",
-    paymentStatus: "Payment Status",
-    date: "Date",
-    updatedDate: "Last Updated",
-    shippingInfo: "Shipping Information",
-    address: "Address",
-    city: "City",
-    notes: "Notes",
-    orderItems: "Order Items",
-    product: "Product",
-    sku: "SKU",
-    quantity: "Quantity",
-    unitPrice: "Unit Price",
-    subtotal: "Subtotal",
-    orderSummary: "Order Summary",
-    total: "Total",
-    tax: "VAT (11%)",
-    grandTotal: "Grand Total",
-    statusPending: "Pending",
-    statusProcessing: "Processing",
-    statusShipped: "Shipped",
-    statusDelivered: "Delivered",
-    statusCancelled: "Cancelled",
-    paymentUnpaid: "Unpaid",
-    paymentPartial: "Partial",
-    paymentPaid: "Paid",
-    saveChanges: "Save Changes",
-    saving: "Saving...",
-    loading: "Loading...",
-    orderNotFound: "Order not found",
-    successUpdate: "Order updated successfully",
-    errorUpdate: "Failed to update order",
-    orderStatus: "Order Status",
-    distributorInfo: "Distributor Information",
-    taxRate: "Tax Rate (%)",
-    editItems: "Edit Items",
-    removeItem: "Remove Item",
-    addItem: "Add Item",
-    actions: "Actions",
-    recalculating: "Recalculating...",
-  };
+  const t =
+    lang === "id"
+      ? {
+          title: "Detail Pesanan",
+          description: "Lihat dan kelola detail pesanan",
+          backToOrders: "Kembali ke Pesanan",
+          orderNumber: "Nomor Pesanan",
+          distributor: "Distributor",
+          status: "Status",
+          paymentStatus: "Status Pembayaran",
+          date: "Tanggal",
+          updatedDate: "Terakhir Diupdate",
+          shippingInfo: "Informasi Pengiriman",
+          address: "Alamat",
+          city: "Kota",
+          notes: "Catatan",
+          orderItems: "Item Pesanan",
+          product: "Produk",
+          sku: "SKU",
+          quantity: "Jumlah",
+          unitPrice: "Harga Satuan",
+          subtotal: "Subtotal",
+          orderSummary: "Ringkasan Pesanan",
+          total: "Total",
+          tax: "PPN (11%)",
+          grandTotal: "Total Keseluruhan",
+          statusPending: "Menunggu",
+          statusProcessing: "Diproses",
+          statusShipped: "Dikirim",
+          statusDelivered: "Terkirim",
+          statusCancelled: "Dibatalkan",
+          paymentUnpaid: "Belum Dibayar",
+          paymentPartial: "Dibayar Sebagian",
+          paymentPaid: "Lunas",
+          saveChanges: "Simpan Perubahan",
+          saving: "Menyimpan...",
+          loading: "Memuat...",
+          orderNotFound: "Pesanan tidak ditemukan",
+          successUpdate: "Pesanan berhasil diupdate",
+          errorUpdate: "Gagal mengupdate pesanan",
+          orderStatus: "Status Pesanan",
+          distributorInfo: "Informasi Distributor",
+          taxRate: "Tarif Pajak (%)",
+          editItems: "Edit Item",
+          removeItem: "Hapus Item",
+          addItem: "Tambah Item",
+          actions: "Aksi",
+          recalculating: "Menghitung ulang...",
+        }
+      : {
+          title: "Order Details",
+          description: "View and manage order details",
+          backToOrders: "Back to Orders",
+          orderNumber: "Order Number",
+          distributor: "Distributor",
+          status: "Status",
+          paymentStatus: "Payment Status",
+          date: "Date",
+          updatedDate: "Last Updated",
+          shippingInfo: "Shipping Information",
+          address: "Address",
+          city: "City",
+          notes: "Notes",
+          orderItems: "Order Items",
+          product: "Product",
+          sku: "SKU",
+          quantity: "Quantity",
+          unitPrice: "Unit Price",
+          subtotal: "Subtotal",
+          orderSummary: "Order Summary",
+          total: "Total",
+          tax: "VAT (11%)",
+          grandTotal: "Grand Total",
+          statusPending: "Pending",
+          statusProcessing: "Processing",
+          statusShipped: "Shipped",
+          statusDelivered: "Delivered",
+          statusCancelled: "Cancelled",
+          paymentUnpaid: "Unpaid",
+          paymentPartial: "Partial",
+          paymentPaid: "Paid",
+          saveChanges: "Save Changes",
+          saving: "Saving...",
+          loading: "Loading...",
+          orderNotFound: "Order not found",
+          successUpdate: "Order updated successfully",
+          errorUpdate: "Failed to update order",
+          orderStatus: "Order Status",
+          distributorInfo: "Distributor Information",
+          taxRate: "Tax Rate (%)",
+          editItems: "Edit Items",
+          removeItem: "Remove Item",
+          addItem: "Add Item",
+          actions: "Actions",
+          recalculating: "Recalculating...",
+        };
 
   useEffect(() => {
     if (id) {
@@ -196,8 +220,9 @@ export default function AdminOrderDetail() {
 
       // Fetch order with distributor info
       const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .select(`
+        .from("orders")
+        .select(
+          `
           id,
           distributor_id,
           total_amount,
@@ -215,16 +240,18 @@ export default function AdminOrderDetail() {
             email_pemilik,
             kontak_pemilik
           )
-        `)
-        .eq('id', id)
+        `
+        )
+        .eq("id", id)
         .single();
 
       if (orderError) throw orderError;
 
       // Fetch order items with product details
       const { data: items, error: itemsError } = await supabase
-        .from('order_items')
-        .select(`
+        .from("order_items")
+        .select(
+          `
           id,
           product_id,
           quantity,
@@ -234,24 +261,25 @@ export default function AdminOrderDetail() {
             name,
             sku
           )
-        `)
-        .eq('order_id', id);
+        `
+        )
+        .eq("order_id", id);
 
       if (itemsError) throw itemsError;
 
       const formattedItems = (items || []).map((item: any) => ({
         ...item,
-        product_name: item.products?.name || 'Unknown Product',
-        product_sku: item.products?.sku || 'N/A',
+        product_name: item.products?.name || "Unknown Product",
+        product_sku: item.products?.sku || "N/A",
       }));
 
       const formattedOrder: Order = {
         ...orderData,
         distributor: {
-          id: orderData.distributor_profiles?.id || '',
-          name: orderData.distributor_profiles?.nama_bisnis || 'Unknown',
-          email: orderData.distributor_profiles?.email_pemilik || '',
-          phone: orderData.distributor_profiles?.kontak_pemilik || '',
+          id: orderData.distributor_profiles?.id || "",
+          name: orderData.distributor_profiles?.nama_bisnis || "Unknown",
+          email: orderData.distributor_profiles?.email_pemilik || "",
+          phone: orderData.distributor_profiles?.kontak_pemilik || "",
         },
         order_items: formattedItems,
       };
@@ -261,7 +289,7 @@ export default function AdminOrderDetail() {
       setPaymentStatus(formattedOrder.payment_status);
       setOrderItems(formattedItems);
     } catch (error: any) {
-      console.error('Error loading order:', error);
+      console.error("Error loading order:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to load order details",
@@ -274,30 +302,34 @@ export default function AdminOrderDetail() {
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (newQuantity < 1) return;
-    
-    setOrderItems(prev => prev.map(item => {
-      if (item.id === itemId) {
-        const subtotal = item.unit_price * newQuantity;
-        return { ...item, quantity: newQuantity, subtotal };
-      }
-      return item;
-    }));
+
+    setOrderItems((prev) =>
+      prev.map((item) => {
+        if (item.id === itemId) {
+          const subtotal = item.unit_price * newQuantity;
+          return { ...item, quantity: newQuantity, subtotal };
+        }
+        return item;
+      })
+    );
   };
 
   const handlePriceChange = (itemId: string, newPrice: number) => {
     if (newPrice < 0) return;
-    
-    setOrderItems(prev => prev.map(item => {
-      if (item.id === itemId) {
-        const subtotal = newPrice * item.quantity;
-        return { ...item, unit_price: newPrice, subtotal };
-      }
-      return item;
-    }));
+
+    setOrderItems((prev) =>
+      prev.map((item) => {
+        if (item.id === itemId) {
+          const subtotal = newPrice * item.quantity;
+          return { ...item, unit_price: newPrice, subtotal };
+        }
+        return item;
+      })
+    );
   };
 
   const handleRemoveItem = (itemId: string) => {
-    setOrderItems(prev => prev.filter(item => item.id !== itemId));
+    setOrderItems((prev) => prev.filter((item) => item.id !== itemId));
   };
 
   const calculateItemsTotal = () => {
@@ -315,27 +347,27 @@ export default function AdminOrderDetail() {
       // Update order items
       for (const item of orderItems) {
         const { error: itemError } = await supabase
-          .from('order_items')
+          .from("order_items")
           .update({
             quantity: item.quantity,
             unit_price: item.unit_price,
             subtotal: item.subtotal,
           })
-          .eq('id', item.id);
-        
+          .eq("id", item.id);
+
         if (itemError) throw itemError;
       }
 
       // Update order
       const { error } = await supabase
-        .from('orders')
+        .from("orders")
         .update({
           status: orderStatus,
           payment_status: paymentStatus,
           total_amount: newTotal,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', order.id);
+        .eq("id", order.id);
 
       if (error) throw error;
 
@@ -345,7 +377,7 @@ export default function AdminOrderDetail() {
 
       fetchOrderDetails();
     } catch (error: any) {
-      console.error('Error updating order:', error);
+      console.error("Error updating order:", error);
       toast({
         title: t.errorUpdate,
         description: error.message,
@@ -358,43 +390,49 @@ export default function AdminOrderDetail() {
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { variant: any; label: string }> = {
-      pending: { variant: 'default', label: t.statusPending },
-      processing: { variant: 'secondary', label: t.statusProcessing },
-      shipped: { variant: 'outline', label: t.statusShipped },
-      delivered: { variant: 'default', label: t.statusDelivered },
-      cancelled: { variant: 'destructive', label: t.statusCancelled },
+      pending: { variant: "default", label: t.statusPending },
+      processing: { variant: "secondary", label: t.statusProcessing },
+      shipped: { variant: "outline", label: t.statusShipped },
+      delivered: { variant: "default", label: t.statusDelivered },
+      cancelled: { variant: "destructive", label: t.statusCancelled },
     };
 
-    const statusInfo = statusMap[status] || { variant: 'default', label: status };
+    const statusInfo = statusMap[status] || {
+      variant: "default",
+      label: status,
+    };
     return <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>;
   };
 
   const getPaymentBadge = (status: string) => {
     const statusMap: Record<string, { variant: any; label: string }> = {
-      unpaid: { variant: 'destructive', label: t.paymentUnpaid },
-      partial: { variant: 'secondary', label: t.paymentPartial },
-      paid: { variant: 'default', label: t.paymentPaid },
+      unpaid: { variant: "destructive", label: t.paymentUnpaid },
+      partial: { variant: "secondary", label: t.paymentPartial },
+      paid: { variant: "default", label: t.paymentPaid },
     };
 
-    const statusInfo = statusMap[status] || { variant: 'default', label: status };
+    const statusInfo = statusMap[status] || {
+      variant: "default",
+      label: status,
+    };
     return <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>;
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
       minimumFractionDigits: 0,
     }).format(amount);
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('id-ID', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return new Date(dateString).toLocaleDateString("id-ID", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -437,10 +475,14 @@ export default function AdminOrderDetail() {
             <div className="max-w-6xl mx-auto">
               <Card className="p-6 text-center">
                 <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h2 className="text-xl font-semibold mb-2">{t.orderNotFound}</h2>
-                <Button onClick={() => navigate('/admin/orders')} className="mt-4">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  {t.backToOrders}
+                <h2 className="text-xl font-semibold mb-2">
+                  {t.orderNotFound}
+                </h2>
+                <Button
+                  onClick={() => navigate("/admin/orders")}
+                  className="mt-4"
+                >
+                  <ArrowLeft className="h-5 w-5" />
                 </Button>
               </Card>
             </div>
@@ -452,7 +494,10 @@ export default function AdminOrderDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <SEO title={`${t.title} - ${order.order_number}`} description={t.description} />
+      <SEO
+        title={`${t.title} - ${order.order_number}`}
+        description={t.description}
+      />
       <Navbar />
       <div className="flex">
         <AdminSidebar lang={lang} />
@@ -463,13 +508,14 @@ export default function AdminOrderDetail() {
               <div className="flex items-center gap-4">
                 <Button
                   variant="outline"
-                  onClick={() => navigate('/admin/orders')}
+                  onClick={() => navigate("/admin/orders")}
                 >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  {t.backToOrders}
+                  <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">{t.title}</h1>
+                  <h1 className="text-3xl font-bold text-gray-900">
+                    {t.title}
+                  </h1>
                   <p className="text-gray-600 mt-1">{order.order_number}</p>
                 </div>
               </div>
@@ -494,7 +540,9 @@ export default function AdminOrderDetail() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label className="text-gray-600">{t.orderNumber}</Label>
-                        <p className="font-medium text-lg">{order.order_number}</p>
+                        <p className="font-medium text-lg">
+                          {order.order_number}
+                        </p>
                       </div>
                       <div>
                         <Label className="text-gray-600">{t.date}</Label>
@@ -505,8 +553,12 @@ export default function AdminOrderDetail() {
                       </div>
                       {order.updated_at && (
                         <div className="col-span-2">
-                          <Label className="text-gray-600">{t.updatedDate}</Label>
-                          <p className="text-sm text-gray-600">{formatDate(order.updated_at)}</p>
+                          <Label className="text-gray-600">
+                            {t.updatedDate}
+                          </Label>
+                          <p className="text-sm text-gray-600">
+                            {formatDate(order.updated_at)}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -516,14 +568,24 @@ export default function AdminOrderDetail() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>{t.orderStatus}</Label>
-                        <Select value={orderStatus} onValueChange={setOrderStatus}>
+                        <Select
+                          value={orderStatus}
+                          onValueChange={setOrderStatus}
+                        >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             {ORDER_STATUSES.map((status) => (
                               <SelectItem key={status} value={status}>
-                                {(t as any)[`status${status.charAt(0).toUpperCase() + status.slice(1)}`]}
+                                {
+                                  (t as any)[
+                                    `status${
+                                      status.charAt(0).toUpperCase() +
+                                      status.slice(1)
+                                    }`
+                                  ]
+                                }
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -532,14 +594,24 @@ export default function AdminOrderDetail() {
 
                       <div className="space-y-2">
                         <Label>{t.paymentStatus}</Label>
-                        <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+                        <Select
+                          value={paymentStatus}
+                          onValueChange={setPaymentStatus}
+                        >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             {PAYMENT_STATUSES.map((status) => (
                               <SelectItem key={status} value={status}>
-                                {(t as any)[`payment${status.charAt(0).toUpperCase() + status.slice(1)}`]}
+                                {
+                                  (t as any)[
+                                    `payment${
+                                      status.charAt(0).toUpperCase() +
+                                      status.slice(1)
+                                    }`
+                                  ]
+                                }
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -568,23 +640,40 @@ export default function AdminOrderDetail() {
                           <TableRow>
                             <TableHead>{t.product}</TableHead>
                             <TableHead>{t.sku}</TableHead>
-                            <TableHead className="text-right">{t.quantity}</TableHead>
-                            <TableHead className="text-right">{t.unitPrice}</TableHead>
-                            <TableHead className="text-right">{t.subtotal}</TableHead>
-                            <TableHead className="text-right">{t.actions}</TableHead>
+                            <TableHead className="text-right">
+                              {t.quantity}
+                            </TableHead>
+                            <TableHead className="text-right">
+                              {t.unitPrice}
+                            </TableHead>
+                            <TableHead className="text-right">
+                              {t.subtotal}
+                            </TableHead>
+                            <TableHead className="text-right">
+                              {t.actions}
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {orderItems.map((item) => (
                             <TableRow key={item.id}>
-                              <TableCell className="font-medium">{item.product_name}</TableCell>
-                              <TableCell className="text-gray-600">{item.product_sku}</TableCell>
+                              <TableCell className="font-medium">
+                                {item.product_name}
+                              </TableCell>
+                              <TableCell className="text-gray-600">
+                                {item.product_sku}
+                              </TableCell>
                               <TableCell className="text-right">
                                 <Input
                                   type="number"
                                   min="1"
                                   value={item.quantity}
-                                  onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 1)}
+                                  onChange={(e) =>
+                                    handleQuantityChange(
+                                      item.id,
+                                      parseInt(e.target.value) || 1
+                                    )
+                                  }
                                   className="w-20 text-right"
                                 />
                               </TableCell>
@@ -593,11 +682,18 @@ export default function AdminOrderDetail() {
                                   type="number"
                                   min="0"
                                   value={item.unit_price}
-                                  onChange={(e) => handlePriceChange(item.id, parseFloat(e.target.value) || 0)}
+                                  onChange={(e) =>
+                                    handlePriceChange(
+                                      item.id,
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
                                   className="w-32 text-right"
                                 />
                               </TableCell>
-                              <TableCell className="text-right font-medium">{formatCurrency(item.subtotal)}</TableCell>
+                              <TableCell className="text-right font-medium">
+                                {formatCurrency(item.subtotal)}
+                              </TableCell>
                               <TableCell className="text-right">
                                 <Button
                                   variant="ghost"
@@ -655,12 +751,17 @@ export default function AdminOrderDetail() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div>
-                      <p className="font-semibold text-lg">{order.distributor?.name}</p>
+                      <p className="font-semibold text-lg">
+                        {order.distributor?.name}
+                      </p>
                     </div>
                     {order.distributor?.email && (
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Mail className="h-4 w-4" />
-                        <a href={`mailto:${order.distributor.email}`} className="hover:underline">
+                        <a
+                          href={`mailto:${order.distributor.email}`}
+                          className="hover:underline"
+                        >
                           {order.distributor.email}
                         </a>
                       </div>
@@ -668,7 +769,10 @@ export default function AdminOrderDetail() {
                     {order.distributor?.phone && (
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Phone className="h-4 w-4" />
-                        <a href={`tel:${order.distributor.phone}`} className="hover:underline">
+                        <a
+                          href={`tel:${order.distributor.phone}`}
+                          className="hover:underline"
+                        >
                           {order.distributor.phone}
                         </a>
                       </div>
@@ -684,9 +788,11 @@ export default function AdminOrderDetail() {
                   <CardContent className="space-y-3">
                     <div className="flex justify-between text-base">
                       <span className="text-gray-600">{t.total}</span>
-                      <span className="font-medium">{formatCurrency(calculateItemsTotal())}</span>
+                      <span className="font-medium">
+                        {formatCurrency(calculateItemsTotal())}
+                      </span>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
                         <Label className="text-gray-600">{t.taxRate}</Label>
@@ -697,7 +803,9 @@ export default function AdminOrderDetail() {
                             max="100"
                             step="0.1"
                             value={taxRate}
-                            onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
+                            onChange={(e) =>
+                              setTaxRate(parseFloat(e.target.value) || 0)
+                            }
                             className="w-20 text-right"
                           />
                           <span className="text-sm text-gray-600">%</span>
@@ -705,25 +813,35 @@ export default function AdminOrderDetail() {
                       </div>
                       <div className="flex justify-between text-sm text-gray-600">
                         <span>{t.tax}</span>
-                        <span>{formatCurrency(calculateTax(calculateItemsTotal()))}</span>
+                        <span>
+                          {formatCurrency(calculateTax(calculateItemsTotal()))}
+                        </span>
                       </div>
                     </div>
-                    
+
                     <Separator />
                     <div className="flex justify-between text-lg font-bold">
                       <span>{t.grandTotal}</span>
-                      <span className="text-primary">{formatCurrency(calculateGrandTotal(calculateItemsTotal()))}</span>
+                      <span className="text-primary">
+                        {formatCurrency(
+                          calculateGrandTotal(calculateItemsTotal())
+                        )}
+                      </span>
                     </div>
-                    
+
                     <Separator />
 
                     <div className="space-y-2 pt-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">{t.status}</span>
+                        <span className="text-sm text-gray-600">
+                          {t.status}
+                        </span>
                         {getStatusBadge(order.status)}
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">{t.paymentStatus}</span>
+                        <span className="text-sm text-gray-600">
+                          {t.paymentStatus}
+                        </span>
                         {getPaymentBadge(order.payment_status)}
                       </div>
                     </div>

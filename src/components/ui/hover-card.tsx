@@ -1,6 +1,10 @@
+// React
 import * as React from "react"
+
+// External Libraries
 import * as HoverCardPrimitive from "@radix-ui/react-hover-card"
 
+// Utils
 import { cn } from "@/lib/utils"
 
 const HoverCard = HoverCardPrimitive.Root

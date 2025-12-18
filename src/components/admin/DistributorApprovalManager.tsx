@@ -3,13 +3,10 @@
  * Admin component for managing distributor approval status
  */
 
+// React
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+
+// External Libraries
 import { 
   CheckCircle, 
   XCircle, 
@@ -21,7 +18,13 @@ import {
   UserX,
   Users
 } from 'lucide-react';
-import { useLanguage } from '@/hooks/use-language';
+
+// UI Components
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useToast } from '@/components/ui/use-toast';
 import { 
   Dialog, 
   DialogContent, 
@@ -32,6 +35,12 @@ import {
   DialogTrigger
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+
+// Hooks
+import { useLanguage } from '@/hooks/use-language';
+
+// Integrations
+import { supabase } from '@/integrations/supabase/client';
 
 interface DistributorProfile {
   id: string;

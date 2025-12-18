@@ -1,7 +1,12 @@
-import { supabase } from '@/integrations/supabase/client';
-import { Product, RegionPricing, ProductVariant } from '@/data/products';
-import { withAuth, requireAuth, requireAuthForViewing, validateAuth } from '@/utils/auth-guards';
-import { getImageUrl } from '@/lib/s3-upload';
+import { supabase } from "@/integrations/supabase/client";
+import { Product, RegionPricing, ProductVariant } from "@/data/products";
+import {
+  withAuth,
+  requireAuth,
+  requireAuthForViewing,
+  validateAuth,
+} from "@/utils/auth-guards";
+import { getImageUrl } from "@/lib/s3-upload";
 
 // Define database types to match our schema
 export type ProductFromDB = {
@@ -95,16 +100,15 @@ interface GenericVariant {
 
 // Convert database product to frontend product format
 export function mapDBProductToProduct(
-  dbProduct: ProductFromDB, 
+  dbProduct: ProductFromDB,
   regionPricing: RegionPricingFromDB[],
   variants?: GenericVariant[] // Using generic interface to handle both old and new variant formats
 ): Product {
-
   return {
     id: dbProduct.id, // Using actual UUID as ID for better compatibility
     sku: dbProduct.sku, // Add SKU separately
-    category: dbProduct.product_categories?.name || 'Uncategorized',
-    brand: dbProduct.brands?.name || 'Unknown Brand',
+    category: dbProduct.product_categories?.name || "Uncategorized",
+    brand: dbProduct.brands?.name || "Unknown Brand",
     name: dbProduct.name,
     size: dbProduct.size,
     distributorPrice: dbProduct.base_distributor_price,
@@ -115,7 +119,9 @@ export function mapDBProductToProduct(
     stock: dbProduct.stock_quantity || 0,
     allow_negative_stock: dbProduct.allow_negative_stock ?? false,
     image: dbProduct.image_url,
-    hasVariants: dbProduct.variant_count ? dbProduct.variant_count > 0 : (dbProduct.has_variants || false),
+    hasVariants: dbProduct.variant_count
+      ? dbProduct.variant_count > 0
+      : dbProduct.has_variants || false,
     // UOM fields
     base_uom: dbProduct.base_uom,
     moq_uom: dbProduct.moq_uom,
@@ -129,16 +135,17 @@ export function mapDBProductToProduct(
     moq_conversion_factor: dbProduct.moq_conversion_factor,
     pricing_conversion_factor: dbProduct.pricing_conversion_factor,
     // Handle both new variant view format and old product_variants format
-    variants: variants?.map(variant => ({
+    variants: variants?.map((variant) => ({
       id: variant.id,
-      variantName: variant.option_name || variant.variantName || variant.variant_name,
-      variantDescription: variant.group_name ? 
-        `${variant.group_name}: ${variant.option_name}` : 
-        (variant.variantDescription || variant.variant_description),
+      variantName:
+        variant.option_name || variant.variantName || variant.variant_name,
+      variantDescription: variant.group_name
+        ? `${variant.group_name}: ${variant.option_name}`
+        : variant.variantDescription || variant.variant_description,
       additionalPrice: variant.additional_price,
-      isActive: variant.is_active
+      isActive: variant.is_active,
     })),
-    regions: regionPricing.map(region => ({
+    regions: regionPricing.map((region) => ({
       area: region.area,
       distributorPrice: region.distributor_price,
       moq: region.moq,
@@ -149,8 +156,8 @@ export function mapDBProductToProduct(
       allowMixVariants: region.allow_mix_variants || false,
       // UOM conversion factors
       moq_conversion_factor: region.moq_conversion_factor,
-      pricing_conversion_factor: region.pricing_conversion_factor
-    }))
+      pricing_conversion_factor: region.pricing_conversion_factor,
+    })),
   };
 }
 
@@ -172,31 +179,30 @@ type ProductVariantWithOption = ProductVariantFromDB & {
 export async function fetchProductVariants(productId: string) {
   // Only require authentication, not approval (allows pending users to view products)
   await requireAuthForViewing();
-  
+
   try {
-    
     // Query the product_variants table directly - this matches your actual schema
     const { data, error } = await supabase
-      .from('product_variants')
-      .select('*')
-      .eq('product_id', productId)
-      .eq('is_active', true);
-    
+      .from("product_variants")
+      .select("*")
+      .eq("product_id", productId)
+      .eq("is_active", true);
+
     if (error) {
       return [];
     }
-    
+
     if (!data || data.length === 0) {
       return [];
     }
-    
+
     // Convert to the format needed by the frontend using the actual variant_name field
     return data.map((variant: ProductVariantFromDB) => ({
       id: variant.id,
-      variantName: variant.variant_name || 'Unnamed Variant',
-      variantDescription: variant.variant_description || '', // Don't add "Variant:" prefix here
+      variantName: variant.variant_name || "Unnamed Variant",
+      variantDescription: variant.variant_description || "", // Don't add "Variant:" prefix here
       additionalPrice: variant.additional_price || 0,
-      isActive: variant.is_active
+      isActive: variant.is_active,
     }));
   } catch (error) {
     return [];
@@ -220,52 +226,76 @@ export async function fetchProductVariantOptions(productId: string) {
   try {
     // Check if product exists and has variants
     const { data: product, error: productError } = await supabase
-      .from('products')
-      .select('id, has_variants')
-      .eq('id', productId)
+      .from("products")
+      .select("id, has_variants")
+      .eq("id", productId)
       .single();
-    
-    if (productError || !product || !(product as ProductWithVariants).has_variants) {
-      console.error('Error finding product or product has no variants:', productError);
+
+    if (
+      productError ||
+      !product ||
+      !(product as ProductWithVariants).has_variants
+    ) {
+      console.error(
+        "Error finding product or product has no variants:",
+        productError
+      );
       return [];
     }
 
-    // Get unique groups and their options from variants_view
+    // Try variants_view first, fallback to product_variants
+    let optionMap: Record<string, string[]> = {};
     const { data: optionsData, error: optionsError } = await supabase
-      .from('variants_view')
-      .select('group_name, option_name')
-      .eq('product_id', productId)
-      .eq('is_active', true);
-    
-    if (optionsError || !optionsData) {
-      console.error('Error fetching product variant options:', optionsError);
-      return [];
+      .from("variants_view")
+      .select("group_name, option_name")
+      .eq("product_id", productId)
+      .eq("is_active", true);
+
+    if (
+      !optionsError &&
+      optionsData &&
+      Array.isArray(optionsData) &&
+      optionsData.length > 0
+    ) {
+      (optionsData as VariantViewOption[]).forEach((opt) => {
+        const groupName = opt.group_name;
+        const optionName = opt.option_name;
+        if (!optionMap[groupName]) optionMap[groupName] = [];
+        if (!optionMap[groupName].includes(optionName))
+          optionMap[groupName].push(optionName);
+      });
+    } else {
+      const { data: pvData, error: pvError } = await supabase
+        .from("product_variants")
+        .select("variant_name, is_active")
+        .eq("product_id", productId)
+        .eq("is_active", true);
+      if (pvError) {
+        console.error("Error fetching product variants for options:", pvError);
+        return [];
+      }
+      const names = (pvData || [])
+        .map((v: any) => v.variant_name)
+        .filter((v: any) => typeof v === "string" && v.trim().length > 0);
+      const uniqueNames = Array.from(new Set(names));
+      if (uniqueNames.length > 0) {
+        optionMap["Variant"] = uniqueNames;
+      } else {
+        return [];
+      }
     }
-    
-    // Group options by name with their values
-    const optionMap: Record<string, string[]> = {};
-    (optionsData as VariantViewOption[]).forEach(opt => {
-      const groupName = opt.group_name;
-      const optionName = opt.option_name;
-      
-      if (!optionMap[groupName]) {
-        optionMap[groupName] = [];
-      }
-      
-      if (!optionMap[groupName].includes(optionName)) {
-        optionMap[groupName].push(optionName);
-      }
-    });
-    
+
     // Convert to array format
-    const options: VariantOptionFromDB[] = Object.entries(optionMap).map(([name, values]) => ({
-      option_name: name,
-      option_values: values.sort() // Sort option values alphabetically
-    }));
-    
+    const options: VariantOptionFromDB[] = Object.entries(optionMap).map(
+      ([name, values]) => ({
+        option_name: name,
+        option_values: values.sort(), // Sort option values alphabetically
+      })
+    );
+
     return options;
   } catch (error) {
-    console.error('Exception fetching product variant options:', error);
+    console.error("Exception fetching product variant options:", error);
     return [];
   }
 }
@@ -274,26 +304,28 @@ export async function fetchProductVariantOptions(productId: string) {
 export async function getAllVariantOptions() {
   try {
     const { data, error } = await supabase
-      .from('product_variant_groups')
-      .select(`
+      .from("product_variant_groups")
+      .select(
+        `
         id,
         name,
         product_variant_options (
           id,
           name
         )
-      `)
-      .order('name')
-      .order('name', { referencedTable: 'product_variant_options' });
-    
+      `
+      )
+      .order("name")
+      .order("name", { referencedTable: "product_variant_options" });
+
     if (error) {
-      console.error('Error fetching all variant options:', error);
+      console.error("Error fetching all variant options:", error);
       return [];
     }
-    
+
     return data;
   } catch (error) {
-    console.error('Exception fetching all variant options:', error);
+    console.error("Exception fetching all variant options:", error);
     return [];
   }
 }
@@ -301,6 +333,7 @@ export async function getAllVariantOptions() {
 // Define type for products with variants
 interface ProductWithVariantCount {
   id: string;
+  sku: string;
   category: string;
   brand?: string;
   brand_id?: string;
@@ -368,12 +401,11 @@ interface FallbackProduct {
 export async function fetchProductsWithVariants(): Promise<Product[]> {
   // Only require authentication, not approval (allows pending users to view products)
   await requireAuthForViewing();
-  
+
   try {
     // Query products directly from the products table (view doesn't exist in schema)
-    const { data: fallbackProducts, error: fallbackError } = await supabase
-      .from('products')
-      .select(`
+    const { data: fallbackProducts, error: fallbackError } =
+      await supabase.from("products").select(`
         id,
         sku,
         name,
@@ -396,20 +428,21 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
         brands:brand_id(name),
         product_categories:category_id(name)
       `);
-    
+
     // Variable to hold our final products list
     let productsData: ProductWithVariantCount[] = [];
-    
+
     if (fallbackError || !fallbackProducts) {
-      console.error('Error fetching products:', fallbackError);
+      console.error("Error fetching products:", fallbackError);
       return [];
     }
-    
+
     // Transform the data to match the expected format
-    productsData = (fallbackProducts as FallbackProduct[]).map(p => ({
+    productsData = (fallbackProducts as FallbackProduct[]).map((p) => ({
       id: p.id,
-      category: p.product_categories?.name || 'Uncategorized',
-      brand: p.brands?.name || 'Unknown',
+      sku: p.sku,
+      category: p.product_categories?.name || "Uncategorized",
+      brand: p.brands?.name || "Unknown",
       name: p.name,
       size: p.size,
       base_distributor_price: p.base_distributor_price,
@@ -421,38 +454,42 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
       variant_count: p.has_variants ? 1 : 0,
       stock_quantity: p.stock_quantity,
       allow_negative_stock: p.allow_negative_stock,
-      base_uom: p.base_uom || 'pcs',
-      moq_uom: p.moq_uom || 'pcs',
-      pricing_uom: p.pricing_uom || 'pcs',
+      base_uom: p.base_uom || "pcs",
+      moq_uom: p.moq_uom || "pcs",
+      pricing_uom: p.pricing_uom || "pcs",
       enable_uom_conversions: p.enable_uom_conversions || false,
       single_sku_moq: p.single_sku_moq || 0,
-      allow_mix_variants: p.allow_mix_variants || false
+      allow_mix_variants: p.allow_mix_variants || false,
     }));
-    
+
     if (!productsData || productsData.length === 0) {
-      console.error('No product data available');
+      console.error("No product data available");
       return [];
     }
-    
+
     // Then get region pricing for all products
     const { data: regionPricing, error: regionError } = await supabase
-      .from('region_pricing')
-      .select('id, product_id, area, distributor_price, moq, moq_uom, price_uom, sku_level_moq, allow_mix_variants, created_at');
-    
+      .from("region_pricing")
+      .select(
+        "id, product_id, area, distributor_price, moq, moq_uom, price_uom, sku_level_moq, allow_mix_variants, created_at"
+      );
+
     if (regionError || !regionPricing) {
-      console.error('Error fetching region pricing:', regionError);
+      console.error("Error fetching region pricing:", regionError);
       return [];
     }
-    
+
     // Map the DB products to our frontend Product type
     return productsData.map((dbProduct) => {
-      const productRegions = (regionPricing as RegionPricingDB[])
-        .filter((r) => r.product_id === dbProduct.id);
-      
+      const productRegions = (regionPricing as RegionPricingDB[]).filter(
+        (r) => r.product_id === dbProduct.id
+      );
+
       return {
         id: dbProduct.id,
+        sku: dbProduct.sku, // Add missing SKU field mapping
         category: dbProduct.category,
-        brand: dbProduct.brand || 'Unknown',
+        brand: dbProduct.brand || "Unknown",
         name: dbProduct.name,
         size: dbProduct.size,
         distributorPrice: dbProduct.base_distributor_price,
@@ -465,9 +502,9 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
         allow_negative_stock: dbProduct.allow_negative_stock ?? false,
         hasVariants: dbProduct.variant_count > 0,
         // UOM fields
-        base_uom: dbProduct.base_uom || 'pcs',
-        moq_uom: dbProduct.moq_uom || 'pcs',
-        pricing_uom: dbProduct.pricing_uom || 'pcs',
+        base_uom: dbProduct.base_uom || "pcs",
+        moq_uom: dbProduct.moq_uom || "pcs",
+        pricing_uom: dbProduct.pricing_uom || "pcs",
         enable_uom_conversions: dbProduct.enable_uom_conversions || false,
         // Mix variants fields
         singleSkuMoq: dbProduct.single_sku_moq || 0,
@@ -478,15 +515,15 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
             distributorPrice: region.distributor_price,
             moq: region.moq,
             // UOM fields for regional pricing - inherit from product if not set regionally
-            price_uom: region.price_uom || dbProduct.pricing_uom || 'pcs',
-            moq_uom: region.moq_uom || dbProduct.moq_uom || 'pcs',
+            price_uom: region.price_uom || dbProduct.pricing_uom || "pcs",
+            moq_uom: region.moq_uom || dbProduct.moq_uom || "pcs",
             // Mix variants fields
             skuLevelMoq: region.sku_level_moq || 0,
-            allowMixVariants: region.allow_mix_variants || false
+            allowMixVariants: region.allow_mix_variants || false,
           };
-          
+
           return mappedRegion;
-        })
+        }),
       };
     });
   } catch (error) {
@@ -498,12 +535,12 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
 export async function getAllProducts(): Promise<Product[]> {
   // Only require authentication, not approval (allows pending users to view products)
   await requireAuthForViewing();
-  
+
   try {
     // Fetch all products with brand and category names - explicitly select UOM fields
-    const { data: productsData, error: productsError } = await supabase
-      .from('products')
-      .select(`
+    const { data: productsData, error: productsError } = await supabase.from(
+      "products"
+    ).select(`
         id,
         sku,
         name,
@@ -526,32 +563,34 @@ export async function getAllProducts(): Promise<Product[]> {
         brands(name),
         product_categories(name)
       `);
-      
+
     if (productsError || !productsData) {
-      console.error('Error fetching products:', productsError);
+      console.error("Error fetching products:", productsError);
       return [];
     }
-    
+
     // Fetch all region pricing
     const { data: regionsData, error: regionsError } = await supabase
-      .from('region_pricing')
-      .select('id, product_id, area, distributor_price, moq, moq_uom, price_uom, sku_level_moq, allow_mix_variants, created_at');
-      
+      .from("region_pricing")
+      .select(
+        "id, product_id, area, distributor_price, moq, moq_uom, price_uom, sku_level_moq, allow_mix_variants, created_at"
+      );
+
     if (regionsError || !regionsData) {
-      console.error('Error fetching region pricing:', regionsError);
+      console.error("Error fetching region pricing:", regionsError);
       return [];
     }
-    
+
     // Map the data to our frontend format
-    return (productsData as ProductFromDB[]).map(product => {
+    return (productsData as ProductFromDB[]).map((product) => {
       const productRegions = (regionsData as RegionPricingFromDB[]).filter(
-        region => region.product_id === product.id
+        (region) => region.product_id === product.id
       );
-      
+
       return mapDBProductToProduct(product, productRegions);
     });
   } catch (error) {
-    console.error('Unexpected error fetching products:', error);
+    console.error("Unexpected error fetching products:", error);
     return [];
   }
 }
@@ -560,60 +599,66 @@ export async function getAllProducts(): Promise<Product[]> {
 export async function getProductById(id: string): Promise<Product | null> {
   // Only require authentication, not approval (allows pending users to view products)
   await requireAuthForViewing();
-  
+
   try {
     // Check if the id looks like a UUID or a SKU
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-    
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        id
+      );
+
     // Fetch the product with joined brand and category data
-    const query = supabase
-      .from('products')
-      .select(`
+    const query = supabase.from("products").select(`
         *,
         brands:brand_id(*),
         product_categories:category_id(*)
       `);
-      
+
     // Apply filter based on whether id is a UUID or SKU
-    const { data: product, error: productError } = await (
-      isUuid ? query.eq('id', id).single() : query.eq('sku', id).single()
-    );
-      
+    const { data: product, error: productError } = await (isUuid
+      ? query.eq("id", id).single()
+      : query.eq("sku", id).single());
+
     if (productError || !product) {
       console.error(`Error fetching product ${id}:`, productError);
       return null;
     }
-    
+
     // Explicitly type the product
     const typedProduct = product as ProductFromDB;
-    
+
     // Fetch the region pricing for this product
     const { data: regions, error: regionsError } = await supabase
-      .from('region_pricing')
-      .select('id, product_id, area, distributor_price, moq, moq_uom, price_uom, sku_level_moq, allow_mix_variants, created_at')
-      .eq('product_id', typedProduct.id); // Always use product.id here
-      
+      .from("region_pricing")
+      .select(
+        "id, product_id, area, distributor_price, moq, moq_uom, price_uom, sku_level_moq, allow_mix_variants, created_at"
+      )
+      .eq("product_id", typedProduct.id); // Always use product.id here
+
     if (regionsError || !regions) {
-      console.error(`Error fetching region pricing for product ${id}:`, regionsError);
+      console.error(
+        `Error fetching region pricing for product ${id}:`,
+        regionsError
+      );
       return null;
     }
-    
+
     // Fetch variants if the product has any
     let variants = [];
     if (typedProduct.has_variants) {
       const { data: variantData, error: variantError } = await supabase
-        .from('product_variants')
-        .select('*')
-        .eq('product_id', typedProduct.id)
-        .eq('is_active', true);
-        
+        .from("product_variants")
+        .select("*")
+        .eq("product_id", typedProduct.id)
+        .eq("is_active", true);
+
       if (!variantError) {
         variants = variantData;
       }
     }
-    
+
     return mapDBProductToProduct(
-      typedProduct, 
+      typedProduct,
       regions as RegionPricingFromDB[],
       variants
     );
@@ -627,22 +672,24 @@ export async function getProductById(id: string): Promise<Product | null> {
 export async function getAllAreas(): Promise<string[]> {
   // Only require authentication, not approval (allows pending users to view products)
   await requireAuthForViewing();
-  
+
   try {
     const { data, error } = await supabase
-      .from('region_pricing')
-      .select('area');
-      
+      .from("region_pricing")
+      .select("area");
+
     if (error || !data) {
-      console.error('Error fetching areas:', error);
+      console.error("Error fetching areas:", error);
       return [];
     }
-    
+
     // Create unique list of areas
-    const areas = [...new Set(data.map(item => (item as { area: string }).area))];
+    const areas = [
+      ...new Set(data.map((item) => (item as { area: string }).area)),
+    ];
     return areas.sort();
   } catch (error) {
-    console.error('Unexpected error fetching areas:', error);
+    console.error("Unexpected error fetching areas:", error);
     return [];
   }
 }
@@ -651,29 +698,30 @@ export async function getAllAreas(): Promise<string[]> {
 export async function getAllBrands(): Promise<string[]> {
   // Only require authentication, not approval (allows pending users to view products)
   await requireAuthForViewing();
-  
+
   try {
     // Query the brands table directly - not the products table
     const { data, error } = await supabase
-      .from('brands')  // Use the brands table, not products
-      .select('name'); // Select only the name column
-      
+      .from("brands") // Use the brands table, not products
+      .select("name"); // Select only the name column
+
     if (error || !data) {
-      console.error('Error fetching brands:', error);
+      console.error("Error fetching brands:", error);
       return [];
     }
-    
+
     // Create list of brand names
-    const brands = data.map(item => (item as { name: string }).name);
+    const brands = data.map((item) => (item as { name: string }).name);
     return brands.sort();
   } catch (error) {
-    console.error('Unexpected error fetching brands:', error);
+    console.error("Unexpected error fetching brands:", error);
     return [];
   }
 }
 
 // Extended Product type that includes variant information in the main product data
-export interface ProductWithVariant extends Omit<Product, 'variants' | 'hasVariants'> {
+export interface ProductWithVariant
+  extends Omit<Product, "variants" | "hasVariants"> {
   variantInfo?: {
     id: string;
     variantName: string;
@@ -691,20 +739,19 @@ export interface ProductWithVariant extends Omit<Product, 'variants' | 'hasVaria
 }
 
 // Fetch products expanded by variants - each variant becomes a separate product entry
-export async function fetchProductsExpandedByVariants(): Promise<ProductWithVariant[]> {
+export async function fetchProductsExpandedByVariants(): Promise<
+  ProductWithVariant[]
+> {
   // Only require authentication, not approval (allows pending users to view products)
   await requireAuthForViewing();
-  
+
   try {
     // Fetch all base products and all variants in parallel
     const [baseProducts, allVariantsData] = await Promise.all([
       fetchProductsWithVariants(),
-      supabase
-        .from('product_variants')
-        .select('*')
-        .eq('is_active', true)
+      supabase.from("product_variants").select("*").eq("is_active", true),
     ]);
-    
+
     // Create a map of variants by product_id for O(1) lookup
     const variantsByProduct = new Map<string, ProductVariantFromDB[]>();
     if (allVariantsData.data) {
@@ -715,32 +762,36 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
         variantsByProduct.get(variant.product_id)!.push(variant);
       });
     }
-    
+
     const expandedProducts: ProductWithVariant[] = [];
-    
+
     for (const product of baseProducts) {
       if (product.hasVariants) {
         const variants = variantsByProduct.get(product.id) || [];
-        
+
         if (variants.length > 0) {
           // Create a separate product entry for each variant
           for (const variantData of variants) {
             const variant = {
               id: variantData.id,
-              variantName: variantData.variant_name || 'Unnamed Variant',
-              variantDescription: variantData.variant_description || '',
+              variantName: variantData.variant_name || "Unnamed Variant",
+              variantDescription: variantData.variant_description || "",
               additionalPrice: variantData.additional_price || 0,
-              isActive: variantData.is_active
+              isActive: variantData.is_active,
             };
-            
+
             // Generate proper S3 URL for image if needed
-            const imageUrl = product.image && !product.image.startsWith('http') && !product.image.startsWith('https')
-              ? getImageUrl(product.image) || product.image
-              : product.image;
+            const imageUrl =
+              product.image &&
+              !product.image.startsWith("http") &&
+              !product.image.startsWith("https")
+                ? getImageUrl(product.image) || product.image
+                : product.image;
 
             const variantProduct: ProductWithVariant = {
               ...product,
               id: `${product.id}_variant_${variant.id}`,
+              sku: product.sku,
               baseProductId: product.id,
               isVariant: true,
               displayName: `${product.name} - ${variant.variantName}`,
@@ -748,56 +799,66 @@ export async function fetchProductsExpandedByVariants(): Promise<ProductWithVari
                 id: variant.id,
                 variantName: variant.variantName,
                 variantDescription: variant.variantDescription,
-                additionalPrice: variant.additionalPrice
+                additionalPrice: variant.additionalPrice,
               },
-              distributorPrice: product.distributorPrice + variant.additionalPrice,
+              distributorPrice:
+                product.distributorPrice + variant.additionalPrice,
               consumerPrice: product.consumerPrice + variant.additionalPrice,
               singleSkuMoq: product.singleSkuMoq || 0,
               allowMixVariants: product.allowMixVariants || false,
               image_url: imageUrl,
-              regions: product.regions.map(region => ({
+              regions: product.regions.map((region) => ({
                 ...region,
-                distributorPrice: region.distributorPrice + variant.additionalPrice,
+                distributorPrice:
+                  region.distributorPrice + variant.additionalPrice,
                 moq_uom: region.moq_uom || product.moq_uom,
                 price_uom: region.price_uom || product.pricing_uom,
                 skuLevelMoq: region.skuLevelMoq || 0,
-                allowMixVariants: region.allowMixVariants || false
-              }))
+                allowMixVariants: region.allowMixVariants || false,
+              })),
             };
             expandedProducts.push(variantProduct);
           }
         } else {
           // Generate proper S3 URL for image if needed
-          const imageUrl = product.image && !product.image.startsWith('http') && !product.image.startsWith('https')
-            ? getImageUrl(product.image) || product.image
-            : product.image;
+          const imageUrl =
+            product.image &&
+            !product.image.startsWith("http") &&
+            !product.image.startsWith("https")
+              ? getImageUrl(product.image) || product.image
+              : product.image;
 
           const regularProduct: ProductWithVariant = {
             ...product,
+            sku: product.sku, // Ensure SKU is explicitly set
             baseProductId: product.id,
             isVariant: false,
             displayName: product.name,
-            image_url: imageUrl
+            image_url: imageUrl,
           };
           expandedProducts.push(regularProduct);
         }
       } else {
         // Generate proper S3 URL for image if needed
-        const imageUrl = product.image && !product.image.startsWith('http') && !product.image.startsWith('https')
-          ? getImageUrl(product.image) || product.image
-          : product.image;
+        const imageUrl =
+          product.image &&
+          !product.image.startsWith("http") &&
+          !product.image.startsWith("https")
+            ? getImageUrl(product.image) || product.image
+            : product.image;
 
         const regularProduct: ProductWithVariant = {
           ...product,
+          sku: product.sku, // Ensure SKU is explicitly set
           baseProductId: product.id,
           isVariant: false,
           displayName: product.name,
-          image_url: imageUrl
+          image_url: imageUrl,
         };
         expandedProducts.push(regularProduct);
       }
     }
-    
+
     return expandedProducts;
   } catch (error) {
     return [];

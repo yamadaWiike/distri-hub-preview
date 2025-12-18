@@ -1,11 +1,7 @@
+// React
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+
+// External Libraries
 import { 
   Users, 
   UserPlus, 
@@ -16,7 +12,23 @@ import {
   Activity,
   MapPin
 } from 'lucide-react';
+
+// UI Components
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/use-toast';
+
+// Hooks
 import { useLanguage } from '@/hooks/use-language';
+
+// Integrations
+import { supabase } from '@/integrations/supabase/client';
+
+// Utils
+import { CatalogExportData, OrderStatus } from '@/utils/analytics';
 
 // Types (simplified without status)
 type DistributorStats = {
@@ -44,8 +56,6 @@ type OrderStats = {
   delivered: number;
   cancelled: number;
 };
-
-import { CatalogExportData, OrderStatus } from '@/utils/analytics';
 
 // Catalog export type
 type CatalogExport = CatalogExportData & {

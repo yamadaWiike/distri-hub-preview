@@ -259,9 +259,11 @@ export default function Checkout() {
       let enrichedItems = items;
 
       if (!bypassEnabled) {
-        const productIds = items.map((item) => item.id);
+        const productSkus = items
+          .map((item) => item.sku)
+          .filter((sku): sku is string => !!sku);
         const inventoryResponse = await getInventory({
-          inventoryId: productIds,
+          skus: productSkus,
           active: true,
           $limit: 100,
         });
@@ -277,9 +279,7 @@ export default function Checkout() {
         // Enrich items and check stock
         enrichedItems = items.map((item) => {
           const inventoryItem = inventoryResponse.data.find(
-            (inv) =>
-              inv.inventoryId === item.id &&
-              (item.variant ? inv.variantId === item.variant.id : true)
+            (inv) => inv.sku === item.sku
           );
 
           const itemDesc = item.variant
@@ -308,6 +308,7 @@ export default function Checkout() {
             inventoryPriceTierId: item.inventoryPriceTierId || "default-tier",
             sku: inventoryItem.sku,
             qtyOnHand: inventoryItem.qtyOnHand,
+            companyId: inventoryItem.companyId,
           };
         });
       }
@@ -417,12 +418,13 @@ export default function Checkout() {
         expeditionName: "",
         products: enrichedItems.map((item) => ({
           productId: item.id,
-          companyId: companyId,
-          inventoryId: item.inventoryId || item.id, // Fallback to productId saat bypass
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          companyId: (item as any).companyId || companyId,
+          inventoryId: item.inventoryId,
           qty: item.qty,
           neededQty: item.qty,
           price: item.unitPrice,
-          inventoryPriceTierId: item.inventoryPriceTierId || "default-tier", // Default tier saat bypass
+          inventoryPriceTierId: item.inventoryPriceTierId || "default-tier",
           discount: 0,
           discountAmount: 0,
           tax: Math.round(item.unitPrice * item.qty * taxRate),

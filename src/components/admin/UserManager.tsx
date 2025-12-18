@@ -1,4 +1,10 @@
+// React
 import React, { useState, useEffect } from 'react';
+
+// External Libraries
+import { Search, Loader2, Edit, RotateCcw, Eye, Shield, ShieldOff } from 'lucide-react';
+
+// UI Components
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -7,9 +13,12 @@ import { useToast } from '@/components/ui/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
-import { Search, Loader2, Edit, RotateCcw, Eye, Shield, ShieldOff } from 'lucide-react';
+
+// Hooks
 import { useLanguage } from '@/hooks/use-language';
+
+// Integrations
+import { supabase } from '@/integrations/supabase/client';
 
 export type UserProfile = {
   id: string;
