@@ -4,6 +4,9 @@ import { Link } from "react-router-dom";
 // Hooks
 import { useLanguage } from "@/hooks/use-language";
 
+// Constants
+import { APP_VERSION } from "@/constants";
+
 export default function Footer() {
   const { lang } = useLanguage();
 
@@ -109,7 +112,7 @@ export default function Footer() {
         {/* Copyright */}
         <div className="border-t border-gray-700 mt-8 pt-6 text-center">
           <p className="text-sm text-gray-400">{translation.copyright}</p>
-          <p className="text-xs text-gray-500 mt-2">v2.3.3</p>
+          <p className="text-xs text-gray-500 mt-2">v{APP_VERSION}</p>
         </div>
       </div>
     </footer>
