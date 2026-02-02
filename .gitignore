@@ -74,3 +74,8 @@ security-local/
 *.md
 *.txt
 !README.md
+
+# Allow technical documentation to be versioned
+!TECH DOC/
+!TECH DOC/*.md
+!TECH DOC/**/*.md

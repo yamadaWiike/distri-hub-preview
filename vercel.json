@@ -2,6 +2,10 @@
   "version": 2,
   "builds": [
     {
+      "src": "api/presign.ts",
+      "use": "@vercel/node"
+    },
+    {
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
@@ -10,6 +14,7 @@
     }
   ],
   "routes": [
+    { "src": "/api/presign", "dest": "/api/presign.ts" },
     { "handle": "filesystem" },
     { "src": "/.*", "dest": "/index.html" }
   ],
@@ -28,10 +33,6 @@
         {
           "key": "X-XSS-Protection",
           "value": "1; mode=block"
-        },
-        {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self'; connect-src 'self' https://www.google-analytics.com https://stats.g.doubleclick.net https://*.hotjar.com https://*.hotjar.io wss://ws.hotjar.com https://*.supabase.co https://nominatim.openstreetmap.org https://*.s3.amazonaws.com https://*.s3.*.amazonaws.com https://s3.*.amazonaws.com https://distrihub.s3.ap-southeast-1.amazonaws.com https://*.imagekit.io blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://www.googletagmanager.com https://www.google-analytics.com https://static.hotjar.com https://script.hotjar.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; frame-src 'self'; worker-src 'self' blob:; object-src 'none';"
         }
       ]
     },
