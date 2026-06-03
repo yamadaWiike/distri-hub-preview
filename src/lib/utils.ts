@@ -51,10 +51,9 @@ export function getProductIdFromSlug(slug: string): string {
   if (parts.length < 2) return slug; // Fallback to original if format unexpected
   
   const lastPart = parts[parts.length - 1];
-  const segments = lastPart.split('-');
-  
-  // The last segment should be the first 8 chars of the ID
-  const idPrefix = segments[segments.length - 1];
+  // The ID prefix is appended as the final 8 characters. It may contain
+  // hyphens itself, e.g. DUMMY-NO, so splitting by "-" loses information.
+  const idPrefix = lastPart.slice(-8);
   
   // Return the ID prefix - we'll use it to find the product
   return idPrefix;

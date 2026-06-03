@@ -63,6 +63,15 @@ export default function ProdukDetail() {
       if (idPrefix) {
         try {
           const expandedProducts = await fetchProductsExpandedByVariants();
+          const matchedBySlug = expandedProducts.find(
+            (item) => generateProductSlug(item) === fullSlug
+          );
+
+          if (matchedBySlug) {
+            setProduct(matchedBySlug as Product);
+            return;
+          }
+
           const matchedExpandedProduct = expandedProducts.find(
             (item) =>
               item.id.startsWith(idPrefix) || item.sku?.startsWith(idPrefix)
@@ -74,6 +83,15 @@ export default function ProdukDetail() {
           }
 
           const allProducts = await getAllProducts();
+          const matchedBaseBySlug = allProducts.find(
+            (item) => generateProductSlug(item) === fullSlug
+          );
+
+          if (matchedBaseBySlug) {
+            setProduct(matchedBaseBySlug);
+            return;
+          }
+
           const matchedProduct = allProducts.find(
             (item) =>
               item.id.startsWith(idPrefix) || item.sku?.startsWith(idPrefix)
@@ -92,7 +110,7 @@ export default function ProdukDetail() {
     }
     
     loadProduct();
-  }, [idPrefix]);
+  }, [fullSlug, idPrefix]);
   
   // Fetch similar products
   useEffect(() => {
