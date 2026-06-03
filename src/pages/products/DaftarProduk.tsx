@@ -411,6 +411,15 @@ const ProductCard = React.memo(
                   : "Waiting for admin approval to access prices and place orders."}
               </p>
             </div>
+
+            <Link
+              to={`/produk/${generateProductSlug(product)}`}
+              className="block"
+            >
+              <button className="w-full py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
+                Lihat Detail
+              </button>
+            </Link>
           </div>
         </article>
       );
