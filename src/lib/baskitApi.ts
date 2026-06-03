@@ -3,6 +3,10 @@ import axios from 'axios';
 
 const API_KEY = import.meta.env.VITE_BASKIT_API_KEY;
 const API_URL = import.meta.env.VITE_BASKIT_API_URL;
+const isLocalPreview =
+  import.meta.env.DEV &&
+  (!import.meta.env.VITE_SUPABASE_URL ||
+    !import.meta.env.VITE_SUPABASE_ANON_KEY);
 // const API_USERNAME = import.meta.env.VITE_BASKIT_API_USERNAME;
 // const API_PASSWORD = import.meta.env.VITE_BASKIT_API_PASSWORD;
 
@@ -15,7 +19,11 @@ export async function baskitApiRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   // Check if bypass mode is enabled
-  const bypassEnabled = import.meta.env.VITE_BASKIT_API_BYPASS === 'true';
+  const bypassEnabled =
+    import.meta.env.VITE_BASKIT_API_BYPASS === 'true' ||
+    isLocalPreview ||
+    !API_URL ||
+    !API_KEY;
   
   if (bypassEnabled) {
     // Return mock success response

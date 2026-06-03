@@ -42,7 +42,11 @@ export async function getInventory(
   payload: InventoryPayload
 ): Promise<InventoryResponse> {
   // Check if bypass mode is enabled
-  const bypassEnabled = import.meta.env.VITE_BASKIT_API_BYPASS === "true";
+  const bypassEnabled =
+    import.meta.env.VITE_BASKIT_API_BYPASS === "true" ||
+    (import.meta.env.DEV &&
+      (!import.meta.env.VITE_SUPABASE_URL ||
+        !import.meta.env.VITE_SUPABASE_ANON_KEY));
 
   if (bypassEnabled) {
     return {

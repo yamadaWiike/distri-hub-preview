@@ -250,6 +250,7 @@ export default function Checkout() {
         variant: "destructive",
       });
 
+      setIsSubmitting(false);
       return;
     }
 
@@ -536,29 +537,33 @@ Please process this order and contact the customer for shipping arrangements.
 You can view this order in the admin panel using Order Number: ${orderNumber}
       `.trim();
 
-      const emailResponse = await fetch("https://api.web3forms.com/submit", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          access_key: import.meta.env.VITE_WEB3FORMS_KEY,
-          subject: `[Baskit] New Order #${orderNumber} from ${fullName}`,
-          from_name: "Baskit Order System",
-          message: emailMessage,
-          "Order Number": orderNumber,
-          "Customer Name": fullName,
-          "Phone Number": phone,
-          "Customer Email": user?.email || "N/A",
-          "Shipping Address": address,
-          City: city,
-          "Total Amount": formatIDR(totalAmount),
-          "Order Items": orderItemsText,
-        }),
-      });
-
-      const result = await emailResponse.json();
+      const web3FormsKey =
+        import.meta.env.VITE_WEB3FORMS_KEY ||
+        import.meta.env.VITE_WEB3FORMS_ACCESS_KEY;
+      const shouldSendEmail = Boolean(web3FormsKey);
+      const result = shouldSendEmail
+        ? await fetch("https://api.web3forms.com/submit", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              access_key: web3FormsKey,
+              subject: `[Baskit] New Order #${orderNumber} from ${fullName}`,
+              from_name: "Baskit Order System",
+              message: emailMessage,
+              "Order Number": orderNumber,
+              "Customer Name": fullName,
+              "Phone Number": phone,
+              "Customer Email": user?.email || "N/A",
+              "Shipping Address": address,
+              City: city,
+              "Total Amount": formatIDR(totalAmount),
+              "Order Items": orderItemsText,
+            }),
+          }).then((response) => response.json())
+        : { success: true };
 
       // ========== Success & Redirect ==========
       toast({
