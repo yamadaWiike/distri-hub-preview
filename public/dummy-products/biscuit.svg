@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480">
+  <rect width="640" height="480" fill="#fffbeb"/>
+  <circle cx="500" cy="100" r="98" fill="#fed7aa"/>
+  <circle cx="142" cy="380" r="118" fill="#fde68a"/>
+  <rect x="184" y="142" width="272" height="196" rx="34" fill="#92400e"/>
+  <rect x="214" y="172" width="212" height="136" rx="26" fill="#f59e0b"/>
+  <text x="320" y="230" text-anchor="middle" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#78350f">BISCUIT</text>
+  <path d="M260 272h120" stroke="#fff7ed" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="256" cy="198" r="10" fill="#78350f"/>
+  <circle cx="386" cy="282" r="10" fill="#78350f"/>
+  <circle cx="346" cy="198" r="8" fill="#78350f"/>
+</svg>

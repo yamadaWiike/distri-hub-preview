@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480">
+  <rect width="640" height="480" fill="#f8fafc"/>
+  <circle cx="500" cy="90" r="96" fill="#fee2e2"/>
+  <circle cx="138" cy="386" r="126" fill="#fef3c7"/>
+  <path d="M230 88h180l26 324H204z" fill="#ef4444"/>
+  <path d="M248 116h144l19 268H229z" fill="#f97316"/>
+  <path d="M260 142h120v72H260z" rx="14" fill="#fff7ed"/>
+  <text x="320" y="187" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#991b1b">SNACK</text>
+  <path d="M258 264c34-28 86-28 124 0-16 41-95 41-124 0z" fill="#fde68a"/>
+  <path d="M272 278c26 16 70 16 96 0" stroke="#92400e" stroke-width="8" stroke-linecap="round" fill="none"/>
+  <path d="M230 88c28 20 57 20 86 0 31 20 62 20 94 0" fill="none" stroke="#7f1d1d" stroke-width="12" stroke-linecap="round"/>
+</svg>

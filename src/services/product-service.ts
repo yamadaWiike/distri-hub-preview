@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Product, RegionPricing, ProductVariant } from "@/data/products";
+import { DUMMY_PRODUCTS } from "@/data/dummyProducts";
 import {
   withAuth,
   requireAuth,
@@ -7,6 +8,85 @@ import {
   validateAuth,
 } from "@/utils/auth-guards";
 import { getImageUrl } from "@/lib/s3-upload";
+
+const useDummyProducts =
+  import.meta.env.VITE_MOCK_PRODUCTS === "true" ||
+  import.meta.env.VITE_MOCK_AUTH === "true" ||
+  import.meta.env.VITE_SUPABASE_PROJECT_ID === "dummy-project" ||
+  (import.meta.env.DEV &&
+    (!import.meta.env.VITE_SUPABASE_URL ||
+      !import.meta.env.VITE_SUPABASE_ANON_KEY));
+
+const cloneDummyProducts = () =>
+  DUMMY_PRODUCTS.map((product) => ({
+    ...product,
+    regions: product.regions.map((region) => ({ ...region })),
+    variants: product.variants?.map((variant) => ({
+      ...variant,
+      options: variant.options?.map((option) => ({ ...option })),
+    })),
+    variantOptions: product.variantOptions?.map((option) => ({
+      ...option,
+      option_values: [...option.option_values],
+    })),
+    images: product.images ? [...product.images] : undefined,
+  }));
+
+const expandProductsByVariants = (products: Product[]): ProductWithVariant[] => {
+  const expandedProducts: ProductWithVariant[] = [];
+
+  products.forEach((product) => {
+    if (product.hasVariants && product.variants?.length) {
+      product.variants
+        .filter((variant) => variant.isActive)
+        .forEach((variant) => {
+          const variantPrice = product.distributorPrice + variant.additionalPrice;
+
+          expandedProducts.push({
+            ...product,
+            id: variant.id,
+            sku: product.sku,
+            displayName: `${product.name} - ${variant.variantName}`,
+            name: product.name,
+            distributorPrice: variantPrice,
+            retailPrice: product.retailPrice
+              ? product.retailPrice + variant.additionalPrice
+              : undefined,
+            consumerPrice: product.consumerPrice + variant.additionalPrice,
+            regions: product.regions.map((region) => ({
+              ...region,
+              distributorPrice: region.distributorPrice + variant.additionalPrice,
+            })),
+            variantInfo: {
+              id: variant.id,
+              variantName: variant.variantName,
+              variantDescription: variant.variantDescription,
+              additionalPrice: variant.additionalPrice,
+            },
+            variant: {
+              id: variant.id,
+              name: variant.variantName,
+              additionalPrice: variant.additionalPrice,
+            },
+            isVariant: true,
+            baseProductId: product.id,
+          } as ProductWithVariant & {
+            variant: { id: string; name: string; additionalPrice: number };
+          });
+        });
+      return;
+    }
+
+    expandedProducts.push({
+      ...product,
+      displayName: product.name,
+      isVariant: false,
+      baseProductId: product.id,
+    });
+  });
+
+  return expandedProducts;
+};
 
 // Define database types to match our schema
 export type ProductFromDB = {
@@ -399,6 +479,10 @@ interface FallbackProduct {
 
 // Fetch all products with variant information
 export async function fetchProductsWithVariants(): Promise<Product[]> {
+  if (useDummyProducts) {
+    return cloneDummyProducts();
+  }
+
   // Only require authentication, not approval (allows pending users to view products)
   await requireAuthForViewing();
 
@@ -533,6 +617,10 @@ export async function fetchProductsWithVariants(): Promise<Product[]> {
 
 // Get all products with their region pricing
 export async function getAllProducts(): Promise<Product[]> {
+  if (useDummyProducts) {
+    return cloneDummyProducts();
+  }
+
   // Only require authentication, not approval (allows pending users to view products)
   await requireAuthForViewing();
 
@@ -597,6 +685,13 @@ export async function getAllProducts(): Promise<Product[]> {
 
 // Get a single product by ID
 export async function getProductById(id: string): Promise<Product | null> {
+  if (useDummyProducts) {
+    const products = cloneDummyProducts();
+    return (
+      products.find((product) => product.id === id || product.sku === id) || null
+    );
+  }
+
   // Only require authentication, not approval (allows pending users to view products)
   await requireAuthForViewing();
 
@@ -670,6 +765,16 @@ export async function getProductById(id: string): Promise<Product | null> {
 
 // Get areas where products are available (distinct list)
 export async function getAllAreas(): Promise<string[]> {
+  if (useDummyProducts) {
+    return Array.from(
+      new Set(
+        DUMMY_PRODUCTS.flatMap((product) =>
+          product.regions.map((region) => region.area)
+        )
+      )
+    ).sort();
+  }
+
   // Only require authentication, not approval (allows pending users to view products)
   await requireAuthForViewing();
 
@@ -696,6 +801,10 @@ export async function getAllAreas(): Promise<string[]> {
 
 // Get all available brands (distinct list)
 export async function getAllBrands(): Promise<string[]> {
+  if (useDummyProducts) {
+    return Array.from(new Set(DUMMY_PRODUCTS.map((product) => product.brand))).sort();
+  }
+
   // Only require authentication, not approval (allows pending users to view products)
   await requireAuthForViewing();
 
@@ -742,6 +851,10 @@ export interface ProductWithVariant
 export async function fetchProductsExpandedByVariants(): Promise<
   ProductWithVariant[]
 > {
+  if (useDummyProducts) {
+    return expandProductsByVariants(cloneDummyProducts());
+  }
+
   // Only require authentication, not approval (allows pending users to view products)
   await requireAuthForViewing();
 

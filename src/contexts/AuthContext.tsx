@@ -14,6 +14,52 @@ import { AuthContext, User, RegistrationData } from "./AuthContextDefinition";
 // Import database types
 import { Database } from "@/integrations/supabase/types";
 
+const isLocalPreviewAuth =
+  import.meta.env.VITE_MOCK_AUTH === "true" ||
+  import.meta.env.VITE_SUPABASE_PROJECT_ID === "dummy-project" ||
+  import.meta.env.VITE_SUPABASE_URL?.includes("dummy-project") ||
+  (import.meta.env.DEV &&
+    (!import.meta.env.VITE_SUPABASE_URL ||
+      !import.meta.env.VITE_SUPABASE_ANON_KEY));
+
+const MOCK_PASSWORD = "Password123";
+
+const mockUsers: Record<string, User & { isMockUser: true }> = {
+  "admin@demo.local": {
+    id: "11111111-1111-4111-8111-111111111111",
+    email: "admin@demo.local",
+    namaBisnis: "Baskit Internal",
+    kota: "Jakarta",
+    role: "admin",
+    status: "active",
+    isApproved: true,
+    profileComplete: true,
+    isMockUser: true,
+  },
+  "distributor@demo.local": {
+    id: "22222222-2222-4222-8222-222222222222",
+    email: "distributor@demo.local",
+    namaBisnis: "PT Demo Distributor Aktif",
+    kota: "Jakarta Selatan",
+    role: "user",
+    status: "active",
+    isApproved: true,
+    profileComplete: true,
+    isMockUser: true,
+  },
+  "pending@demo.local": {
+    id: "33333333-3333-4333-8333-333333333333",
+    email: "pending@demo.local",
+    namaBisnis: "CV Demo Menunggu Approval",
+    kota: "Kota Bandung",
+    role: "user",
+    status: "pending",
+    isApproved: false,
+    profileComplete: true,
+    isMockUser: true,
+  },
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -158,6 +204,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Auto-logout when session is expired
     const sessionMonitor = setInterval(async () => {
+      if (isLocalPreviewAuth) {
+        try {
+          const stored = localStorage.getItem("baskit_user");
+          const storedUser = stored ? JSON.parse(stored) : null;
+          if (storedUser?.isMockUser) return;
+        } catch {
+          // Continue with the normal session check if local storage is malformed.
+        }
+      }
+
       try {
         const {
           data: { session },
@@ -192,6 +248,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
+      if (isLocalPreviewAuth) {
+        const normalizedEmail = email.trim().toLowerCase();
+        const mockUser = mockUsers[normalizedEmail];
+
+        if (mockUser) {
+          if (password !== MOCK_PASSWORD) {
+            throw new Error("Password demo salah. Gunakan Password123.");
+          }
+
+          setUser(mockUser);
+          localStorage.setItem("baskit_user", JSON.stringify(mockUser));
+
+          toast({
+            title: "Login Demo Berhasil",
+            description: `Masuk sebagai ${mockUser.email}.`,
+            variant: "default",
+          });
+
+          return;
+        }
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480">
+  <rect width="640" height="480" fill="#f8fafc"/>
+  <circle cx="508" cy="108" r="100" fill="#dbeafe"/>
+  <circle cx="150" cy="380" r="112" fill="#fee2e2"/>
+  <path d="M238 110h164l30 66v240H208V176z" fill="#2563eb"/>
+  <path d="M238 110h164l-26 66H208z" fill="#60a5fa"/>
+  <rect x="244" y="220" width="152" height="104" rx="22" fill="#eff6ff"/>
+  <text x="320" y="267" text-anchor="middle" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#1d4ed8">MILK</text>
+  <path d="M282 298h76" stroke="#ef4444" stroke-width="10" stroke-linecap="round"/>
+  <path d="M262 144h116" stroke="#bfdbfe" stroke-width="12" stroke-linecap="round"/>
+</svg>

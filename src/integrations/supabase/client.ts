@@ -2,12 +2,16 @@ import { createClient } from '@supabase/supabase-js';
 import type { ExtendedDatabase } from './extended-types';
 
 // Using environment variables for security
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const rawSupabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const rawSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const isLocalPreview = import.meta.env.DEV && (!rawSupabaseUrl || !rawSupabaseAnonKey);
+
+const SUPABASE_URL = rawSupabaseUrl || 'https://dummy-project.supabase.co';
+const SUPABASE_ANON_KEY = rawSupabaseAnonKey || 'dummy-anon-key-for-local-preview';
 
 // Validate environment variables are set
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error('Missing Supabase environment variables. Check your .env file.');
+if (isLocalPreview) {
+  console.warn('Missing Supabase environment variables. Using local preview mock data.');
 }
 
 // Import the supabase client like this:
