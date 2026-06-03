@@ -20,14 +20,16 @@ import { useLanguage } from "@/hooks/use-language";
 import { useDistributorApproval } from "@/hooks/use-distributor-approval";
 
 // Utils & Data
-import { PRODUCTS, Product } from "@/data/products";
+import { Product } from "@/data/products";
 import { formatIDR, getProductIdFromSlug, generateProductSlug } from "@/lib/utils";
 import { translations } from "@/lib/translations";
-import { fetchProductBySku } from "@/lib/db";
 // getImageUrl no longer needed for display; PresignedImage handles S3
 import PresignedImage from "@/components/ui/PresignedImage";
 import { checkMixedVariantsMOQ } from "@/utils/mixVariants";
-import { getAllProducts } from "@/services/product-service";
+import {
+  fetchProductsExpandedByVariants,
+  getAllProducts,
+} from "@/services/product-service";
 import { CartItem } from "@/contexts/CartContextDefinition";
 
 export default function ProdukDetail() {
@@ -55,42 +57,32 @@ export default function ProdukDetail() {
   const [loading, setLoading] = useState(true);
   const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
   
-  // First look for product in hardcoded data using ID prefix
-  const hardcodedProduct = PRODUCTS.find((p) => p.id.startsWith(idPrefix));
-  
-  // Always fetch product from database to get UOM data
+  // Fetch product through the same service used by the catalog, including local preview fallback.
   useEffect(() => {
     async function loadProduct() {
-      if (idPrefix || hardcodedProduct) {
+      if (idPrefix) {
         try {
-          let fetchedProduct = null;
-          
-          console.log('Attempting to fetch product:', { idPrefix, hardcodedProductId: hardcodedProduct?.id });
-          
-          // If we found the product in hardcoded data, use its full ID
-          if (hardcodedProduct) {
-            console.log('Fetching by hardcoded ID:', hardcodedProduct.id);
-            fetchedProduct = await fetchProductBySku(hardcodedProduct.id);
+          const expandedProducts = await fetchProductsExpandedByVariants();
+          const matchedExpandedProduct = expandedProducts.find(
+            (item) =>
+              item.id.startsWith(idPrefix) || item.sku?.startsWith(idPrefix)
+          );
+
+          if (matchedExpandedProduct) {
+            setProduct(matchedExpandedProduct as Product);
+            return;
           }
-          
-          // If not found by full ID and we have a prefix, try prefix search
-          if (!fetchedProduct && idPrefix) {
-            console.log('Fetching by ID prefix:', idPrefix);
-            fetchedProduct = await fetchProductBySku(idPrefix);
-          }
-          
-          console.log('Fetched product result:', fetchedProduct);
-          
-          if (fetchedProduct) {
-            setProduct(fetchedProduct);
-          } else {
-            // Fallback to hardcoded if database fetch fails
-            setProduct(hardcodedProduct || null);
-          }
+
+          const allProducts = await getAllProducts();
+          const matchedProduct = allProducts.find(
+            (item) =>
+              item.id.startsWith(idPrefix) || item.sku?.startsWith(idPrefix)
+          );
+
+          setProduct(matchedProduct || null);
         } catch (error) {
           console.error("Error fetching product:", error);
-          // Fallback to hardcoded if database fetch fails
-          setProduct(hardcodedProduct || null);
+          setProduct(null);
         } finally {
           setLoading(false);
         }
@@ -100,7 +92,7 @@ export default function ProdukDetail() {
     }
     
     loadProduct();
-  }, [idPrefix, hardcodedProduct]);
+  }, [idPrefix]);
   
   // Fetch similar products
   useEffect(() => {
@@ -650,9 +642,9 @@ export default function ProdukDetail() {
               <div className="flex -ml-4">
                 {similarProducts.map((similarProduct) => (
                   <div className="flex-[0_0_100%] min-w-0 sm:flex-[0_0_50%] md:flex-[0_0_33.33%] lg:flex-[0_0_25%] pl-4" key={similarProduct.id}>
-                    <div className="bg-white rounded-lg border overflow-hidden shadow hover:shadow-lg transition cursor-pointer" onClick={() => navigate(`/${similarProduct.category}/${generateProductSlug(similarProduct)}`)}>
+                    <div className="bg-white rounded-lg border overflow-hidden shadow hover:shadow-lg transition cursor-pointer" onClick={() => navigate(`/produk/${generateProductSlug(similarProduct)}`)}>
                       <img 
-                        src={similarProduct.image} 
+                        src={similarProduct.image || "/placeholder.svg"} 
                         alt={similarProduct.name} 
                         className="w-full h-40 object-cover" 
                       />
