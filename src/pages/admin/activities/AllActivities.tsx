@@ -18,6 +18,12 @@ import { useAuth } from "@/hooks/use-auth";
 
 // Integrations
 import { supabase } from "@/integrations/supabase/client";
+import {
+  isPreviewDataMode,
+  mockDistributorProfiles,
+  mockOrders,
+  mockProducts,
+} from "@/data/adminMockData";
 
 interface Activity {
   id: string;
@@ -78,14 +84,44 @@ export default function AllActivities() {
       setIsLoading(true);
       const allActivities: Activity[] = [];
 
-      // Fetch distributor approvals
-      const { data: distributors } = await supabase
-        .from("distributor_profiles")
-        .select(
-          "id, nama_bisnis, approval_status, created_at, updated_at, user_id"
-        )
-        .order("updated_at", { ascending: false })
-        .limit(50);
+      let distributors: any[] = mockDistributorProfiles;
+      let products: any[] = mockProducts;
+      let orders: any[] = mockOrders;
+      let orderDistributors: any[] = mockDistributorProfiles;
+
+      if (!isPreviewDataMode) {
+        // Fetch distributor approvals
+        const { data: distributorRows } = await supabase
+          .from("distributor_profiles")
+          .select(
+            "id, nama_bisnis, approval_status, created_at, updated_at, user_id"
+          )
+          .order("updated_at", { ascending: false })
+          .limit(50);
+        distributors = distributorRows || [];
+
+        // Fetch products
+        const { data: productRows } = await supabase
+          .from("products")
+          .select("id, name, created_at")
+          .order("created_at", { ascending: false })
+          .limit(50);
+        products = productRows || [];
+
+        // Fetch orders with distributor info
+        const { data: orderRows } = await supabase
+          .from("orders")
+          .select("id, distributor_id, total, status, created_at")
+          .order("created_at", { ascending: false })
+          .limit(50);
+        orders = orderRows || [];
+
+        // Get distributor names for orders
+        const { data: distributorLookupRows } = await supabase
+          .from("distributor_profiles")
+          .select("id, nama_bisnis, user_id");
+        orderDistributors = distributorLookupRows || [];
+      }
 
       distributors?.forEach((dist: any) => {
         if (dist.approval_status === "approved" && dist.updated_at) {
@@ -119,13 +155,6 @@ export default function AllActivities() {
         }
       });
 
-      // Fetch products
-      const { data: products } = await supabase
-        .from("products")
-        .select("id, name, created_at")
-        .order("created_at", { ascending: false })
-        .limit(50);
-
       products?.forEach((product: any) => {
         if (product.created_at) {
           allActivities.push({
@@ -141,18 +170,6 @@ export default function AllActivities() {
           });
         }
       });
-
-      // Fetch orders with distributor info
-      const { data: orders } = await supabase
-        .from("orders")
-        .select("id, distributor_id, total, status, created_at")
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      // Get distributor names for orders
-      const { data: orderDistributors } = await supabase
-        .from("distributor_profiles")
-        .select("id, nama_bisnis, user_id");
 
       orders?.forEach((order: any) => {
         if (order.created_at) {

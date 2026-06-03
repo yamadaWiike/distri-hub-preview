@@ -27,6 +27,12 @@ import { useAuth } from "@/hooks/use-auth";
 
 // Integrations
 import { supabase } from "@/integrations/supabase/client";
+import {
+  isPreviewDataMode,
+  mockDistributorProfiles,
+  mockOrders,
+  mockProducts,
+} from "@/data/adminMockData";
 
 export default function Admin() {
   const { lang } = useLanguage();
@@ -59,24 +65,33 @@ export default function Admin() {
       try {
         setLoadingData(true);
 
-        // Fetch distributors
-        const { data: distributors } = await supabase
-          .from('distributor_profiles')
-          .select('*');
+        let distributors: any[] = mockDistributorProfiles;
+        let products: any[] = mockProducts;
+        let orders: any[] = mockOrders;
+
+        if (!isPreviewDataMode) {
+          // Fetch distributors
+          const { data: distributorRows } = await supabase
+            .from('distributor_profiles')
+            .select('*');
+          distributors = distributorRows || [];
+
+          // Fetch products
+          const { data: productRows } = await supabase
+            .from('products')
+            .select('id, name, created_at');
+          products = productRows || [];
+
+          // Fetch orders
+          const { data: orderRows } = await supabase
+            .from('orders')
+            .select('*');
+          orders = orderRows || [];
+        }
 
         const totalDist = distributors?.length || 0;
         const pending = distributors?.filter((d: any) => d.approval_status === 'pending').length || 0;
         const approved = distributors?.filter((d: any) => d.approval_status === 'approved').length || 0;
-
-        // Fetch products
-        const { data: products } = await supabase
-          .from('products')
-          .select('id, name, created_at');
-
-        // Fetch orders
-        const { data: orders } = await supabase
-          .from('orders')
-          .select('*');
 
         const activeOrders = orders?.filter((o: any) => o.status === 'pending' || o.status === 'processing').length || 0;
 

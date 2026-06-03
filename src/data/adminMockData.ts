@@ -1,5 +1,14 @@
 import { DUMMY_PRODUCTS } from "./dummyProducts";
 
+export const isPreviewDataMode =
+  import.meta.env.VITE_MOCK_AUTH === "true" ||
+  import.meta.env.VITE_MOCK_PRODUCTS === "true" ||
+  import.meta.env.VITE_SUPABASE_PROJECT_ID === "dummy-project" ||
+  import.meta.env.VITE_SUPABASE_URL?.includes("dummy-project") ||
+  (import.meta.env.DEV &&
+    (!import.meta.env.VITE_SUPABASE_URL ||
+      !import.meta.env.VITE_SUPABASE_ANON_KEY));
+
 const now = new Date();
 const daysAgo = (days: number) =>
   new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
