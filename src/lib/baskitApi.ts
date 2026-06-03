@@ -4,9 +4,13 @@ import axios from 'axios';
 const API_KEY = import.meta.env.VITE_BASKIT_API_KEY;
 const API_URL = import.meta.env.VITE_BASKIT_API_URL;
 const isLocalPreview =
-  import.meta.env.DEV &&
-  (!import.meta.env.VITE_SUPABASE_URL ||
-    !import.meta.env.VITE_SUPABASE_ANON_KEY);
+  import.meta.env.VITE_MOCK_AUTH === 'true' ||
+  import.meta.env.VITE_MOCK_PRODUCTS === 'true' ||
+  import.meta.env.VITE_SUPABASE_PROJECT_ID === 'dummy-project' ||
+  import.meta.env.VITE_SUPABASE_URL?.includes('dummy-project') ||
+  (import.meta.env.DEV &&
+    (!import.meta.env.VITE_SUPABASE_URL ||
+      !import.meta.env.VITE_SUPABASE_ANON_KEY));
 // const API_USERNAME = import.meta.env.VITE_BASKIT_API_USERNAME;
 // const API_PASSWORD = import.meta.env.VITE_BASKIT_API_PASSWORD;
 

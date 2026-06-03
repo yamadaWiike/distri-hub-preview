@@ -5,7 +5,12 @@ import { previewTables } from '@/data/adminMockData';
 // Using environment variables for security
 const rawSupabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const rawSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const isLocalPreview = import.meta.env.DEV && (!rawSupabaseUrl || !rawSupabaseAnonKey);
+const isLocalPreview =
+  import.meta.env.VITE_MOCK_AUTH === 'true' ||
+  import.meta.env.VITE_MOCK_PRODUCTS === 'true' ||
+  import.meta.env.VITE_SUPABASE_PROJECT_ID === 'dummy-project' ||
+  rawSupabaseUrl.includes('dummy-project') ||
+  (import.meta.env.DEV && (!rawSupabaseUrl || !rawSupabaseAnonKey));
 
 const SUPABASE_URL = rawSupabaseUrl || 'https://dummy-project.supabase.co';
 const SUPABASE_ANON_KEY = rawSupabaseAnonKey || 'dummy-anon-key-for-local-preview';
