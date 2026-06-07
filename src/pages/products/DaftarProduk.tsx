@@ -435,43 +435,35 @@ const ProductCard = React.memo(
             {!loggedIn ? (
               <div className="mt-auto mb-3 space-y-3 rounded-md border border-orange-300 bg-orange-50 p-3">
                 <p className="text-center text-xs font-medium text-orange-800">
-                  Masuk atau daftar untuk melihat harga eksklusif Anda
+                  Masuk untuk melihat harga special Anda
                 </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <Link to="/masuk">
-                    <Button className="h-9 w-full bg-orange-500 text-xs text-white hover:bg-orange-600">
-                      Masuk
-                    </Button>
-                  </Link>
-                  <Link to="/daftar">
-                    <Button
-                      variant="outline"
-                      className="h-9 w-full border-orange-500 text-xs text-orange-600 hover:bg-orange-50"
-                    >
-                      Daftar
-                    </Button>
-                  </Link>
-                </div>
+                <Link to="/masuk" className="block">
+                  <Button className="h-9 w-full bg-orange-500 text-xs text-white hover:bg-orange-600">
+                    Lihat Harga
+                  </Button>
+                </Link>
               </div>
             ) : (
               <div className="mt-auto mb-3 rounded-md border border-orange-300 bg-orange-50 p-3">
                 <p className="text-center text-xs font-semibold text-orange-900">
-                  Akun Anda sedang ditinjau
+                  Akun sedang ditinjau
                 </p>
                 <p className="mt-1 text-center text-[11px] leading-relaxed text-orange-800">
-                  Harga akan tersedia setelah akun disetujui. Biasanya 1-2 hari kerja.
+                  Harga akan tersedia setelah akun disetujui
                 </p>
               </div>
             )}
 
-            <Link
-              to={`/produk/${generateProductSlug(product)}`}
-              className="block"
-            >
-              <button className="w-full py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
-                Lihat Detail
-              </button>
-            </Link>
+            {!distributorAccess.isPending && (
+              <Link
+                to={`/produk/${generateProductSlug(product)}`}
+                className="block"
+              >
+                <button className="w-full py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
+                  Lihat Detail
+                </button>
+              </Link>
+            )}
           </div>
         </article>
       );
