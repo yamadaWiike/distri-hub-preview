@@ -1,5 +1,5 @@
 // React imports first
-import React, { useEffect } from "react";
+import React, { Suspense, lazy, useEffect } from "react";
 
 // Third-party library imports
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -24,32 +24,31 @@ import GoogleAnalytics from "./components/seo/GoogleAnalytics";
 import Hotjar from "./components/seo/Hotjar";
 
 // Pages
-import Index from "./pages/home/Index";
-import DaftarProduk from "./pages/products/DaftarProduk";
-import ProdukDetail from "./pages/products/ProdukDetail";
-import Tentang from "./pages/about/Tentang";
-import Hubungi from "./pages/contact/Hubungi";
-import Masuk from "./pages/auth/Masuk";
-import Daftar from "./pages/auth/Daftar";
-import Profil from "./pages/profile/Profil";
-import LengkapiProfil from "./pages/profile/LengkapiProfil";
-import Admin from "./pages/admin/dashboard/Admin";
-import AllActivities from "./pages/admin/activities/AllActivities";
-import AdminDistributors from "./pages/admin/distributors/AdminDistributors";
-import AdminUsers from "./pages/admin/users/AdminUsers";
-import AdminProducts from "./pages/admin/products/AdminProducts";
-import AdminSKUManager from "./pages/admin/products/AdminSKUManager";
-import AdminAddProduct from "./pages/admin/products/AdminAddProduct";
-import AdminEditProduct from "./pages/admin/products/AdminEditProduct";
-import AdminViewDistributor from "./pages/admin/distributors/AdminViewDistributor";
-import AdminEditDistributor from "./pages/admin/distributors/AdminEditDistributor";
-import AdminOrders from "./pages/admin/orders/AdminOrders";
-import OrderManagement from "./pages/admin/orders/OrderManagement";
-import AdminOrderDetail from "./pages/admin/orders/AdminOrderDetail";
-import AdminAnalytics from "./pages/admin/analytics/AdminAnalytics";
-import AdminReports from "./pages/admin/reports/AdminReports";
-import Checkout from "./pages/orders/Checkout";
-import NotFound from "./pages/shared/NotFound";
+const Index = lazy(() => import("./pages/home/Index"));
+const DaftarProduk = lazy(() => import("./pages/products/DaftarProduk"));
+const ProdukDetail = lazy(() => import("./pages/products/ProdukDetail"));
+const Tentang = lazy(() => import("./pages/about/Tentang"));
+const Hubungi = lazy(() => import("./pages/contact/Hubungi"));
+const Masuk = lazy(() => import("./pages/auth/Masuk"));
+const Daftar = lazy(() => import("./pages/auth/Daftar"));
+const Profil = lazy(() => import("./pages/profile/Profil"));
+const LengkapiProfil = lazy(() => import("./pages/profile/LengkapiProfil"));
+const Checkout = lazy(() => import("./pages/orders/Checkout"));
+const Admin = lazy(() => import("./pages/admin/dashboard/Admin"));
+const AllActivities = lazy(() => import("./pages/admin/activities/AllActivities"));
+const AdminDistributors = lazy(() => import("./pages/admin/distributors/AdminDistributors"));
+const AdminUsers = lazy(() => import("./pages/admin/users/AdminUsers"));
+const AdminProducts = lazy(() => import("./pages/admin/products/AdminProducts"));
+const AdminSKUManager = lazy(() => import("./pages/admin/products/AdminSKUManager"));
+const AdminAddProduct = lazy(() => import("./pages/admin/products/AdminAddProduct"));
+const AdminEditProduct = lazy(() => import("./pages/admin/products/AdminEditProduct"));
+const AdminViewDistributor = lazy(() => import("./pages/admin/distributors/AdminViewDistributor"));
+const AdminEditDistributor = lazy(() => import("./pages/admin/distributors/AdminEditDistributor"));
+const OrderManagement = lazy(() => import("./pages/admin/orders/OrderManagement"));
+const AdminOrderDetail = lazy(() => import("./pages/admin/orders/AdminOrderDetail"));
+const AdminAnalytics = lazy(() => import("./pages/admin/analytics/AdminAnalytics"));
+const AdminReports = lazy(() => import("./pages/admin/reports/AdminReports"));
+const NotFound = lazy(() => import("./pages/shared/NotFound"));
 
 /**
  * Configure React Query client with default options
@@ -80,6 +79,12 @@ const Protected: React.FC<ProtectedRouteProps> = ({ children }) => {
   // Either render the children or redirect to login
   return user ? children : <Navigate to="/masuk" replace />;
 };
+
+const RouteFallback: React.FC = () => (
+  <div className="flex min-h-screen items-center justify-center bg-white text-sm text-muted-foreground">
+    Memuat halaman...
+  </div>
+);
 
 /**
  * Main application component
@@ -156,91 +161,93 @@ const App: React.FC = () => {
                   <GoogleAnalytics />
                   <Hotjar />
 
-                  <Routes>
-                    {/* Public pages */}
-                    <Route path="/" element={<Index />} />
-                    <Route path="/daftar-produk" element={<DaftarProduk />} />
-                    <Route
-                      path="/produk/:category/:slug"
-                      element={<ProdukDetail />}
-                    />
-                    <Route path="/tentang" element={<Tentang />} />
-                    <Route path="/hubungi" element={<Hubungi />} />
-                    <Route path="/masuk" element={<Masuk />} />
-                    <Route path="/daftar" element={<Daftar />} />
+                  <Suspense fallback={<RouteFallback />}>
+                    <Routes>
+                      {/* Public pages */}
+                      <Route path="/" element={<Index />} />
+                      <Route path="/daftar-produk" element={<DaftarProduk />} />
+                      <Route
+                        path="/produk/:category/:slug"
+                        element={<ProdukDetail />}
+                      />
+                      <Route path="/tentang" element={<Tentang />} />
+                      <Route path="/hubungi" element={<Hubungi />} />
+                      <Route path="/masuk" element={<Masuk />} />
+                      <Route path="/daftar" element={<Daftar />} />
 
-                    {/* Protected routes - require authentication */}
-                    <Route
-                      path="/profil"
-                      element={
-                        <Protected>
-                          <Profil />
-                        </Protected>
-                      }
-                    />
-                    <Route
-                      path="/lengkapi-profil"
-                      element={
-                        <Protected>
-                          <LengkapiProfil />
-                        </Protected>
-                      }
-                    />
-                    <Route
-                      path="/checkout"
-                      element={
-                        <Protected>
-                          <Checkout />
-                        </Protected>
-                      }
-                    />
+                      {/* Protected routes - require authentication */}
+                      <Route
+                        path="/profil"
+                        element={
+                          <Protected>
+                            <Profil />
+                          </Protected>
+                        }
+                      />
+                      <Route
+                        path="/lengkapi-profil"
+                        element={
+                          <Protected>
+                            <LengkapiProfil />
+                          </Protected>
+                        }
+                      />
+                      <Route
+                        path="/checkout"
+                        element={
+                          <Protected>
+                            <Checkout />
+                          </Protected>
+                        }
+                      />
 
-                    {/* Admin routes */}
-                    <Route path="/admin" element={<Admin />} />
-                    <Route
-                      path="/admin/activities"
-                      element={<AllActivities />}
-                    />
-                    <Route
-                      path="/admin/distributors"
-                      element={<AdminDistributors />}
-                    />
-                    <Route
-                      path="/admin/distributors/view/:id"
-                      element={<AdminViewDistributor />}
-                    />
-                    <Route
-                      path="/admin/distributors/edit/:id"
-                      element={<AdminEditDistributor />}
-                    />
-                    <Route path="/admin/users" element={<AdminUsers />} />
-                    <Route path="/admin/products" element={<AdminProducts />} />
-                    <Route
-                      path="/admin/products/add"
-                      element={<AdminAddProduct />}
-                    />
-                    <Route
-                      path="/admin/products/edit/:id"
-                      element={<AdminEditProduct />}
-                    />
-                    <Route
-                      path="/admin/sku-manager"
-                      element={<AdminSKUManager />}
-                    />
-                    <Route path="/admin/orders" element={<OrderManagement />} />
-                    <Route
-                      path="/admin/orders/:id"
-                      element={<AdminOrderDetail />}
-                    />
-                    <Route
-                      path="/admin/analytics"
-                      element={<AdminAnalytics />}
-                    />
-                    <Route path="/admin/reports" element={<AdminReports />} />
+                      {/* Admin routes */}
+                      <Route path="/admin" element={<Admin />} />
+                      <Route
+                        path="/admin/activities"
+                        element={<AllActivities />}
+                      />
+                      <Route
+                        path="/admin/distributors"
+                        element={<AdminDistributors />}
+                      />
+                      <Route
+                        path="/admin/distributors/view/:id"
+                        element={<AdminViewDistributor />}
+                      />
+                      <Route
+                        path="/admin/distributors/edit/:id"
+                        element={<AdminEditDistributor />}
+                      />
+                      <Route path="/admin/users" element={<AdminUsers />} />
+                      <Route path="/admin/products" element={<AdminProducts />} />
+                      <Route
+                        path="/admin/products/add"
+                        element={<AdminAddProduct />}
+                      />
+                      <Route
+                        path="/admin/products/edit/:id"
+                        element={<AdminEditProduct />}
+                      />
+                      <Route
+                        path="/admin/sku-manager"
+                        element={<AdminSKUManager />}
+                      />
+                      <Route path="/admin/orders" element={<OrderManagement />} />
+                      <Route
+                        path="/admin/orders/:id"
+                        element={<AdminOrderDetail />}
+                      />
+                      <Route
+                        path="/admin/analytics"
+                        element={<AdminAnalytics />}
+                      />
+                      <Route path="/admin/reports" element={<AdminReports />} />
 
-                    {/* Fallback route for 404 errors */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
+                      {/* Fallback route for 404 errors */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Suspense>
                 </BrowserRouter>
               </CartProvider>
             </AuthProvider>

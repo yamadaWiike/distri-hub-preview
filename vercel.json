@@ -47,7 +47,7 @@
     }
   ],
   "buildCommand": "npm run build:vercel",
-  "installCommand": "npm install",
+  "installCommand": "npm ci",
   "framework": null,
   "outputDirectory": "dist"
 }

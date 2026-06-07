@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#ffffff"/>
+  <rect x="40" y="40" width="432" height="432" rx="92" fill="#f8fafc" stroke="#e5e7eb" stroke-width="8"/>
+  <text x="256" y="250" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="96" font-weight="700" fill="#1f2937">b</text>
+  <circle cx="198" cy="318" r="16" fill="#f08a24"/>
+  <circle cx="256" cy="318" r="16" fill="#f08a24"/>
+  <circle cx="314" cy="318" r="16" fill="#f08a24"/>
+  <text x="256" y="382" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#4b5563">hub</text>
+</svg>
