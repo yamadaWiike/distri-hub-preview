@@ -3,12 +3,16 @@ import { Link } from "react-router-dom";
 
 // Hooks
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/use-auth";
 
 // Constants
 import { APP_VERSION } from "@/constants";
 
 export default function Footer() {
   const { lang } = useLanguage();
+  const { user } = useAuth();
+
+  if (user) return null;
 
   const t = {
     id: {

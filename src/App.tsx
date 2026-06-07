@@ -34,6 +34,7 @@ const Daftar = lazy(() => import("./pages/auth/Daftar"));
 const Profil = lazy(() => import("./pages/profile/Profil"));
 const LengkapiProfil = lazy(() => import("./pages/profile/LengkapiProfil"));
 const Checkout = lazy(() => import("./pages/orders/Checkout"));
+const RiwayatPembelian = lazy(() => import("./pages/orders/RiwayatPembelian"));
 const Admin = lazy(() => import("./pages/admin/dashboard/Admin"));
 const AllActivities = lazy(() => import("./pages/admin/activities/AllActivities"));
 const AdminDistributors = lazy(() => import("./pages/admin/distributors/AdminDistributors"));
@@ -197,6 +198,14 @@ const App: React.FC = () => {
                         element={
                           <Protected>
                             <Checkout />
+                          </Protected>
+                        }
+                      />
+                      <Route
+                        path="/riwayat-pembelian"
+                        element={
+                          <Protected>
+                            <RiwayatPembelian />
                           </Protected>
                         }
                       />

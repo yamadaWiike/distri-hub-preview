@@ -13,6 +13,7 @@ import {
   LogOut,
   Languages,
   LayoutDashboard,
+  ReceiptText,
 } from "lucide-react";
 
 // UI Components
@@ -50,6 +51,13 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
       : "text-gray-700 hover:text-orange-600 hover:after:absolute hover:after:bottom-0 hover:after:left-0 hover:after:right-0 hover:after:h-0.5 hover:after:bg-orange-300"
   }`;
 
+const mobileNavClass = (isActive: boolean) =>
+  `flex items-center px-4 py-3 transition-colors relative w-full ${
+    isActive
+      ? "bg-orange-50 text-orange-600 font-medium border-r-4 border-orange-500"
+      : "text-foreground/80 hover:bg-accent/50"
+  }`;
+
 // const mobileNavLinkClass = ({ isActive }: { isActive: boolean }) =>
 //   `flex items-center gap-2 px-4 py-3 transition-colors relative w-full ${
 //     isActive
@@ -80,6 +88,8 @@ export default function Navbar() {
   const isMobile = useIsMobile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const isLoggedIn = Boolean(user);
+  const logoDestination = isLoggedIn ? "/daftar-produk" : "/";
 
   // Close the mobile menu when resizing to desktop
   useEffect(() => {
@@ -111,66 +121,70 @@ export default function Navbar() {
                   </div>
                 </SheetHeader>
 
-                {/* Mobile Navigation Links */}
                 <div className="py-3 flex flex-col">
-                  <SheetClose asChild>
-                    <NavLink
-                      to="/"
-                      className={`flex items-center px-4 py-3 transition-colors relative w-full ${
-                        location.pathname === "/"
-                          ? "bg-orange-50 text-orange-600 font-medium border-r-4 border-orange-500"
-                          : "text-foreground/80 hover:bg-accent/50"
-                      }`}
-                    >
-                      <Home className="h-4 w-4 me-3" />
-                      <span>{t.home}</span>
-                    </NavLink>
-                  </SheetClose>
+                  {!isLoggedIn && (
+                    <SheetClose asChild>
+                      <NavLink
+                        to="/"
+                        className={mobileNavClass(location.pathname === "/")}
+                      >
+                        <Home className="h-4 w-4 me-3" />
+                        <span>{t.home}</span>
+                      </NavLink>
+                    </SheetClose>
+                  )}
                   <SheetClose asChild>
                     <NavLink
                       to="/daftar-produk"
-                      className={`flex items-center px-4 py-3 transition-colors relative w-full ${
-                        location.pathname === "/daftar-produk"
-                          ? "bg-orange-50 text-orange-600 font-medium border-r-4 border-orange-500"
-                          : "text-foreground/80 hover:bg-accent/50"
-                      }`}
+                      className={mobileNavClass(
+                        location.pathname === "/daftar-produk" ||
+                          location.pathname.startsWith("/produk/")
+                      )}
                     >
                       <Package className="h-4 w-4 me-3" />
-                      <span>{t.productList}</span>
+                      <span>{isLoggedIn ? "Katalog" : t.productList}</span>
                     </NavLink>
                   </SheetClose>
-                  <SheetClose asChild>
-                    <NavLink
-                      to="/tentang"
-                      className={`flex items-center px-4 py-3 transition-colors relative w-full ${
-                        location.pathname === "/tentang"
-                          ? "bg-orange-50 text-orange-600 font-medium border-r-4 border-orange-500"
-                          : "text-foreground/80 hover:bg-accent/50"
-                      }`}
-                    >
-                      <Info className="h-4 w-4 me-3" />
-                      <span>{t.about}</span>
-                    </NavLink>
-                  </SheetClose>
-                  <SheetClose asChild>
-                    <NavLink
-                      to="/hubungi"
-                      className={`flex items-center px-4 py-3 transition-colors relative w-full ${
-                        location.pathname === "/hubungi"
-                          ? "bg-orange-50 text-orange-600 font-medium border-r-4 border-orange-500"
-                          : "text-foreground/80 hover:bg-accent/50"
-                      }`}
-                    >
-                      <Phone className="h-4 w-4 me-3" />
-                      <span>{t.contact}</span>
-                    </NavLink>
-                  </SheetClose>
+                  {isLoggedIn ? (
+                    <SheetClose asChild>
+                      <NavLink
+                        to="/riwayat-pembelian"
+                        className={mobileNavClass(
+                          location.pathname === "/riwayat-pembelian"
+                        )}
+                      >
+                        <ReceiptText className="h-4 w-4 me-3" />
+                        <span>Riwayat Pembelian</span>
+                      </NavLink>
+                    </SheetClose>
+                  ) : (
+                    <>
+                      <SheetClose asChild>
+                        <NavLink
+                          to="/tentang"
+                          className={mobileNavClass(location.pathname === "/tentang")}
+                        >
+                          <Info className="h-4 w-4 me-3" />
+                          <span>{t.about}</span>
+                        </NavLink>
+                      </SheetClose>
+                      <SheetClose asChild>
+                        <NavLink
+                          to="/hubungi"
+                          className={mobileNavClass(location.pathname === "/hubungi")}
+                        >
+                          <Phone className="h-4 w-4 me-3" />
+                          <span>{t.contact}</span>
+                        </NavLink>
+                      </SheetClose>
+                    </>
+                  )}
                 </div>
               </SheetContent>
             </Sheet>
           )}
 
-          <Link to="/" className="flex items-center gap-2">
+          <Link to={logoDestination} className="flex items-center gap-2">
             <img src="/assets/baskit-logo.png" alt="Baskit" className="h-8" />
           </Link>
         </div>
@@ -178,18 +192,41 @@ export default function Navbar() {
         {/* Desktop Navigation */}
         {!isMobile && (
           <nav className="hidden md:flex items-center gap-1">
-            <NavLink to="/" className={navLinkClass}>
-              {t.home}
+            {!isLoggedIn && (
+              <NavLink to="/" className={navLinkClass}>
+                {t.home}
+              </NavLink>
+            )}
+            <NavLink
+              to="/daftar-produk"
+              className={({ isActive }) =>
+                navLinkClass({
+                  isActive: isActive || location.pathname.startsWith("/produk/"),
+                })
+              }
+            >
+              {isLoggedIn
+                ? lang === "id"
+                  ? "Katalog"
+                  : "Catalog"
+                : lang === "id"
+                ? "Daftar Produk"
+                : "Product List"}
             </NavLink>
-            <NavLink to="/daftar-produk" className={navLinkClass}>
-              {lang === "id" ? "Daftar Produk" : "Product List"}
-            </NavLink>
-            <NavLink to="/tentang" className={navLinkClass}>
-              {lang === "id" ? "Tentang Baskit" : "About Baskit"}
-            </NavLink>
-            <NavLink to="/hubungi" className={navLinkClass}>
-              {lang === "id" ? "Hubungi Kami" : "Contact Us"}
-            </NavLink>
+            {isLoggedIn ? (
+              <NavLink to="/riwayat-pembelian" className={navLinkClass}>
+                {lang === "id" ? "Riwayat Pembelian" : "Purchase History"}
+              </NavLink>
+            ) : (
+              <>
+                <NavLink to="/tentang" className={navLinkClass}>
+                  {lang === "id" ? "Tentang Baskit" : "About Baskit"}
+                </NavLink>
+                <NavLink to="/hubungi" className={navLinkClass}>
+                  {lang === "id" ? "Hubungi Kami" : "Contact Us"}
+                </NavLink>
+              </>
+            )}
           </nav>
         )}
 
@@ -275,24 +312,35 @@ export default function Navbar() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="default">
-                      <span className="text-sm">{user.email}</span>
+                      <User className="h-4 w-4 me-2" />
+                      <span className="text-sm">{lang === "id" ? "Akun" : "Account"}</span>
                     </Button>
                   </DropdownMenuTrigger>
 
                   <DropdownMenuContent align="end">
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                      {user.email}
+                    </div>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem asChild className="cursor-pointer">
-                      <div className="w-full flex justify-start items-center font-normal">
+                      <Link to="/profil" className="w-full flex justify-start items-center font-normal">
                         <User className="h-4 w-4 me-2" />
-                        <Link to="/profil">{t.profile}</Link>
-                      </div>
+                        {t.profile}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link to="/riwayat-pembelian" className="w-full flex justify-start items-center font-normal">
+                        <ReceiptText className="h-4 w-4 me-2" />
+                        {lang === "id" ? "Riwayat Pembelian" : "Purchase History"}
+                      </Link>
                     </DropdownMenuItem>
                     {user.role === "admin" && (
                       <>
                         <DropdownMenuItem asChild className="cursor-pointer">
-                          <div className="w-full flex justify-start items-center font-normal">
+                          <Link to="/admin" className="w-full flex justify-start items-center font-normal">
                             <LayoutDashboard className="h-4 w-4 me-2" />
-                            <Link to="/admin">Admin Dashboard</Link>
-                          </div>
+                            Admin Dashboard
+                          </Link>
                         </DropdownMenuItem>
                       </>
                     )}
@@ -320,25 +368,33 @@ export default function Navbar() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="default">
-                    <span className="text-sm overflow-hidden text-ellipsis whitespace-nowrap max-w-20">
-                      {user.email}
-                    </span>
+                    <User className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground max-w-48 truncate">
+                    {user.email}
+                  </div>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <div className="w-full flex justify-start items-center font-normal">
+                    <Link to="/profil" className="w-full flex justify-start items-center font-normal">
                       <User className="h-4 w-4 me-2" />
-                      <Link to="/profil">{t.profile}</Link>
-                    </div>
+                      {t.profile}
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/riwayat-pembelian" className="w-full flex justify-start items-center font-normal">
+                      <ReceiptText className="h-4 w-4 me-2" />
+                      {lang === "id" ? "Riwayat Pembelian" : "Purchase History"}
+                    </Link>
                   </DropdownMenuItem>
                   {user.role === "admin" && (
                     <>
                       <DropdownMenuItem asChild>
-                        <div className="w-full flex justify-start items-center font-normal">
+                        <Link to="/admin" className="w-full flex justify-start items-center font-normal">
                           <LayoutDashboard className="h-4 w-4 me-2" />
-                          <Link to="/admin">Admin Dashboard</Link>
-                        </div>
+                          Admin Dashboard
+                        </Link>
                       </DropdownMenuItem>
                     </>
                   )}
