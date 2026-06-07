@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 // External Libraries & Icons
-import { Upload, X, Loader2, Eye, EyeOff } from "lucide-react";
+import { Check, Upload, X, Loader2, Eye, EyeOff } from "lucide-react";
 
 // UI Components
 import SEO from "@/components/seo/SEO";
@@ -34,11 +34,30 @@ import {
   District,
 } from "@/data/indonesiaRegions";
 
+const accountTypeOptions = [
+  {
+    value: "distributor",
+    title: "Distributor",
+    description: "Saya membeli untuk dijual kembali ke retailer",
+  },
+  {
+    value: "wholeseller",
+    title: "Wholeseller",
+    description: "Saya membeli dalam jumlah besar untuk dijual ke distributor lain",
+  },
+  {
+    value: "retailer",
+    title: "Retailer",
+    description: "Saya membeli untuk dijual langsung ke konsumen",
+  },
+] as const;
+
 export default function Daftar() {
   const { register } = useAuth();
   const { lang } = useLanguage();
   const t = translations[lang];
   const [form, setForm] = useState({
+    account_type: "" as "" | "distributor" | "wholeseller" | "retailer",
     namaBisnis: "",
     fotoToko: null as File | null,
     fotoTokoUrl: "", // URL from S3 after upload
@@ -145,6 +164,7 @@ export default function Daftar() {
       await register({
         email: form.email,
         password: form.password,
+        account_type: form.account_type || "distributor",
         namaBisnis: form.namaBisnis,
         alamatLengkap: form.alamatLengkap,
         provinsiId: form.provinsiId,
@@ -280,6 +300,7 @@ export default function Daftar() {
   
   // Step validation
   const validateStep1 = () => {
+    if (!form.account_type) return false;
     if (!form.namaBisnis.trim()) return false;
     if (!form.fotoToko) return false;
     if (!form.alamatLengkap.trim()) return false;
@@ -590,6 +611,44 @@ export default function Daftar() {
               <h2 className="text-xl font-semibold mb-6">{lang === 'id' ? "Informasi Bisnis" : "Business Information"}</h2>
               
               <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium mb-3">
+                    {lang === 'id' ? "Tipe Akun" : "Account Type"} <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {accountTypeOptions.map((option) => {
+                      const selected = form.account_type === option.value;
+
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() =>
+                            setForm({ ...form, account_type: option.value })
+                          }
+                          className={`relative rounded-lg border p-4 text-left transition-colors ${
+                            selected
+                              ? "border-orange-500 bg-orange-50 ring-1 ring-orange-500"
+                              : "border-gray-200 bg-white hover:border-orange-300"
+                          }`}
+                        >
+                          {selected && (
+                            <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-white">
+                              <Check className="h-3.5 w-3.5" />
+                            </span>
+                          )}
+                          <p className="font-semibold text-gray-900 pr-7">
+                            {option.title}
+                          </p>
+                          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                            {option.description}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     {lang === 'id' ? "Nama Bisnis" : "Business Name"} <span className="text-red-500">*</span>

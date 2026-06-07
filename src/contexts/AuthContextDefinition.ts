@@ -14,6 +14,7 @@ export type User = {
   email: string;
   namaBisnis?: string;
   kota?: string;
+  account_type?: "distributor" | "wholeseller" | "retailer";
   role: "user" | "admin";
   status?:
     | "pending"
@@ -37,6 +38,7 @@ export type DistributorProfile =
 export type RegistrationData = {
   email: string;
   password: string;
+  account_type: "distributor" | "wholeseller" | "retailer";
   namaBisnis: string;
   alamatLengkap: string;
   provinsiId: string;

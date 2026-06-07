@@ -41,6 +41,19 @@ const mockUsers: Record<string, User & { isMockUser: true }> = {
     email: "distributor@demo.local",
     namaBisnis: "PT Demo Distributor Aktif",
     kota: "Jakarta Selatan",
+    account_type: "distributor",
+    role: "user",
+    status: "active",
+    isApproved: true,
+    profileComplete: true,
+    isMockUser: true,
+  },
+  "wholeseller@demo.local": {
+    id: "44444444-4444-4444-8444-444444444444",
+    email: "wholeseller@demo.local",
+    namaBisnis: "PT Demo Wholeseller Aktif",
+    kota: "Kota Surabaya",
+    account_type: "wholeseller",
     role: "user",
     status: "active",
     isApproved: true,
@@ -101,6 +114,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: session.user.email || "",
             namaBisnis: profile?.nama_bisnis,
             kota: profile?.kota,
+            account_type:
+              ((profile as { account_type?: User["account_type"] } | null)
+                ?.account_type as User["account_type"]) ||
+              (session.user.user_metadata?.account_type as User["account_type"]) ||
+              "distributor",
             role: session.user.app_metadata?.role || "user",
             status: userStatus,
             isApproved: userStatus === "active",
@@ -114,6 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const userData = {
             id: session.user.id,
             email: session.user.email || "",
+            account_type: "distributor",
             role: session.user.app_metadata?.role || "user",
             status: "pending" as const,
             isApproved: false,
@@ -145,7 +164,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
               if (userData.id && uuidRegex.test(userData.id)) {
-                setUser(userData);
+                setUser({
+                  ...userData,
+                  account_type: userData.account_type || "distributor",
+                });
               } else {
                 console.warn(
                   "Invalid user ID in localStorage, clearing stored user data"
@@ -169,7 +191,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
             if (userData.id && uuidRegex.test(userData.id)) {
-              setUser(userData);
+              setUser({
+                ...userData,
+                account_type: userData.account_type || "distributor",
+              });
             } else {
               console.warn(
                 "Invalid user ID in localStorage, clearing stored user data"
@@ -304,6 +329,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         options: {
           data: {
             role: "user",
+            account_type: data.account_type || "distributor",
           },
         },
       });
@@ -377,6 +403,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: data.email,
           namaBisnis: data.namaBisnis,
           kota: data.kota,
+          account_type: data.account_type || "distributor",
           role: "user",
           status: "pending",
           isApproved: false,

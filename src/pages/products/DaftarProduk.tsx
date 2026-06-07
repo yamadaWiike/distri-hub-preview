@@ -65,6 +65,36 @@ import { safeNumber, safeString } from "@/utils/catalog/Funtions";
 // Cache duration constant
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 
+const getAccountPriceLabel = (accountType?: User["account_type"]) => {
+  if (accountType === "wholeseller") return "Harga Wholeseller";
+  if (accountType === "retailer") return "Harga Retailer";
+  return "Harga Distributor";
+};
+
+const getProductTypeMeta = (productType?: string) => {
+  const normalized = (productType || "FMCG").toLowerCase();
+  if (normalized === "bpc") {
+    return { label: "BPC", className: "bg-purple-50 text-purple-700 border-purple-200" };
+  }
+  if (normalized === "bundle") {
+    return { label: "Bundle", className: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+  }
+  return { label: "FMCG", className: "bg-blue-50 text-blue-700 border-blue-200" };
+};
+
+const ProductTypeBadge = ({ product }: { product: ProductWithVariant }) => {
+  const productType = (product as ProductWithVariant & { product_type?: string }).product_type;
+  const meta = getProductTypeMeta(productType);
+
+  return (
+    <div
+      className={`mb-2 inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${meta.className}`}
+    >
+      {meta.label}
+    </div>
+  );
+};
+
 const ProductCard = React.memo(
   ({
     product,
@@ -105,6 +135,7 @@ const ProductCard = React.memo(
       product.regions[0];
     const basePrice = regional?.distributorPrice ?? product.distributorPrice;
     const usedMoq = regional?.moq ?? product.moq;
+    const priceLabel = getAccountPriceLabel(user?.account_type);
 
     // Determine if this product allows mixing variants to meet MOQ
     // IMPORTANT: Make absolutely sure we're checking correctly - use explicit boolean checks
@@ -313,6 +344,8 @@ const ProductCard = React.memo(
 
           {/* Product Info Section */}
           <div className="p-3 flex-1 flex flex-col">
+            <ProductTypeBadge product={product} />
+
             {/* Brand Name */}
             {product.brand &&
               product.brand !== "unknown" &&
@@ -351,7 +384,7 @@ const ProductCard = React.memo(
               {/* Distributor Price - Blurred with Orange Background */}
               <div className="mb-1 -mx-3 px-3 py-1.5 bg-orange-50 blur-sm select-none">
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-600">Distributor</span>
+                  <span className="text-xs text-gray-600">{priceLabel}</span>
                   <span className="text-sm font-bold text-gray-900">
                     Rp 150,000
                   </span>
@@ -399,18 +432,37 @@ const ProductCard = React.memo(
               </div>
             </div>
 
-            {/* Login/Approval Message */}
-            <div className="mt-auto mb-3 p-3 bg-orange-50 border border-orange-300 rounded-md">
-              <p className="text-xs text-orange-800 text-center font-medium">
-                {!loggedIn
-                  ? lang === "id"
-                    ? "Silakan login untuk mengakses harga dan melakukan pemesanan."
-                    : "Please login to access prices and place orders."
-                  : lang === "id"
-                  ? "Menunggu approval admin untuk mengakses harga dan melakukan pemesanan."
-                  : "Waiting for admin approval to access prices and place orders."}
-              </p>
-            </div>
+            {!loggedIn ? (
+              <div className="mt-auto mb-3 space-y-3 rounded-md border border-orange-300 bg-orange-50 p-3">
+                <p className="text-center text-xs font-medium text-orange-800">
+                  Masuk atau daftar untuk melihat harga eksklusif Anda
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Link to="/masuk">
+                    <Button className="h-9 w-full bg-orange-500 text-xs text-white hover:bg-orange-600">
+                      Masuk
+                    </Button>
+                  </Link>
+                  <Link to="/daftar">
+                    <Button
+                      variant="outline"
+                      className="h-9 w-full border-orange-500 text-xs text-orange-600 hover:bg-orange-50"
+                    >
+                      Daftar
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-auto mb-3 rounded-md border border-orange-300 bg-orange-50 p-3">
+                <p className="text-center text-xs font-semibold text-orange-900">
+                  Akun Anda sedang ditinjau
+                </p>
+                <p className="mt-1 text-center text-[11px] leading-relaxed text-orange-800">
+                  Harga akan tersedia setelah akun disetujui. Biasanya 1-2 hari kerja.
+                </p>
+              </div>
+            )}
 
             <Link
               to={`/produk/${generateProductSlug(product)}`}
@@ -445,6 +497,8 @@ const ProductCard = React.memo(
 
           {/* Product Info Section */}
           <div className="p-3 flex-1 flex flex-col">
+            <ProductTypeBadge product={product} />
+
             {/* Brand Name */}
             {product.brand &&
               product.brand !== "unknown" &&
@@ -484,7 +538,7 @@ const ProductCard = React.memo(
               <div className="mb-1 -mx-3 px-3 py-1.5 bg-orange-50">
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-gray-600">
-                    {lang === "id" ? "Distributor" : "Distributor"}
+                    {priceLabel}
                   </span>
                   <span className="text-sm font-bold text-orange-600">
                     {formatIDR(basePrice)}
@@ -581,8 +635,10 @@ const ProductCard = React.memo(
           </div>
         </div>
 
-        {/* Product Info Section */}
+          {/* Product Info Section */}
         <div className="p-3 flex-1 flex flex-col">
+          <ProductTypeBadge product={product} />
+
           {/* Brand Name */}
           {product.brand &&
             product.brand !== "unknown" &&
@@ -620,7 +676,7 @@ const ProductCard = React.memo(
             <div className="mb-1 -mx-3 px-3 py-1.5 bg-orange-50">
               <div className="flex justify-between items-center">
                 <span className="text-xs text-gray-600">
-                  {lang === "id" ? "Distributor" : "Distributor"}
+                  {priceLabel}
                 </span>
                 <span className="text-sm font-bold text-orange-600">
                   {formatIDR(basePrice)}
@@ -2372,7 +2428,7 @@ export default function DaftarProduk() {
                   size="sm"
                   onClick={exportFilteredCatalog}
                   disabled={!distributorAccess.canDownloadCatalog}
-                  className="flex items-center gap-2"
+                  className="hidden sm:flex items-center gap-2"
                 >
                   <svg
                     className="w-4 h-4"
@@ -2450,7 +2506,7 @@ export default function DaftarProduk() {
         )}
 
         <div ref={ref} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {loading || isFilterLoading
               ? // Show skeleton loading cards
                 Array.from({ length: 12 }).map((_, index) => (

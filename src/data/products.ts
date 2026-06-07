@@ -33,6 +33,7 @@ export type ProductVariant = {
 export type Product = {
   id: string;
   category: string;
+  product_type?: "FMCG" | "BPC" | "Bundle" | string;
   brand: string;
   name: string;
   size: string;
